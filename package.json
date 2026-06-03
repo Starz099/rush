@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "pnpm exec tauri dev",
-    "build": "pnpm exec tauri build",
+    "dev": "pnpm tauri dev",
+    "build": "pnpm tauri build",
     "format": "prettier --write ."
   },
   "keywords": [],
