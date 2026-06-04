@@ -1,9 +1,9 @@
-import { RESOLUTIONS, FPS_OPTIONS } from '@/constants/project'
-import type { Project as ProjectBinding } from '@/api/bindings'
-
-export type ResolutionValue = (typeof RESOLUTIONS)[number]['value']
-export type ProjectWidth = (typeof RESOLUTIONS)[number]['width']
-export type ProjectHeight = (typeof RESOLUTIONS)[number]['height']
-export type FPSValue = `${(typeof FPS_OPTIONS)[number]}`
+import type {
+  Project as ProjectBinding,
+  ResolutionPreset,
+  FpsPreset,
+} from '@/api/bindings'
 
 export type Project = ProjectBinding
+export type ResolutionValue = ResolutionPreset
+export type FPSValue = FpsPreset

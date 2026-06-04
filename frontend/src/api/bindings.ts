@@ -4,13 +4,15 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	createProject: (name: string, width: number, height: number, fps: number) => typedError<Project, string>(__TAURI_INVOKE("create_project", { name, width, height, fps })),
+	createProject: (name: string, resolution: ResolutionPreset, fps: FpsPreset) => typedError<Project, string>(__TAURI_INVOKE("create_project", { name, resolution, fps })),
 	getProjects: () => typedError<Project[], string>(__TAURI_INVOKE("get_projects")),
 	deleteProject: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_project", { id })),
 	updateProjectName: (id: string, newName: string) => typedError<null, string>(__TAURI_INVOKE("update_project_name", { id, newName })),
 };
 
 /* Types */
+export type FpsPreset = "15" | "30" | "60";
+
 export type Project = {
 	id: string,
 	name: string,
@@ -20,6 +22,8 @@ export type Project = {
 	created_at: string,
 	updated_at: string,
 };
+
+export type ResolutionPreset = "1080p" | "4k" | "vertical";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

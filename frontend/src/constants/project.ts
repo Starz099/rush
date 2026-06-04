@@ -1,4 +1,11 @@
-export const RESOLUTIONS = [
+import type { ResolutionValue, FPSValue } from '@/types/project'
+
+export const RESOLUTIONS: {
+  label: string
+  value: ResolutionValue
+  width: number
+  height: number
+}[] = [
   { label: '1080p (16:9)', value: '1080p', width: 1920, height: 1080 },
   { label: '4K UHD (16:9)', value: '4k', width: 3840, height: 2160 },
   {
@@ -7,13 +14,15 @@ export const RESOLUTIONS = [
     width: 1080,
     height: 1920,
   },
-] as const
+]
 
-export const FPS_OPTIONS = [24, 30, 60] as const
+export const FPS_OPTIONS: { label: string; value: FPSValue }[] = [
+  { label: '15 FPS', value: '15' },
+  { label: '30 FPS', value: '30' },
+  { label: '60 FPS', value: '60' },
+]
 
 export const DEFAULT_PROJECT_CONFIG = {
-  RESOLUTION: '1080p',
-  WIDTH: 1920,
-  HEIGHT: 1080,
-  FPS: '30',
+  RESOLUTION: '1080p' as ResolutionValue,
+  FPS: '30' as FPSValue,
 } as const

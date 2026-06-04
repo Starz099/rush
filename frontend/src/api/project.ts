@@ -1,12 +1,13 @@
 import { commands } from './bindings'
-import type { Project } from '@/types/project'
+import type { Project, ResolutionValue, FPSValue } from '@/types/project'
 
 /**
  * Helper to unwrap specta responses.
- * If status is "error", it throws the error string so the UI can catch it.
  */
 const unwrap = async <T>(
-  promise: Promise<{ status: 'ok'; data: T } | { status: 'error'; error: string }>,
+  promise: Promise<
+    { status: 'ok'; data: T } | { status: 'error'; error: string }
+  >,
 ): Promise<T> => {
   const result = await promise
   if (result.status === 'ok') return result.data
@@ -14,8 +15,11 @@ const unwrap = async <T>(
 }
 
 export const projectApi = {
-  create: (name: string, width: number, height: number, fps: number): Promise<Project> =>
-    unwrap(commands.createProject(name, width, height, fps)),
+  create: (
+    name: string,
+    resolution: ResolutionValue,
+    fps: FPSValue,
+  ): Promise<Project> => unwrap(commands.createProject(name, resolution, fps)),
 
   getAll: (): Promise<Project[]> => unwrap(commands.getProjects()),
 

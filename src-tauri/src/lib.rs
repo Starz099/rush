@@ -1,21 +1,21 @@
 mod commands;
 mod db;
+mod models;
 mod state;
 
+use specta_typescript::Typescript;
 use state::AppState;
 use tauri::Manager;
 use tauri_specta::collect_commands;
-use specta_typescript::Typescript;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(collect_commands![
-            commands::project::create_project,
-            commands::project::get_projects,
-            commands::project::delete_project,
-            commands::project::update_project_name
-        ]);
+    let builder = tauri_specta::Builder::<tauri::Wry>::new().commands(collect_commands![
+        commands::project::create_project,
+        commands::project::get_projects,
+        commands::project::delete_project,
+        commands::project::update_project_name
+    ]);
 
     #[cfg(debug_assertions)]
     builder
@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn export_bindings() {
-        let builder = tauri_specta::Builder::<tauri::NoopRuntime>::new().commands(collect_commands![
+        let builder = tauri_specta::Builder::<tauri::Wry>::new().commands(collect_commands![
             commands::project::create_project,
             commands::project::get_projects,
             commands::project::delete_project,

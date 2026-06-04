@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DotsThreeVerticalIcon,
   PlayIcon,
   PlusIcon,
   TrashIcon,
   PencilSimpleIcon,
-  ShareIcon,
 } from '@phosphor-icons/react'
 
 import { Button } from '@/components/ui/button'
@@ -34,72 +34,44 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { projectApi } from '@/api/project'
+import { useProjectStore } from '@/store/projectStore'
 import {
   RESOLUTIONS,
   FPS_OPTIONS,
   DEFAULT_PROJECT_CONFIG,
 } from '@/constants/project'
-import type {
-  Project,
-  ResolutionValue,
-  ProjectWidth,
-  ProjectHeight,
-  FPSValue,
-} from '@/types/project'
+import type { Project, ResolutionValue, FPSValue } from '@/types/project'
 
 const Home = () => {
+  const navigate = useNavigate()
+  // Store state and actions
+  const projects = useProjectStore((state) => state.projects)
+  const fetchProjects = useProjectStore((state) => state.fetchProjects)
+  const createProject = useProjectStore((state) => state.createProject)
+  const deleteProject = useProjectStore((state) => state.deleteProject)
+  const renameProject = useProjectStore((state) => state.renameProject)
+  const setActiveProject = useProjectStore((state) => state.setActiveProject)
+
   const [isOpen, setIsOpen] = useState(false)
-  const [projects, setProjects] = useState<Project[]>([])
   const [projectName, setProjectName] = useState('')
   const [resolution, setResolution] = useState<ResolutionValue>(
     DEFAULT_PROJECT_CONFIG.RESOLUTION,
   )
-  const [width, setWidth] = useState<ProjectWidth>(DEFAULT_PROJECT_CONFIG.WIDTH)
-  const [height, setHeight] = useState<ProjectHeight>(
-    DEFAULT_PROJECT_CONFIG.HEIGHT,
-  )
   const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS)
 
-  // Rename state
   const [isRenameOpen, setIsRenameOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
-
-  // Delete state
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
 
-  const applyResolutionPreset = (val: string) => {
-    const preset = RESOLUTIONS.find((r) => r.value === val)
-    if (preset) {
-      setResolution(preset.value)
-      setWidth(preset.width)
-      setHeight(preset.height)
-    }
-  }
-
-  const fetchProjects = useCallback(async () => {
-    try {
-      const projectsData = await projectApi.getAll()
-      setProjects(projectsData)
-    } catch (error) {
-      console.error('Failed to fetch projects:', error)
-    }
-  }, [])
-
   const handleCreate = async () => {
     try {
-      await projectApi.create(projectName, width, height, parseInt(fps))
+      await createProject(projectName, resolution, fps)
       setIsOpen(false)
-      // Reset form
       setProjectName('')
       setResolution(DEFAULT_PROJECT_CONFIG.RESOLUTION)
-      setWidth(DEFAULT_PROJECT_CONFIG.WIDTH)
-      setHeight(DEFAULT_PROJECT_CONFIG.HEIGHT)
       setFps(DEFAULT_PROJECT_CONFIG.FPS)
-      // Refresh list
-      fetchProjects()
     } catch (error) {
       console.error('Failed to create project:', error)
     }
@@ -108,9 +80,8 @@ const Home = () => {
   const handleRename = async () => {
     if (!editingProject) return
     try {
-      await projectApi.updateName(editingProject.id, newProjectName)
+      await renameProject(editingProject.id, newProjectName)
       setIsRenameOpen(false)
-      fetchProjects()
     } catch (error) {
       console.error('Failed to rename project:', error)
     }
@@ -119,9 +90,8 @@ const Home = () => {
   const handleDelete = async () => {
     if (!deletingProject) return
     try {
-      await projectApi.delete(deletingProject.id)
+      await deleteProject(deletingProject.id)
       setIsDeleteOpen(false)
-      fetchProjects()
     } catch (error) {
       console.error('Failed to delete project:', error)
     }
@@ -161,7 +131,9 @@ const Home = () => {
                   <Label htmlFor="resolution">Resolution</Label>
                   <Select
                     value={resolution}
-                    onValueChange={applyResolutionPreset}
+                    onValueChange={(val) =>
+                      setResolution(val as ResolutionValue)
+                    }
                   >
                     <SelectTrigger id="resolution">
                       <SelectValue placeholder="Select resolution" />
@@ -187,8 +159,8 @@ const Home = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {FPS_OPTIONS.map((option) => (
-                        <SelectItem key={option} value={option.toString()}>
-                          {option} FPS
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -254,6 +226,10 @@ const Home = () => {
                   aria-label={`Open ${project.name}`}
                   size="icon-sm"
                   variant="ghost"
+                  onClick={() => {
+                    setActiveProject(project)
+                    navigate('/workspace')
+                  }}
                 >
                   <PlayIcon weight="regular" className="translate-x-[0.5px]" />
                 </Button>

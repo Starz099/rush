@@ -1,4 +1,5 @@
 use crate::db::models::project::Project;
+use crate::models::{FpsPreset, ResolutionPreset};
 use crate::state::AppState;
 use tauri::State;
 use uuid::Uuid;
@@ -8,18 +9,19 @@ use uuid::Uuid;
 pub fn create_project(
     state: State<'_, AppState>,
     name: String,
-    width: i32,
-    height: i32,
-    fps: i32,
+    resolution: ResolutionPreset,
+    fps: FpsPreset,
 ) -> Result<Project, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
     let id = Uuid::new_v4().to_string();
+    let (width, height) = resolution.dimensions();
+    let fps_val = fps.value();
 
     db.execute(
         "INSERT INTO projects (id, name, viewport_width, viewport_height, framerate) 
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&id, &name, &width, &height, &fps),
+        (&id, &name, &width, &height, &fps_val),
     )
     .map_err(|e| e.to_string())?;
 
