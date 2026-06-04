@@ -7,7 +7,7 @@ const Router = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/workspace" element={<Workspace />} />
+        <Route path="/workspace/:projectId" element={<Workspace />} />
       </Routes>
     </BrowserRouter>
   )

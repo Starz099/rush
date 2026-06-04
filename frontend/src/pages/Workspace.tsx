@@ -1,59 +1,158 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useProjectStore } from '@/store/projectStore'
-import { Button } from '@/components/ui/button'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
+import type { Project } from '@/types/project'
+import { projectApi } from '@/api/project'
 import { CaretLeftIcon } from '@phosphor-icons/react'
+import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 const Workspace = () => {
   const navigate = useNavigate()
+  const { projectId } = useParams<{ projectId: string }>()
   const activeProject = useProjectStore((state) => state.activeProject)
+  const setActiveProject = useProjectStore((state) => state.setActiveProject)
+  const [project, setProject] = useState<Project | null>(activeProject)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!activeProject) {
+    if (!projectId) {
       navigate('/')
+      return
     }
-  }, [activeProject, navigate])
 
-  if (!activeProject) return null
+    let isMounted = true
+
+    const loadProject = async () => {
+      setIsLoading(true)
+
+      try {
+        const loadedProject = await projectApi.getById(projectId)
+
+        if (!isMounted) return
+
+        setProject(loadedProject)
+        setActiveProject(loadedProject)
+      } catch (error) {
+        if (!isMounted) return
+
+        console.error('Failed to load project:', error)
+        navigate('/')
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadProject()
+
+    return () => {
+      isMounted = false
+    }
+  }, [navigate, projectId, setActiveProject])
+
+  if (isLoading || !project) {
+    return (
+      <div className="bg-background text-foreground flex h-screen items-center justify-center">
+        Loading workspace...
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-background text-foreground flex h-screen flex-col">
+    <div className="bg-background text-foreground flex h-screen flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex h-12 items-center justify-between border-b px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
+            className="size-8"
             onClick={() => navigate('/')}
             title="Back to Home"
           >
             <CaretLeftIcon weight="bold" />
           </Button>
-          <div className="bg-border h-4 w-[1px]" />
-          <h1 className="text-sm font-medium">{activeProject.name}</h1>
-          <span className="text-muted-foreground text-[10px] tracking-widest uppercase">
-            {activeProject.viewport_width}x{activeProject.viewport_height} @{' '}
-            {activeProject.framerate}fps
-          </span>
+          <Separator orientation="vertical" className="h-4" />
+          <h1 className="text-sm font-medium">{project.name}</h1>
+          <Badge variant="outline" className="h-5 py-0 text-[10px]">
+            {project.viewport_width}x{project.viewport_height} @{' '}
+            {project.framerate}fps
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline">
+            Export
+          </Button>
+          <Button size="sm">Save</Button>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex flex-1 items-center justify-center overflow-hidden p-8">
-        <div className="text-center">
-          <h2 className="mb-2 text-2xl font-bold">Workspace initialized</h2>
-          <p className="text-muted-foreground">
-            Project:{' '}
-            <span className="text-foreground">{activeProject.name}</span>
-          </p>
-          <p className="text-muted-foreground">
-            ID:{' '}
-            <span className="text-foreground font-mono text-xs">
-              {activeProject.id}
-            </span>
-          </p>
-        </div>
-      </main>
+      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+        {/* Left Sidebar */}
+        <ResizablePanel maxSize={15} className="border-r">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b p-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Assets
+              </h2>
+            </div>
+            <div className="flex-1 p-4">
+              <p className="text-muted-foreground text-sm">
+                Asset list will go here...
+              </p>
+            </div>
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle />
+
+        {/* Center Content */}
+        <ResizablePanel maxSize={60} className="flex flex-col bg-black/10">
+          <ResizablePanelGroup orientation="vertical" className="flex-1">
+            <ResizablePanel maxSize={60} className="border-b">
+              <div className="flex items-center justify-center">
+                <div className="flex aspect-video w-[80%] items-center justify-center bg-black text-white/20 shadow-2xl">
+                  Preview Canvas
+                </div>
+              </div>
+            </ResizablePanel>
+            <ResizablePanel maxSize={40} className="border-t">
+              <div className="flex items-center justify-center">
+                <div className="flex h-24 w-[80%] items-center justify-center bg-white/10 text-white/20 shadow-inner">
+                  Timeline
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+
+        <ResizableHandle />
+
+        {/* Right Sidebar */}
+        <ResizablePanel maxSize={25} className="border-l">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b p-3">
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Properties
+              </h2>
+            </div>
+            <div className="flex-1 p-4">
+              <p className="text-muted-foreground text-sm">
+                Properties will go here...
+              </p>
+            </div>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }

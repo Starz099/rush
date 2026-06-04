@@ -23,6 +23,8 @@ export const projectApi = {
 
   getAll: (): Promise<Project[]> => unwrap(commands.getProjects()),
 
+  getById: (id: string): Promise<Project> => unwrap(commands.getProject(id)),
+
   delete: async (id: string): Promise<void> => {
     await unwrap(commands.deleteProject(id))
   },

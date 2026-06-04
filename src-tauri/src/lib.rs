@@ -13,6 +13,7 @@ pub fn run() {
     let builder = tauri_specta::Builder::<tauri::Wry>::new().commands(collect_commands![
         commands::project::create_project,
         commands::project::get_projects,
+        commands::project::get_project,
         commands::project::delete_project,
         commands::project::update_project_name
     ]);
@@ -49,6 +50,7 @@ mod tests {
         let builder = tauri_specta::Builder::<tauri::Wry>::new().commands(collect_commands![
             commands::project::create_project,
             commands::project::get_projects,
+            commands::project::get_project,
             commands::project::delete_project,
             commands::project::update_project_name
         ]);

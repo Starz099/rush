@@ -228,7 +228,7 @@ const Home = () => {
                   variant="ghost"
                   onClick={() => {
                     setActiveProject(project)
-                    navigate('/workspace')
+                    navigate(`/workspace/${project.id}`)
                   }}
                 >
                   <PlayIcon weight="regular" className="translate-x-[0.5px]" />
