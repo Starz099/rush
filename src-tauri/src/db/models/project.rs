@@ -1,7 +1,7 @@
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct Project {
     pub id: String,
     pub name: String,

@@ -25,3 +25,6 @@ tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
 rusqlite = { version = "0.40.0", features = ["bundled"] }
 uuid = { version = "1.20.0", features = ["v4"] }
+specta = { version = "2.0.0-rc.20", features = ["derive"] }
+tauri-specta = { version = "2.0.0-rc.15", features = ["javascript", "typescript"] }
+specta-typescript = "0.0.12"

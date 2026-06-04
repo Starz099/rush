@@ -1,24 +1,29 @@
-import { invoke } from '@tauri-apps/api/core'
+import { commands } from './bindings'
 import type { Project } from '@/types/project'
 
+/**
+ * Helper to unwrap specta responses.
+ * If status is "error", it throws the error string so the UI can catch it.
+ */
+const unwrap = async <T>(
+  promise: Promise<{ status: 'ok'; data: T } | { status: 'error'; error: string }>,
+): Promise<T> => {
+  const result = await promise
+  if (result.status === 'ok') return result.data
+  throw new Error(result.error)
+}
+
 export const projectApi = {
-  create: (
-    name: string,
-    width: number,
-    height: number,
-    fps: number,
-  ): Promise<Project> =>
-    invoke('create_project', {
-      name,
-      width,
-      height,
-      fps,
-    }),
+  create: (name: string, width: number, height: number, fps: number): Promise<Project> =>
+    unwrap(commands.createProject(name, width, height, fps)),
 
-  getAll: (): Promise<Project[]> => invoke('get_projects'),
+  getAll: (): Promise<Project[]> => unwrap(commands.getProjects()),
 
-  delete: (id: string): Promise<void> => invoke('delete_project', { id }),
+  delete: async (id: string): Promise<void> => {
+    await unwrap(commands.deleteProject(id))
+  },
 
-  updateName: (id: string, name: string): Promise<void> =>
-    invoke('update_project_name', { id, name }),
+  updateName: async (id: string, name: string): Promise<void> => {
+    await unwrap(commands.updateProjectName(id, name))
+  },
 }

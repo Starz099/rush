@@ -61,6 +61,15 @@ const Home = () => {
   )
   const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS)
 
+  // Rename state
+  const [isRenameOpen, setIsRenameOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [newProjectName, setNewProjectName] = useState('')
+
+  // Delete state
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+
   const applyResolutionPreset = (val: string) => {
     const preset = RESOLUTIONS.find((r) => r.value === val)
     if (preset) {
@@ -93,6 +102,28 @@ const Home = () => {
       fetchProjects()
     } catch (error) {
       console.error('Failed to create project:', error)
+    }
+  }
+
+  const handleRename = async () => {
+    if (!editingProject) return
+    try {
+      await projectApi.updateName(editingProject.id, newProjectName)
+      setIsRenameOpen(false)
+      fetchProjects()
+    } catch (error) {
+      console.error('Failed to rename project:', error)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletingProject) return
+    try {
+      await projectApi.delete(deletingProject.id)
+      setIsDeleteOpen(false)
+      fetchProjects()
+    } catch (error) {
+      console.error('Failed to delete project:', error)
     }
   }
 
@@ -168,6 +199,51 @@ const Home = () => {
             </DialogContent>
           </Dialog>
 
+          {/* Rename Project Dialog */}
+          <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Rename Project</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="rename-name">New Project Name</Label>
+                  <Input
+                    id="rename-name"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                  />
+                </div>
+              </div>
+              <Button onClick={handleRename}>Save Changes</Button>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Delete Project</DialogTitle>
+              </DialogHeader>
+              <div className="text-muted-foreground py-4 text-sm">
+                Are you sure you want to delete{' '}
+                <span className="text-foreground font-semibold">
+                  {deletingProject?.name}
+                </span>
+                ? This action cannot be undone.
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setIsDeleteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleDelete}>
+                  Delete Project
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <div className="flex flex-col">
             {projects.map((project) => (
               <div
@@ -208,15 +284,23 @@ const Home = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditingProject(project)
+                        setNewProjectName(project.name)
+                        setIsRenameOpen(true)
+                      }}
+                    >
                       <PencilSimpleIcon data-icon="inline-start" />
-                      Edit
+                      Rename
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <ShareIcon data-icon="inline-start" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => {
+                        setDeletingProject(project)
+                        setIsDeleteOpen(true)
+                      }}
+                    >
                       <TrashIcon data-icon="inline-start" />
                       Delete
                     </DropdownMenuItem>

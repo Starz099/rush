@@ -4,6 +4,7 @@ use tauri::State;
 use uuid::Uuid;
 
 #[tauri::command]
+#[specta::specta]
 pub fn create_project(
     state: State<'_, AppState>,
     name: String,
@@ -35,6 +36,7 @@ pub fn create_project(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
@@ -58,6 +60,7 @@ pub fn get_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_project(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
@@ -70,6 +73,7 @@ pub fn delete_project(state: State<'_, AppState>, id: String) -> Result<(), Stri
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn update_project_name(
     state: State<'_, AppState>,
     id: String,

@@ -4,9 +4,24 @@ mod state;
 
 use state::AppState;
 use tauri::Manager;
+use tauri_specta::collect_commands;
+use specta_typescript::Typescript;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            commands::project::create_project,
+            commands::project::get_projects,
+            commands::project::delete_project,
+            commands::project::update_project_name
+        ]);
+
+    #[cfg(debug_assertions)]
+    builder
+        .export(Typescript::default(), "../frontend/src/api/bindings.ts")
+        .expect("Failed to export specta bindings");
+
     tauri::Builder::default()
         .setup(|app| {
             let app_data_dir = app
@@ -20,12 +35,26 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(builder.invoke_handler())
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_bindings() {
+        let builder = tauri_specta::Builder::<tauri::NoopRuntime>::new().commands(collect_commands![
             commands::project::create_project,
             commands::project::get_projects,
             commands::project::delete_project,
             commands::project::update_project_name
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        ]);
+
+        builder
+            .export(Typescript::default(), "../frontend/src/api/bindings.ts")
+            .expect("Failed to export specta bindings");
+    }
 }
