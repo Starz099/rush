@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   DotsThreeVerticalIcon,
   PlayIcon,
@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react'
 
 import { Button } from '@/components/ui/button'
+import { BackgroundBeams } from '@/components/ui/background-beams'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -33,62 +34,76 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const projects = [
-  { title: 'Summer Travel Vlog', meta: 'Edited 2 hours ago · 4:32' },
-  { title: 'Product Launch Teaser', meta: 'Edited yesterday · 1:08' },
-  { title: 'Podcast Episode 14', meta: 'Edited 3 days ago · 52:17' },
-]
-
-const resolutions = [
-  { label: '1080p (16:9)', value: '1080p', width: 1920, height: 1080 },
-  { label: '4K UHD (16:9)', value: '4k', width: 3840, height: 2160 },
-  {
-    label: 'Vertical / Shorts (9:16)',
-    value: 'vertical',
-    width: 1080,
-    height: 1920,
-  },
-]
-
-const fps_options = [24, 30, 60]
+import { projectApi } from '@/api/project'
+import {
+  RESOLUTIONS,
+  FPS_OPTIONS,
+  DEFAULT_PROJECT_CONFIG,
+} from '@/constants/project'
+import type {
+  Project,
+  ResolutionValue,
+  ProjectWidth,
+  ProjectHeight,
+  FPSValue,
+} from '@/types/project'
 
 const Home = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
   const [projectName, setProjectName] = useState('')
-  const [resolution, setResolution] = useState('1080p')
-  const [width, setWidth] = useState(1920)
-  const [height, setHeight] = useState(1080)
-  const [fps, setFps] = useState('30')
+  const [resolution, setResolution] = useState<ResolutionValue>(
+    DEFAULT_PROJECT_CONFIG.RESOLUTION,
+  )
+  const [width, setWidth] = useState<ProjectWidth>(DEFAULT_PROJECT_CONFIG.WIDTH)
+  const [height, setHeight] = useState<ProjectHeight>(
+    DEFAULT_PROJECT_CONFIG.HEIGHT,
+  )
+  const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS)
 
-  const handleResolutionChange = (val: string) => {
-    setResolution(val)
-    const preset = resolutions.find((r) => r.value === val)
-    if (preset && val !== 'custom') {
+  const applyResolutionPreset = (val: string) => {
+    const preset = RESOLUTIONS.find((r) => r.value === val)
+    if (preset) {
+      setResolution(preset.value)
       setWidth(preset.width)
       setHeight(preset.height)
     }
   }
 
-  const handleCreate = () => {
-    console.log('Creating project:', {
-      projectName,
-      resolution,
-      width,
-      height,
-      fps,
-    })
-    setIsOpen(false)
-    // Reset form
-    setProjectName('')
-    setResolution('1080p')
-    setWidth(1920)
-    setHeight(1080)
-    setFps('30')
+  const fetchProjects = useCallback(async () => {
+    try {
+      const projectsData = await projectApi.getAll()
+      setProjects(projectsData)
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+    }
+  }, [])
+
+  const handleCreate = async () => {
+    try {
+      await projectApi.create(projectName, width, height, parseInt(fps))
+      setIsOpen(false)
+      // Reset form
+      setProjectName('')
+      setResolution(DEFAULT_PROJECT_CONFIG.RESOLUTION)
+      setWidth(DEFAULT_PROJECT_CONFIG.WIDTH)
+      setHeight(DEFAULT_PROJECT_CONFIG.HEIGHT)
+      setFps(DEFAULT_PROJECT_CONFIG.FPS)
+      // Refresh list
+      fetchProjects()
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    }
   }
 
+  useEffect(() => {
+    fetchProjects()
+  }, [fetchProjects])
+
   return (
-    <div className="bg-background text-foreground flex h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-[400px]">
+    <div className="bg-background text-foreground relative flex h-screen items-center justify-center overflow-hidden p-4">
+      <BackgroundBeams />
+      <Card className="relative z-10 w-full max-w-[400px]">
         <CardContent className="flex flex-col gap-5 p-4">
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
@@ -115,13 +130,13 @@ const Home = () => {
                   <Label htmlFor="resolution">Resolution</Label>
                   <Select
                     value={resolution}
-                    onValueChange={handleResolutionChange}
+                    onValueChange={applyResolutionPreset}
                   >
                     <SelectTrigger id="resolution">
                       <SelectValue placeholder="Select resolution" />
                     </SelectTrigger>
                     <SelectContent>
-                      {resolutions.map((r) => (
+                      {RESOLUTIONS.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
                           {r.label}
                         </SelectItem>
@@ -132,12 +147,15 @@ const Home = () => {
 
                 <div className="grid gap-2">
                   <Label htmlFor="fps">Framerate (FPS)</Label>
-                  <Select value={fps} onValueChange={setFps}>
+                  <Select
+                    value={fps}
+                    onValueChange={(val) => setFps(val as FPSValue)}
+                  >
                     <SelectTrigger id="fps">
                       <SelectValue placeholder="Select framerate" />
                     </SelectTrigger>
                     <SelectContent>
-                      {fps_options.map((option) => (
+                      {FPS_OPTIONS.map((option) => (
                         <SelectItem key={option} value={option.toString()}>
                           {option} FPS
                         </SelectItem>
@@ -153,11 +171,11 @@ const Home = () => {
           <div className="flex flex-col">
             {projects.map((project) => (
               <div
-                key={project.title}
+                key={project.id}
                 className="group hover:bg-muted/60 flex items-center gap-4 px-3 py-4 transition-all duration-100 hover:scale-[1.01]"
               >
                 <Button
-                  aria-label={`Open ${project.title}`}
+                  aria-label={`Open ${project.name}`}
                   size="icon-sm"
                   variant="ghost"
                 >
@@ -166,17 +184,22 @@ const Home = () => {
 
                 <div className="min-w-0 flex-1">
                   <div className="text-foreground truncate text-[15px] leading-5 font-medium">
-                    {project.title}
+                    {project.name}
+                  </div>
+
+                  <div className="text-muted-foreground truncate text-[12px] leading-4">
+                    {project.viewport_width}x{project.viewport_height} @{' '}
+                    {project.framerate} FPS
                   </div>
                   <div className="text-muted-foreground truncate text-[12px] leading-4">
-                    {project.meta}
+                    last updated at: {project.updated_at}
                   </div>
                 </div>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      aria-label={`${project.title} options`}
+                      aria-label={`${project.name} options`}
                       className="group-hover:bg-muted opacity-0 transition-all group-hover:opacity-100"
                       size="icon-sm"
                       variant="ghost"
