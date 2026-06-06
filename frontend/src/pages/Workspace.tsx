@@ -8,6 +8,10 @@ import {
 } from '@/components/ui/resizable'
 import type { Project } from '@/types/project'
 import { projectApi } from '@/api/project'
+import { AssetSidebar } from '@/components/AssetSidebar'
+import { PreviewPanel } from '@/components/PreviewPanel'
+import { TimelinePanel } from '@/components/TimelinePanel'
+import { PropertiesSidebar } from '@/components/PropertiesSidebar'
 import { CaretLeftIcon } from '@phosphor-icons/react'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
@@ -29,7 +33,7 @@ const Workspace = () => {
 
     let isMounted = true
 
-    const loadProject = async () => {
+    const loadData = async () => {
       setIsLoading(true)
 
       try {
@@ -42,7 +46,7 @@ const Workspace = () => {
       } catch (error) {
         if (!isMounted) return
 
-        console.error('Failed to load project:', error)
+        console.error('Failed to load project data:', error)
         navigate('/')
       } finally {
         if (isMounted) {
@@ -51,7 +55,7 @@ const Workspace = () => {
       }
     }
 
-    loadProject()
+    loadData()
 
     return () => {
       isMounted = false
@@ -99,18 +103,7 @@ const Workspace = () => {
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
         {/* Left Sidebar */}
         <ResizablePanel maxSize={15} className="border-r">
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b p-3">
-              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Assets
-              </h2>
-            </div>
-            <div className="flex-1 p-4">
-              <p className="text-muted-foreground text-sm">
-                Asset list will go here...
-              </p>
-            </div>
-          </div>
+          <AssetSidebar projectId={projectId!} />
         </ResizablePanel>
 
         <ResizableHandle />
@@ -119,18 +112,11 @@ const Workspace = () => {
         <ResizablePanel maxSize={60} className="flex flex-col bg-black/10">
           <ResizablePanelGroup orientation="vertical" className="flex-1">
             <ResizablePanel maxSize={60} className="border-b">
-              <div className="flex items-center justify-center">
-                <div className="flex aspect-video w-[80%] items-center justify-center bg-black text-white/20 shadow-2xl">
-                  Preview Canvas
-                </div>
-              </div>
+              <PreviewPanel />
             </ResizablePanel>
+
             <ResizablePanel maxSize={40} className="border-t">
-              <div className="flex items-center justify-center">
-                <div className="flex h-24 w-[80%] items-center justify-center bg-white/10 text-white/20 shadow-inner">
-                  Timeline
-                </div>
-              </div>
+              <TimelinePanel />
             </ResizablePanel>
           </ResizablePanelGroup>
         </ResizablePanel>
@@ -139,18 +125,7 @@ const Workspace = () => {
 
         {/* Right Sidebar */}
         <ResizablePanel maxSize={25} className="border-l">
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b p-3">
-              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Properties
-              </h2>
-            </div>
-            <div className="flex-1 p-4">
-              <p className="text-muted-foreground text-sm">
-                Properties will go here...
-              </p>
-            </div>
-          </div>
+          <PropertiesSidebar />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

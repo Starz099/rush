@@ -18,9 +18,30 @@ export const commands = {
     typedError<null, string>(
       __TAURI_INVOKE('update_project_name', { id, newName }),
     ),
+  registerAsset: (projectId: string, filePath: string) =>
+    typedError<Asset, string>(
+      __TAURI_INVOKE('register_asset', { projectId, filePath }),
+    ),
+  getAssets: (projectId: string) =>
+    typedError<Asset[], string>(__TAURI_INVOKE('get_assets', { projectId })),
+  deleteAsset: (id: string) =>
+    typedError<null, string>(__TAURI_INVOKE('delete_asset', { id })),
+  renameAsset: (id: string, newName: string) =>
+    typedError<null, string>(__TAURI_INVOKE('rename_asset', { id, newName })),
 }
 
 /* Types */
+export type Asset = {
+  id: string
+  project_id: string
+  name: string
+  file_path: string
+  media_type: string
+  thumbnail_path: string | null
+  duration_ms: number | null
+  created_at: string
+}
+
 export type FpsPreset = '15' | '30' | '60'
 
 export type Project = {
