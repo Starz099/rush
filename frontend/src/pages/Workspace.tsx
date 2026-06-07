@@ -22,6 +22,8 @@ const Workspace = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const activeProject = useProjectStore((state) => state.activeProject)
   const setActiveProject = useProjectStore((state) => state.setActiveProject)
+  const fetchAssets = useProjectStore((state) => state.fetchAssets)
+  const saveTimeline = useProjectStore((state) => state.saveTimeline)
   const [project, setProject] = useState<Project | null>(activeProject)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -43,6 +45,7 @@ const Workspace = () => {
 
         setProject(loadedProject)
         setActiveProject(loadedProject)
+        await fetchAssets(projectId)
       } catch (error) {
         if (!isMounted) return
 
@@ -95,7 +98,14 @@ const Workspace = () => {
           <Button size="sm" variant="outline">
             Export
           </Button>
-          <Button size="sm">Save</Button>
+          <Button
+            size="sm"
+            onClick={() =>
+              project && saveTimeline(project.id, project.timeline_state)
+            }
+          >
+            Save
+          </Button>
         </div>
       </header>
 

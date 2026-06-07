@@ -1,3 +1,4 @@
+use crate::db::models::clip::{TimelineState, Track};
 use crate::db::models::project::Project;
 use crate::models::{FpsPreset, ResolutionPreset};
 use crate::state::AppState;
@@ -17,17 +18,36 @@ pub fn create_project(
     let id = Uuid::new_v4().to_string();
     let (width, height) = resolution.dimensions();
     let fps_val = fps.value();
+    
+    let initial_timeline = TimelineState {
+        playhead_position: 0,
+        tracks: vec![
+            Track {
+                id: "video-1".to_string(),
+                name: "Video 1".to_string(),
+                track_type: "video".to_string(),
+                clips: vec![],
+            },
+            Track {
+                id: "audio-1".to_string(),
+                name: "Audio 1".to_string(),
+                track_type: "audio".to_string(),
+                clips: vec![],
+            },
+        ],
+    };
+    let timeline_json = serde_json::to_string(&initial_timeline).map_err(|e| e.to_string())?;
 
     db.execute(
-        "INSERT INTO projects (id, name, viewport_width, viewport_height, framerate) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&id, &name, &width, &height, &fps_val),
+        "INSERT INTO projects (id, name, viewport_width, viewport_height, framerate, timeline_state) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (&id, &name, &width, &height, &fps_val, &timeline_json),
     )
     .map_err(|e| e.to_string())?;
 
     let new_project = db
         .query_row(
-            "SELECT id, name, viewport_width, viewport_height, framerate, created_at, updated_at 
+            "SELECT id, name, viewport_width, viewport_height, framerate, timeline_state, created_at, updated_at 
          FROM projects WHERE id = ?1",
             [&id],
             Project::from_row,
@@ -44,7 +64,7 @@ pub fn get_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> 
 
     let mut stmt = db
         .prepare(
-            "SELECT id, name, viewport_width, viewport_height, framerate, created_at, updated_at 
+            "SELECT id, name, viewport_width, viewport_height, framerate, timeline_state, created_at, updated_at 
          FROM projects ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -68,7 +88,7 @@ pub fn get_project(state: State<'_, AppState>, id: String) -> Result<Project, St
 
     let project = db
         .query_row(
-            "SELECT id, name, viewport_width, viewport_height, framerate, created_at, updated_at 
+            "SELECT id, name, viewport_width, viewport_height, framerate, timeline_state, created_at, updated_at 
          FROM projects WHERE id = ?1",
             [&id],
             Project::from_row,
@@ -107,6 +127,25 @@ pub fn update_project_name(
     .map_err(|e| e.to_string())?;
 
     println!("Updated project name as {} for id: {}", new_name, id);
+
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_project_timeline(
+    state: State<'_, AppState>,
+    id: String,
+    timeline_state: TimelineState,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let timeline_json = serde_json::to_string(&timeline_state).map_err(|e| e.to_string())?;
+
+    db.execute(
+        "UPDATE projects SET timeline_state = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+        (&timeline_json, &id),
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }

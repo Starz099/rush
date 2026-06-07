@@ -5,43 +5,54 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { AssetCell } from './AssetCell'
 import { assetApi } from '@/api/asset'
 import type { Asset } from '@/api/bindings'
+import { convertFileSrc } from '@tauri-apps/api/core'
 
 import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useProjectStore } from '@/store/projectStore'
 
 interface AssetSidebarProps {
   projectId: string
 }
 
 export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
-  const [assets, setAssets] = useState<Asset[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const selectedAsset = useWorkspaceStore((state) => state.selectedAsset)
   const setSelectedAsset = useWorkspaceStore((state) => state.setSelectedAsset)
 
+  const activeProject = useProjectStore((state) => state.activeProject)
+  const assets = useProjectStore((state) => state.assets)
+  const fetchAssets = useProjectStore((state) => state.fetchAssets)
+  const addAsset = useProjectStore((state) => state.addAsset)
+  const removeAsset = useProjectStore((state) => state.removeAsset)
+  const updateAsset = useProjectStore((state) => state.updateAsset)
+  const saveTimeline = useProjectStore((state) => state.saveTimeline)
+
   useEffect(() => {
     let isMounted = true
-
     const loadAssets = async () => {
       setIsLoading(true)
-      try {
-        const loadedAssets = await assetApi.getAll(projectId)
-        if (isMounted) {
-          setAssets(loadedAssets)
-        }
-      } catch (error) {
-        console.error('Failed to load assets:', error)
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
+      await fetchAssets(projectId)
+      if (isMounted) setIsLoading(false)
     }
-
     loadAssets()
     return () => {
       isMounted = false
     }
-  }, [projectId])
+  }, [projectId, fetchAssets])
+
+  const getMediaDuration = (filePath: string): Promise<number | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.onloadedmetadata = () => {
+        resolve(Math.round(video.duration * 1000))
+      }
+      video.onerror = () => {
+        resolve(null)
+      }
+      video.src = convertFileSrc(filePath)
+    })
+  }
 
   const handleAddAsset = async () => {
     const filePath = window.prompt(
@@ -50,8 +61,9 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
     if (!filePath) return
 
     try {
-      const newAsset = await assetApi.register(projectId, filePath)
-      setAssets((prev) => [...prev, newAsset])
+      const duration = await getMediaDuration(filePath)
+      const newAsset = await assetApi.register(projectId, filePath, duration)
+      addAsset(newAsset)
     } catch (error) {
       console.error('Failed to register asset:', error)
       alert('Error registering asset: ' + error)
@@ -61,10 +73,8 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   const handleDeleteAsset = async (assetId: string) => {
     try {
       await assetApi.delete(assetId)
-      setAssets((prev) => prev.filter((asset) => asset.id !== assetId))
-      if (selectedAsset?.id === assetId) {
-        setSelectedAsset(null)
-      }
+      removeAsset(assetId)
+      if (selectedAsset?.id === assetId) setSelectedAsset(null)
     } catch (error) {
       console.error('Failed to delete asset:', error)
       alert('Error deleting asset: ' + error)
@@ -74,20 +84,49 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   const handleRenameAsset = async (asset: Asset) => {
     const newName = window.prompt('Enter new name for asset:', asset.name)
     if (!newName || newName === asset.name) return
-
     try {
       await assetApi.rename(asset.id, newName)
-      const updatedAsset = { ...asset, name: newName }
-      setAssets((prev) =>
-        prev.map((a) => (a.id === asset.id ? updatedAsset : a)),
-      )
-      if (selectedAsset?.id === asset.id) {
-        setSelectedAsset(updatedAsset)
-      }
+      const updated = { ...asset, name: newName }
+      updateAsset(updated)
+      if (selectedAsset?.id === asset.id) setSelectedAsset(updated)
     } catch (error) {
       console.error('Failed to rename asset:', error)
       alert('Error renaming asset: ' + error)
     }
+  }
+
+  const handleAddToTimeline = async (asset: Asset) => {
+    if (!activeProject) return
+    const timeline = activeProject.timeline_state
+    const videoTrack = timeline.tracks.find(
+      (t: any) => t.track_type === 'video',
+    )
+    if (!videoTrack) {
+      alert('Please create a new project to get the default tracks.')
+      return
+    }
+
+    const lastClip = videoTrack.clips[videoTrack.clips.length - 1]
+    const timelineIn = lastClip ? lastClip.timeline_out : 0
+    // Use asset duration or default to 5s (for images/unknowns)
+    const duration = asset.duration_ms || 5000
+    const timelineOut = timelineIn + duration
+
+    const newClip = {
+      id: crypto.randomUUID(),
+      asset_id: asset.id,
+      timeline_in: timelineIn,
+      timeline_out: timelineOut,
+      source_in: 0,
+      source_out: duration,
+    }
+
+    const updatedTracks = timeline.tracks.map((t: any) => {
+      if (t.id === videoTrack.id) return { ...t, clips: [...t.clips, newClip] }
+      return t
+    })
+
+    await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
   }
 
   if (isLoading) {
@@ -136,6 +175,10 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
                 onRename={(e) => {
                   e.stopPropagation()
                   handleRenameAsset(asset)
+                }}
+                onAddToTimeline={(e) => {
+                  e.stopPropagation()
+                  handleAddToTimeline(asset)
                 }}
               />
             ))

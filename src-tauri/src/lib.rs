@@ -16,6 +16,7 @@ pub fn run() {
         commands::project::get_project,
         commands::project::delete_project,
         commands::project::update_project_name,
+        commands::project::save_project_timeline,
         commands::asset::register_asset,
         commands::asset::get_assets,
         commands::asset::delete_asset,

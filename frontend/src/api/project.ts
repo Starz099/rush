@@ -20,4 +20,8 @@ export const projectApi = {
   updateName: async (id: string, name: string): Promise<void> => {
     await unwrap(commands.updateProjectName(id, name))
   },
+
+  saveTimeline: async (id: string, timelineState: any): Promise<void> => {
+    await unwrap(commands.saveProjectTimeline(id, timelineState))
+  },
 }

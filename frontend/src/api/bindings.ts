@@ -18,9 +18,17 @@ export const commands = {
     typedError<null, string>(
       __TAURI_INVOKE('update_project_name', { id, newName }),
     ),
-  registerAsset: (projectId: string, filePath: string) =>
+  saveProjectTimeline: (id: string, timelineState: TimelineState) =>
+    typedError<null, string>(
+      __TAURI_INVOKE('save_project_timeline', { id, timelineState }),
+    ),
+  registerAsset: (
+    projectId: string,
+    filePath: string,
+    durationMs: number | null,
+  ) =>
     typedError<Asset, string>(
-      __TAURI_INVOKE('register_asset', { projectId, filePath }),
+      __TAURI_INVOKE('register_asset', { projectId, filePath, durationMs }),
     ),
   getAssets: (projectId: string) =>
     typedError<Asset[], string>(__TAURI_INVOKE('get_assets', { projectId })),
@@ -42,6 +50,15 @@ export type Asset = {
   created_at: string
 }
 
+export type Clip = {
+  id: string
+  asset_id: string
+  timeline_in: number
+  timeline_out: number
+  source_in: number
+  source_out: number
+}
+
 export type FpsPreset = '15' | '30' | '60'
 
 export type Project = {
@@ -50,11 +67,24 @@ export type Project = {
   viewport_width: number
   viewport_height: number
   framerate: number
+  timeline_state: TimelineState
   created_at: string
   updated_at: string
 }
 
 export type ResolutionPreset = '1080p' | '4k' | 'vertical'
+
+export type TimelineState = {
+  playhead_position: number
+  tracks: Track[]
+}
+
+export type Track = {
+  id: string
+  name: string
+  track_type: string
+  clips: Clip[]
+}
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(

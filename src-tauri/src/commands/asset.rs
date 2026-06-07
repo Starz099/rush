@@ -10,6 +10,7 @@ pub fn register_asset(
     state: State<'_, AppState>,
     project_id: String,
     file_path: String,
+    duration_ms: Option<i32>,
 ) -> Result<Asset, String> {
     let path = Path::new(&file_path);
     if !path.exists() {
@@ -44,9 +45,9 @@ pub fn register_asset(
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
     db.execute(
-        "INSERT INTO assets (id, project_id, name, file_path,  media_type) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&id, &project_id, &file_name, &file_path, &media_type),
+        "INSERT INTO assets (id, project_id, name, file_path, media_type, duration_ms) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (&id, &project_id, &file_name, &file_path, &media_type, &duration_ms),
     )
     .map_err(|e| e.to_string())?;
 

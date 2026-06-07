@@ -20,20 +20,21 @@ pub fn initialize_database(app_data_dir: &Path) -> Connection {
             viewport_width INTEGER DEFAULT 1920,
             viewport_height INTEGER DEFAULT 1080,
             framerate INTEGER DEFAULT 60,
+            timeline_state TEXT DEFAULT '{\"playhead_position\":0,\"tracks\":[]}',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS assets (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        file_path TEXT NOT NULL,
-        media_type TEXT NOT NULL,
-        thumbnail_path TEXT,
-        duration_ms INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            thumbnail_path TEXT,
+            duration_ms INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
         );
         ",
     )

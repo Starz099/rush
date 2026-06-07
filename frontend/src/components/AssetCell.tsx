@@ -6,6 +6,7 @@ import {
   FileIcon,
   TrashIcon,
   PencilSimpleIcon,
+  PlusIcon,
 } from '@phosphor-icons/react'
 
 interface AssetCellProps {
@@ -14,6 +15,7 @@ interface AssetCellProps {
   onClick: () => void
   onDelete: (e: React.MouseEvent) => void
   onRename: (e: React.MouseEvent) => void
+  onAddToTimeline: (e: React.MouseEvent) => void
 }
 
 export const AssetCell = ({
@@ -22,6 +24,7 @@ export const AssetCell = ({
   onClick,
   onDelete,
   onRename,
+  onAddToTimeline,
 }: AssetCellProps) => {
   return (
     <div
@@ -40,6 +43,15 @@ export const AssetCell = ({
       <span className="flex-1 truncate">{asset.name}</span>
 
       <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 text-blue-500 hover:text-blue-600"
+          onClick={onAddToTimeline}
+          title="Add to Timeline"
+        >
+          <PlusIcon weight="bold" className="size-3.5" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
