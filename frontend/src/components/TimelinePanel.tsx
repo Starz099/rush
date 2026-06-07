@@ -105,6 +105,17 @@ export const TimelinePanel = () => {
 
   const timeline = activeProject.timeline_state
 
+  // Calculate total duration for dynamic width
+  const allClips = timeline.tracks.flatMap((t: any) => t.clips)
+  const maxTime = allClips.reduce(
+    (max: number, clip: any) => Math.max(max, clip.timeline_out),
+    0,
+  )
+  // Ensure at least 30 seconds or enough to fit all clips
+  const totalDurationMs = Math.max(maxTime + 5000, 30000)
+  const timelineWidthPx = totalDurationMs / MS_PER_PIXEL
+  const numTicks = Math.ceil(totalDurationMs / TICK_INTERVAL_MS) + 1
+
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineContentRef.current) return
     const rect = timelineContentRef.current.getBoundingClientRect()
@@ -181,12 +192,12 @@ export const TimelinePanel = () => {
             className="relative flex min-h-full flex-col"
             ref={timelineContentRef}
             onClick={handleTimelineClick}
-            style={{ width: '5000px' }} // Temporary large width for scrolling
+            style={{ width: `${timelineWidthPx}px` }}
           >
             {/* Timebar/Ruler */}
             <div className="relative h-6 border-b border-white/5 bg-white/[0.01]">
               {/* Simple markers every few seconds */}
-              {Array.from({ length: 20 }).map((_, i) => (
+              {Array.from({ length: numTicks }).map((_, i) => (
                 <div
                   key={i}
                   className="absolute top-0 bottom-0 border-l border-white/10 pt-1 pl-1 text-[8px] text-white/20"
