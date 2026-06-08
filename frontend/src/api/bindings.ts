@@ -36,6 +36,10 @@ export const commands = {
     typedError<null, string>(__TAURI_INVOKE('delete_asset', { id })),
   renameAsset: (id: string, newName: string) =>
     typedError<null, string>(__TAURI_INVOKE('rename_asset', { id, newName })),
+  readAssetBytes: (filePath: string) =>
+    typedError<number[], string>(
+      __TAURI_INVOKE('read_asset_bytes', { filePath }),
+    ),
 }
 
 /* Types */

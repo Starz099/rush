@@ -9,6 +9,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
+import { useAppStore } from '../store/timelineStore'
 
 interface AssetSidebarProps {
   projectId: string
@@ -26,6 +27,8 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   const removeAsset = useProjectStore((state) => state.removeAsset)
   const updateAsset = useProjectStore((state) => state.updateAsset)
   const saveTimeline = useProjectStore((state) => state.saveTimeline)
+
+  const prepareAsset = useAppStore((state) => state.prepareAsset)
 
   useEffect(() => {
     let isMounted = true
@@ -127,6 +130,7 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
     })
 
     await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
+    void prepareAsset(asset.id, asset.file_path)
   }
 
   if (isLoading) {
