@@ -111,9 +111,11 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
     const lastClip = videoTrack.clips[videoTrack.clips.length - 1]
     const timelineIn = lastClip ? lastClip.timeline_out : 0
-    // Use asset duration or default to 5s (for images/unknowns)
-    const duration = asset.duration_ms || 5000
-    const timelineOut = timelineIn + duration
+    const framerate = activeProject.framerate
+    const durationMs = asset.duration_ms || 5000 // Use asset duration or default to 5s (for images/unknowns)
+    const durationFrames = Math.round((durationMs / 1000) * framerate) // Use asset duration or default to 5s (for images/unknowns)
+
+    const timelineOut = timelineIn + durationFrames
 
     const newClip = {
       id: crypto.randomUUID(),
@@ -121,7 +123,7 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
       timeline_in: timelineIn,
       timeline_out: timelineOut,
       source_in: 0,
-      source_out: duration,
+      source_out: durationFrames,
     }
 
     const updatedTracks = timeline.tracks.map((t: any) => {

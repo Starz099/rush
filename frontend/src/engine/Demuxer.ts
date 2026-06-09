@@ -5,13 +5,33 @@ export class VideoDemuxer {
   private mp4boxfile: any
   private decoder: VideoDecoder
   private filePath: string
+  private renderer?: { draw: (frame: VideoFrame) => void }
   private decoderConfigured = false
+  private disposed = false
 
-  constructor(filePath: string) {
+  private samples: any[] = []
+  private currentSampleIndex = 0
+  private videoTrack: any
+
+  constructor(
+    filePath: string,
+    renderer?: { draw: (frame: VideoFrame) => void },
+  ) {
     this.filePath = filePath
+    this.renderer = renderer
     this.mp4boxfile = MP4Box.createFile()
     this.decoder = new VideoDecoder({
-      output: (frame) => {
+      output: (frame: VideoFrame) => {
+        if (this.disposed) {
+          frame.close()
+          return
+        }
+
+        if (this.renderer) {
+          this.renderer.draw(frame)
+          return
+        }
+
         console.log(
           `Decoded Frame at ${frame.timestamp}ms. Size: ${frame.codedWidth}x${frame.codedHeight}`,
         )
@@ -21,22 +41,27 @@ export class VideoDemuxer {
     })
   }
 
+  public dispose() {
+    this.disposed = true
+    if (this.decoder.state !== 'closed') {
+      this.decoder.close()
+    }
+  }
+
   public async initialize(): Promise<any> {
     return new Promise((resolve, reject) => {
-      let videoTrack: any
-
       // Metadata
       this.mp4boxfile.onReady = (info: any) => {
-        videoTrack = info.videoTracks[0]
-        if (!videoTrack) return reject('No video track found')
+        this.videoTrack = info.videoTracks[0]
+        if (!this.videoTrack) return reject('No video track found')
         // Start extraction
-        this.mp4boxfile.setExtractionOptions(videoTrack.id, null, {
-          nbSamples: 100,
+        this.mp4boxfile.setExtractionOptions(this.videoTrack.id, null, {
+          nbSamples: 180,
         })
         this.mp4boxfile.start()
         // Return basic metadata
         resolve({
-          codec: videoTrack.codec,
+          codec: this.videoTrack.codec,
           timescale: info.timescale,
           duration: info.duration,
         })
@@ -48,38 +73,48 @@ export class VideoDemuxer {
         _user: any,
         samples: any[],
       ) => {
-        // Decode
-        for (const sample of samples) {
-          if (!this.decoderConfigured) {
-            if (!sample.is_sync) {
-              continue
-            }
-
-            this.decoder.configure({
-              codec: videoTrack.codec,
-              codedWidth: videoTrack.video.width,
-              codedHeight: videoTrack.video.height,
-              ...(this.getDecoderDescription(sample) ?? {}),
-            })
-            this.decoderConfigured = true
-          }
-
-          const chunk = new EncodedVideoChunk({
-            type: sample.is_sync ? 'key' : 'delta',
-            timestamp: sample.cts, // The exact time this frame appears
-            duration: sample.duration,
-            data: sample.data, // The raw H.264 binary bytes
-          })
-
-          // Push to decoder
-          this.decoder.decode(chunk)
-        }
+        if (this.disposed) return
+        this.samples.push(...samples)
       }
 
       this.mp4boxfile.onError = (e: string) => reject(e)
 
       this.fetchAndFeed()
     })
+  }
+
+  public decodeNextFrame() {
+    if (this.disposed || this.currentSampleIndex >= this.samples.length) {
+      return
+    }
+
+    const sample = this.samples[this.currentSampleIndex]
+
+    if (!this.decoderConfigured) {
+      if (!sample.is_sync) {
+        this.currentSampleIndex++
+        this.decodeNextFrame() // Skip until first sync frame
+        return
+      }
+
+      this.decoder.configure({
+        codec: this.videoTrack.codec,
+        codedWidth: this.videoTrack.video.width,
+        codedHeight: this.videoTrack.video.height,
+        ...(this.getDecoderDescription(sample) ?? {}),
+      })
+      this.decoderConfigured = true
+    }
+
+    const chunk = new EncodedVideoChunk({
+      type: sample.is_sync ? 'key' : 'delta',
+      timestamp: sample.cts,
+      duration: sample.duration,
+      data: sample.data,
+    })
+
+    this.decoder.decode(chunk)
+    this.currentSampleIndex++
   }
 
   private async fetchAndFeed() {

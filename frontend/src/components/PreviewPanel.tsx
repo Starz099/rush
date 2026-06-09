@@ -1,72 +1,106 @@
 import { useProjectStore } from '@/store/projectStore'
-import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useAppStore } from '@/store/timelineStore'
+import { usePlaybackLoop } from '@/hooks/usePlaybackLoop'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { FileIcon, FilmStripIcon } from '@phosphor-icons/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { VideoDemuxer } from '../engine/Demuxer'
+import { WebGPURenderer } from '../engine/Renderer'
 
 export const PreviewPanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
   const assets = useProjectStore((state) => state.assets)
-  const isPlaying = useWorkspaceStore((state) => state.isPlaying)
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [demuxer, setDemuxer] = useState<VideoDemuxer | null>(null)
 
-  if (!activeProject) return null
+  const playheadPosition = useAppStore((state) => state.playhead_position)
 
-  const timeline = activeProject.timeline_state
-  const videoTrack = timeline.tracks.find((t: any) => t.track_type === 'video')
+  const timeline = activeProject?.timeline_state
+  const videoTrack = timeline?.tracks.find((t: any) => t.track_type === 'video')
 
-  // Find clip at playhead
   const activeClip = videoTrack?.clips.find(
     (clip: any) =>
-      timeline.playhead_position >= clip.timeline_in &&
-      timeline.playhead_position < clip.timeline_out,
+      playheadPosition >= clip.timeline_in &&
+      playheadPosition < clip.timeline_out,
   )
 
   const activeAsset = activeClip
     ? assets.find((a) => a.id === activeClip.asset_id)
     : null
 
+  const previewWidth = activeProject?.viewport_width ?? 1920
+  const previewHeight = activeProject?.viewport_height ?? 1080
+
+  // Attach the engine to the metronome clock
+  usePlaybackLoop(demuxer)
+
   useEffect(() => {
-    if (!videoRef.current || !activeClip) return
-
-    const video = videoRef.current
-    const offset = timeline.playhead_position - activeClip.timeline_in
-    const targetSourceTime = (activeClip.source_in + offset) / 1000 // ms to s
-
-    // Handle Play/Pause
-    if (isPlaying) {
-      if (video.paused) {
-        // Sync time before playing to ensure we start at the right frame
-        video.currentTime = targetSourceTime
-        video.play().catch((e) => console.error('Playback failed', e))
-      } else {
-        // While playing, only force seek if we get too far out of sync (> 100ms)
-        const diff = Math.abs(video.currentTime - targetSourceTime)
-        if (diff > 0.1) {
-          video.currentTime = targetSourceTime
-        }
-      }
-    } else {
-      if (!video.paused) {
-        video.pause()
-      }
-      // Always sync time when paused/scrubbing
-      video.currentTime = targetSourceTime
+    const canvas = canvasRef.current
+    if (!canvas || !activeAsset || activeAsset.media_type !== 'video') {
+      demuxer?.dispose()
+      setDemuxer(null)
+      return
     }
-  }, [timeline.playhead_position, activeClip, isPlaying])
+
+    let cancelled = false
+
+    const initEngine = async () => {
+      try {
+        canvas.width = previewWidth
+        canvas.height = previewHeight
+
+        const renderer = new WebGPURenderer(canvas)
+        await renderer.initialize()
+
+        if (cancelled) return
+
+        const newDemuxer = new VideoDemuxer(activeAsset.file_path, renderer)
+        await newDemuxer.initialize()
+
+        if (cancelled) {
+          newDemuxer.dispose()
+          return
+        }
+
+        setDemuxer(newDemuxer)
+      } catch (error) {
+        console.error('Failed to initialize WebGPU preview:', error)
+      }
+    }
+
+    initEngine()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    activeAsset?.file_path,
+    activeAsset?.id,
+    activeAsset?.media_type,
+    previewWidth,
+    previewHeight,
+  ])
+
+  // Cleanup demuxer on unmount
+  useEffect(() => {
+    return () => {
+      demuxer?.dispose()
+    }
+  }, [demuxer])
+
+  if (!activeProject) return null
 
   return (
-    <div className="flex h-full items-center justify-center bg-black/40 p-4">
-      <div className="relative flex aspect-video w-full max-w-[90%] items-center justify-center overflow-hidden border border-white/5 bg-black text-white/20 shadow-2xl">
+    <div className="flex h-full flex-col bg-black/40 p-4">
+      <div className="relative mx-auto flex aspect-video w-full max-w-[90%] flex-1 items-center justify-center overflow-hidden border border-white/5 bg-black text-white/20 shadow-2xl">
         {activeAsset ? (
           activeAsset.media_type === 'video' ? (
-            <video
-              ref={videoRef}
+            <canvas
+              ref={canvasRef}
               key={activeAsset.id}
-              src={convertFileSrc(activeAsset.file_path)}
               className="h-full w-full object-contain"
-              muted
-              playsInline
+              width={previewWidth}
+              height={previewHeight}
             />
           ) : activeAsset.media_type === 'image' ? (
             <img

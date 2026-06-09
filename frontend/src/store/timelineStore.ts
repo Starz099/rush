@@ -2,15 +2,21 @@ import { create } from 'zustand'
 import { VideoDemuxer } from '../engine/Demuxer'
 
 interface AppState {
-  // Stores metadata about ready assets (codec, etc)
   readyAssets: Record<string, any>
+  isPlaying: boolean
+  playhead_position: number
+  framerate: number
 
-  // The action to trigger the demuxer
   prepareAsset: (assetId: string, filePath: string) => Promise<void>
+  togglePlayback: () => void
+  setPlayhead: (frame: number) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
   readyAssets: {},
+  isPlaying: false,
+  playhead_position: 0,
+  framerate: 60,
 
   prepareAsset: async (assetId, filePath) => {
     console.log(`Demuxing ${assetId}...`)
@@ -30,4 +36,7 @@ export const useAppStore = create<AppState>((set) => ({
       console.error(`Failed to demux ${assetId}:`, error)
     }
   },
+
+  togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  setPlayhead: (frame) => set({ playhead_position: frame }),
 }))
