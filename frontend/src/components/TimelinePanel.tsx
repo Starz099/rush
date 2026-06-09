@@ -1,5 +1,5 @@
 import { useProjectStore } from '@/store/projectStore'
-import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useAppStore } from '@/store/timelineStore'
 import {
   FilmStripIcon,
   SpeakerHighIcon,
@@ -7,17 +7,19 @@ import {
   PauseIcon,
 } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 
-const MS_PER_PIXEL = 40
-const TICK_INTERVAL_MS = 5000
+// Constants for timeline scaling
+const PIXELS_PER_SECOND = 20
+const TICK_INTERVAL_SECONDS = 5 // Mark every 5 seconds
 
 interface TimelineTrackProps {
   track: any
+  framerate: number
 }
 
-const TimelineTrack = ({ track }: TimelineTrackProps) => {
+const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
   return (
     <div className="flex h-16 border-b border-white/5 bg-white/[0.02]">
       {/* Track Content */}
@@ -27,8 +29,8 @@ const TimelineTrack = ({ track }: TimelineTrackProps) => {
             key={clip.id}
             className="absolute top-1 bottom-1 flex items-center justify-center rounded border border-blue-500/50 bg-blue-500/20 px-2 text-[9px] text-blue-200"
             style={{
-              left: `${clip.timeline_in / MS_PER_PIXEL}px`,
-              width: `${(clip.timeline_out - clip.timeline_in) / MS_PER_PIXEL}px`,
+              left: `${(clip.timeline_in / framerate) * PIXELS_PER_SECOND}px`,
+              width: `${((clip.timeline_out - clip.timeline_in) / framerate) * PIXELS_PER_SECOND}px`,
             }}
           >
             {clip.id.slice(0, 4)}
@@ -42,79 +44,29 @@ const TimelineTrack = ({ track }: TimelineTrackProps) => {
 export const TimelinePanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
   const saveTimeline = useProjectStore((state) => state.saveTimeline)
-  const setPlayheadOnly = useProjectStore((state) => state.setPlayheadOnly)
 
-  const isPlaying = useWorkspaceStore((state) => state.isPlaying)
-  const togglePlaying = useWorkspaceStore((state) => state.togglePlaying)
+  const isPlaying = useAppStore((state) => state.isPlaying)
+  const togglePlayback = useAppStore((state) => state.togglePlayback)
+  const playheadPosition = useAppStore((state) => state.playhead_position)
+  const setPlayhead = useAppStore((state) => state.setPlayhead)
+  const framerate = useAppStore((state) => state.framerate)
 
   const timelineContentRef = useRef<HTMLDivElement>(null)
-  const requestRef = useRef<number>(null)
-  const lastTimeRef = useRef<number>(0)
-
-  useEffect(() => {
-    const animate = (time: number) => {
-      if (!lastTimeRef.current) {
-        lastTimeRef.current = time
-      }
-
-      const deltaTime = time - lastTimeRef.current
-      lastTimeRef.current = time
-
-      const state = useProjectStore.getState()
-      const project = state.activeProject
-
-      if (project && isPlaying) {
-        // Find the end of the timeline (max timeline_out across all tracks)
-        const allClips = project.timeline_state.tracks.flatMap(
-          (t: any) => t.clips,
-        )
-        const maxTime = allClips.reduce(
-          (max: number, clip: any) => Math.max(max, clip.timeline_out),
-          0,
-        )
-
-        const currentPos = project.timeline_state.playhead_position
-        const newPosition = currentPos + deltaTime
-
-        if (newPosition >= maxTime && maxTime > 0) {
-          setPlayheadOnly(maxTime)
-          useWorkspaceStore.getState().setIsPlaying(false)
-        } else {
-          setPlayheadOnly(Math.round(newPosition))
-          requestRef.current = requestAnimationFrame(animate)
-        }
-      }
-    }
-
-    if (isPlaying) {
-      lastTimeRef.current = 0
-      requestRef.current = requestAnimationFrame(animate)
-    } else {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current)
-      if (activeProject) {
-        saveTimeline(activeProject.id, activeProject.timeline_state)
-      }
-    }
-
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current)
-    }
-  }, [isPlaying, setPlayheadOnly, saveTimeline])
 
   if (!activeProject) return null
 
   const timeline = activeProject.timeline_state
 
-  // Calculate total duration for dynamic width
+  // Calculate total duration in frames
   const allClips = timeline.tracks.flatMap((t: any) => t.clips)
-  const maxTime = allClips.reduce(
+  const maxFrames = allClips.reduce(
     (max: number, clip: any) => Math.max(max, clip.timeline_out),
     0,
   )
-  // Ensure at least 30 seconds or enough to fit all clips
-  const totalDurationMs = Math.max(maxTime + 5000, 30000)
-  const timelineWidthPx = totalDurationMs / MS_PER_PIXEL
-  const numTicks = Math.ceil(totalDurationMs / TICK_INTERVAL_MS) + 1
+
+  const totalDurationSeconds = Math.max(maxFrames / framerate + 5, 30)
+  const timelineWidthPx = totalDurationSeconds * PIXELS_PER_SECOND
+  const numTicks = Math.ceil(totalDurationSeconds / TICK_INTERVAL_SECONDS) + 1
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineContentRef.current) return
@@ -122,15 +74,30 @@ export const TimelinePanel = () => {
     const x = e.clientX - rect.left
     if (x < 0) return
 
-    const newPosition = Math.round(x * MS_PER_PIXEL)
-    setPlayheadOnly(newPosition)
+    // Convert pixel X to time (seconds) then to frame
+    const timeInSeconds = x / PIXELS_PER_SECOND
+    const newFramePosition = Math.round(timeInSeconds * framerate)
+
+    setPlayhead(newFramePosition)
 
     if (!isPlaying) {
       saveTimeline(activeProject.id, {
         ...timeline,
-        playhead_position: newPosition,
+        playhead_position: newFramePosition,
       })
     }
+  }
+
+  // Format frames to HH:MM:SS:FF or MM:SS:FF
+  const formatTime = (frame: number) => {
+    const totalSeconds = Math.floor(frame / framerate)
+    const f = frame % framerate
+    const s = totalSeconds % 60
+    const m = Math.floor(totalSeconds / 60) % 60
+
+    return `${m.toString().padStart(2, '0')}:${s
+      .toString()
+      .padStart(2, '0')}:${f.toString().padStart(2, '0')}`
   }
 
   return (
@@ -145,7 +112,7 @@ export const TimelinePanel = () => {
             variant="ghost"
             size="icon"
             className="size-6 hover:bg-white/10"
-            onClick={togglePlaying}
+            onClick={togglePlayback}
           >
             {isPlaying ? (
               <PauseIcon weight="fill" className="size-3 text-white" />
@@ -156,10 +123,7 @@ export const TimelinePanel = () => {
         </div>
 
         <div className="text-muted-foreground rounded bg-white/5 px-2 py-0.5 font-mono text-[10px]">
-          {Math.floor(timeline.playhead_position / 1000)}s{' '}
-          <span className="opacity-30">
-            {(timeline.playhead_position % 1000).toString().padStart(3, '0')}ms
-          </span>
+          {formatTime(playheadPosition)}
         </div>
       </div>
 
@@ -201,9 +165,11 @@ export const TimelinePanel = () => {
                 <div
                   key={i}
                   className="absolute top-0 bottom-0 border-l border-white/10 pt-1 pl-1 text-[8px] text-white/20"
-                  style={{ left: `${(i * TICK_INTERVAL_MS) / MS_PER_PIXEL}px` }}
+                  style={{
+                    left: `${i * TICK_INTERVAL_SECONDS * PIXELS_PER_SECOND}px`,
+                  }}
                 >
-                  {Math.floor((i * TICK_INTERVAL_MS) / 1000)}s
+                  {i * TICK_INTERVAL_SECONDS}s
                 </div>
               ))}
             </div>
@@ -211,13 +177,19 @@ export const TimelinePanel = () => {
             {/* Playhead */}
             <div
               className="pointer-events-none absolute top-0 bottom-0 z-10 w-[2px] bg-red-500"
-              style={{ left: `${timeline.playhead_position / MS_PER_PIXEL}px` }}
+              style={{
+                left: `${(playheadPosition / framerate) * PIXELS_PER_SECOND}px`,
+              }}
             >
               <div className="absolute top-0 left-1/2 -translate-x-1/2 border-t-[8px] border-r-[6px] border-l-[6px] border-t-red-500 border-r-transparent border-l-transparent" />
             </div>
 
             {timeline.tracks.map((track: any) => (
-              <TimelineTrack key={track.id} track={track} />
+              <TimelineTrack
+                key={track.id}
+                track={track}
+                framerate={framerate}
+              />
             ))}
 
             {timeline.tracks.length === 0 && (

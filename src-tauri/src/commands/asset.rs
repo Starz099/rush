@@ -47,7 +47,14 @@ pub fn register_asset(
     db.execute(
         "INSERT INTO assets (id, project_id, name, file_path, media_type, duration_ms) 
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (&id, &project_id, &file_name, &file_path, &media_type, &duration_ms),
+        (
+            &id,
+            &project_id,
+            &file_name,
+            &file_path,
+            &media_type,
+            &duration_ms,
+        ),
     )
     .map_err(|e| e.to_string())?;
 
@@ -116,4 +123,10 @@ pub fn rename_asset(
     println!("Renamed asset with id: {}", id);
 
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn read_asset_bytes(file_path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&file_path).map_err(|e| e.to_string())
 }

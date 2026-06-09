@@ -20,7 +20,8 @@ pub fn run() {
         commands::asset::register_asset,
         commands::asset::get_assets,
         commands::asset::delete_asset,
-        commands::asset::rename_asset
+        commands::asset::rename_asset,
+        commands::asset::read_asset_bytes
     ]);
 
     #[cfg(debug_assertions)]
