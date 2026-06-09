@@ -13,6 +13,7 @@ export const PreviewPanel = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [demuxer, setDemuxer] = useState<VideoDemuxer | null>(null)
 
+  const isPlaying = useAppStore((state) => state.isPlaying)
   const playheadPosition = useAppStore((state) => state.playhead_position)
 
   const timeline = activeProject?.timeline_state
@@ -33,6 +34,14 @@ export const PreviewPanel = () => {
 
   // Attach the engine to the metronome clock
   usePlaybackLoop(demuxer)
+
+  useEffect(() => {
+    if (!isPlaying && demuxer && activeClip) {
+      const targetFrame =
+        playheadPosition - activeClip.timeline_in + activeClip.source_in
+      demuxer.seekAndDisplay(targetFrame)
+    }
+  }, [playheadPosition, isPlaying, demuxer, activeClip])
 
   useEffect(() => {
     const canvas = canvasRef.current

@@ -8,28 +8,23 @@ export function usePlaybackLoop(videoEngine: any) {
   const framerate = useAppStore((state) => state.framerate)
   const setPlayhead = useAppStore((state) => state.setPlayhead)
 
-  // Use the active project from projectStore to get tracks/clips
   const activeProject = useProjectStore((state) => state.activeProject)
 
-  // We use refs to avoid re-triggering the useEffect on every frame
   const requestRef = useRef<number>(null)
   const lastTickTime = useRef<number>(performance.now())
+  const lastActiveClipId = useRef<string | null>(null)
   const frameInterval = 1000 / framerate // e.g., 16.66ms for 60fps
 
   useEffect(() => {
     const tick = (currentTime: number) => {
       if (!isPlaying) return
 
-      // Calculate how much time passed since the last render
       const deltaTime = currentTime - lastTickTime.current
 
-      // If enough time has passed to render the next frame (e.g., 16.6ms)
       if (deltaTime >= frameInterval) {
-        // 1. Advance the global Zustand playhead
         const nextPlayhead = useAppStore.getState().playhead_position + 1
         setPlayhead(nextPlayhead)
 
-        // 2. Grab the latest state for math
         const timeline = activeProject?.timeline_state
         const videoTrack = timeline?.tracks.find(
           (t: any) => t.track_type === 'video',
@@ -41,30 +36,33 @@ export function usePlaybackLoop(videoEngine: any) {
         )
 
         if (activeClip && videoEngine) {
-          // 3. Calculate the math (Verify we should still be playing this clip)
           const targetFrame = getSourceFrameForPlayhead(
             nextPlayhead,
             activeClip,
           )
 
           if (targetFrame !== null) {
-            // 4. Tell your WebCodecs engine to decode & draw this specific frame!
-            // NOTE: In V1, we assume sequential decoding for playback.
-            videoEngine.decodeNextFrame()
+            // when clips switch, we need to do a seek to the correct frame. If we're on the same clip, we can just decode the next frame for smoother playback.
+            if (activeClip.id !== lastActiveClipId.current) {
+              videoEngine.seekAndDisplay(targetFrame)
+              lastActiveClipId.current = activeClip.id
+            } else {
+              videoEngine.decodeNextFrame()
+            }
           }
+        } else {
+          lastActiveClipId.current = null
         }
 
-        // Reset the timer for the next frame, accounting for any drift
         lastTickTime.current = currentTime - (deltaTime % frameInterval)
       }
 
-      // Loop again
-      requestRef.current = requestAnimationFrame(tick)
+      requestRef.current = requestAnimationFrame(tick) as any
     }
 
     if (isPlaying) {
       lastTickTime.current = performance.now()
-      requestRef.current = requestAnimationFrame(tick)
+      requestRef.current = requestAnimationFrame(tick) as any
     } else if (requestRef.current) {
       cancelAnimationFrame(requestRef.current)
     }

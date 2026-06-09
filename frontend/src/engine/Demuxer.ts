@@ -12,6 +12,7 @@ export class VideoDemuxer {
   private samples: any[] = []
   private currentSampleIndex = 0
   private videoTrack: any
+  private seekTargetTimestamp: number | null = null
 
   constructor(
     filePath: string,
@@ -26,6 +27,19 @@ export class VideoDemuxer {
           frame.close()
           return
         }
+
+        // QUIET SEEK: If we are seeking to a specific time,
+        // skip rendering all intermediate frames.
+        if (
+          this.seekTargetTimestamp !== null &&
+          frame.timestamp < this.seekTargetTimestamp
+        ) {
+          frame.close()
+          return
+        }
+
+        // Once we hit or pass our target, we stop filtering
+        this.seekTargetTimestamp = null
 
         if (this.renderer) {
           this.renderer.draw(frame)
@@ -54,11 +68,12 @@ export class VideoDemuxer {
       this.mp4boxfile.onReady = (info: any) => {
         this.videoTrack = info.videoTracks[0]
         if (!this.videoTrack) return reject('No video track found')
-        // Start extraction
+
         this.mp4boxfile.setExtractionOptions(this.videoTrack.id, null, {
-          nbSamples: 180,
+          nbSamples: 10000,
         })
         this.mp4boxfile.start()
+
         // Return basic metadata
         resolve({
           codec: this.videoTrack.codec,
@@ -67,7 +82,6 @@ export class VideoDemuxer {
         })
       }
 
-      // Samples
       this.mp4boxfile.onSamples = (
         _track_id: number,
         _user: any,
@@ -84,18 +98,50 @@ export class VideoDemuxer {
   }
 
   public decodeNextFrame() {
-    if (this.disposed || this.currentSampleIndex >= this.samples.length) {
+    this.decodeAtIndex(this.currentSampleIndex)
+    this.currentSampleIndex++
+  }
+
+  /**
+   * Jumps to a specific frame and renders it immediately.
+   * This is used for scrubbing (clicking the timeline while paused).
+   */
+  public async seekAndDisplay(frameIndex: number) {
+    if (this.disposed || frameIndex < 0 || frameIndex >= this.samples.length) {
       return
     }
 
-    const sample = this.samples[this.currentSampleIndex]
+    const targetSample = this.samples[frameIndex]
+    this.seekTargetTimestamp = targetSample.cts
+
+    // Find the nearest preceding Keyframe (Sync frame)
+    let syncIndex = frameIndex
+    while (syncIndex > 0 && !this.samples[syncIndex].is_sync) {
+      syncIndex--
+    }
+
+    // Reset the hardware decoder to clear old state and abort pending decodes
+    if (this.decoder.state !== 'unconfigured') {
+      this.decoder.reset()
+      this.decoderConfigured = false
+    }
+
+    // Decode from the Keyframe up to our target frame
+    for (let i = syncIndex; i <= frameIndex; i++) {
+      this.decodeAtIndex(i)
+    }
+
+    // Update our sequential pointer so "Play" continues from here
+    this.currentSampleIndex = frameIndex + 1
+  }
+
+  private decodeAtIndex(index: number) {
+    if (index < 0 || index >= this.samples.length) return
+
+    const sample = this.samples[index]
 
     if (!this.decoderConfigured) {
-      if (!sample.is_sync) {
-        this.currentSampleIndex++
-        this.decodeNextFrame() // Skip until first sync frame
-        return
-      }
+      if (!sample.is_sync) return // Wait for a keyframe
 
       this.decoder.configure({
         codec: this.videoTrack.codec,
@@ -114,7 +160,6 @@ export class VideoDemuxer {
     })
 
     this.decoder.decode(chunk)
-    this.currentSampleIndex++
   }
 
   private async fetchAndFeed() {
