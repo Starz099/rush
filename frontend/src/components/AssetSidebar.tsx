@@ -100,38 +100,61 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
   const handleAddToTimeline = async (asset: Asset) => {
     if (!activeProject) return
-    const timeline = activeProject.timeline_state
-    const videoTrack = timeline.tracks.find(
-      (t: any) => t.track_type === 'video',
-    )
-    if (!videoTrack) {
-      alert('Please create a new project to get the default tracks.')
+
+    const isMP4 = asset.file_path.toLowerCase().endsWith('.mp4')
+    if (!isMP4) {
+      alert(
+        'Currently, only MP4 demuxing is supported. Audio and other formats cannot be added to the timeline yet.',
+      )
       return
     }
 
-    const lastClip = videoTrack.clips[videoTrack.clips.length - 1]
-    const timelineIn = lastClip ? lastClip.timeline_out : 0
+    const timeline = activeProject.timeline_state
+
+    // Determine target tracks for this asset type
+    const isVideo = asset.media_type === 'video'
+    const isAudio = asset.media_type === 'audio'
+    const isImage = asset.media_type === 'image'
+
+    // Duration calculation
     const framerate = activeProject.framerate
-    const durationMs = asset.duration_ms || 5000 // Use asset duration or default to 5s (for images/unknowns)
-    const durationFrames = Math.round((durationMs / 1000) * framerate) // Use asset duration or default to 5s (for images/unknowns)
-
-    const timelineOut = timelineIn + durationFrames
-
-    const newClip = {
-      id: crypto.randomUUID(),
-      asset_id: asset.id,
-      timeline_in: timelineIn,
-      timeline_out: timelineOut,
-      source_in: 0,
-      source_out: durationFrames,
-    }
+    const durationMs = asset.duration_ms || 5000
+    const durationFrames = Math.round((durationMs / 1000) * framerate)
 
     const updatedTracks = timeline.tracks.map((t: any) => {
-      if (t.id === videoTrack.id) return { ...t, clips: [...t.clips, newClip] }
+      const shouldAddToThisTrack =
+        (t.track_type === 'video' && (isVideo || isImage)) ||
+        (t.track_type === 'audio' && (isVideo || isAudio))
+
+      if (shouldAddToThisTrack) {
+        // Find the next available position on THIS specific track
+        const lastClip = t.clips[t.clips.length - 1]
+        const timelineIn = lastClip ? lastClip.timeline_out : 0
+        const timelineOut = timelineIn + durationFrames
+
+        const newClip = {
+          id: crypto.randomUUID(),
+          asset_id: asset.id,
+          timeline_in: timelineIn,
+          timeline_out: timelineOut,
+          source_in: 0,
+          source_out: durationFrames,
+        }
+        return { ...t, clips: [...t.clips, newClip] }
+      }
+
       return t
     })
 
+    // Verify if any tracks were actually updated
+    const tracksUpdated = updatedTracks.some((t, i) => t !== timeline.tracks[i])
+    if (!tracksUpdated) {
+      alert(`Could not find a suitable track for ${asset.media_type} asset.`)
+      return
+    }
+
     await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
+
     void prepareAsset(asset.id, asset.file_path)
   }
 

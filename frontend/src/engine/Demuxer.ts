@@ -5,7 +5,7 @@ export class VideoDemuxer {
   private mp4boxfile: any
   private decoder: VideoDecoder
   private filePath: string
-  private renderer?: { draw: (frame: VideoFrame) => void }
+  private renderer?: { draw: (frame: VideoFrame) => void; dispose?: () => void }
   private decoderConfigured = false
   private disposed = false
 
@@ -16,7 +16,7 @@ export class VideoDemuxer {
 
   constructor(
     filePath: string,
-    renderer?: { draw: (frame: VideoFrame) => void },
+    renderer?: { draw: (frame: VideoFrame) => void; dispose?: () => void },
   ) {
     this.filePath = filePath
     this.renderer = renderer
@@ -59,6 +59,9 @@ export class VideoDemuxer {
     this.disposed = true
     if (this.decoder.state !== 'closed') {
       this.decoder.close()
+    }
+    if (this.renderer?.dispose) {
+      this.renderer.dispose()
     }
   }
 
@@ -136,7 +139,7 @@ export class VideoDemuxer {
   }
 
   private decodeAtIndex(index: number) {
-    if (index < 0 || index >= this.samples.length) return
+    if (this.disposed || index < 0 || index >= this.samples.length) return
 
     const sample = this.samples[index]
 
@@ -179,7 +182,7 @@ export class VideoDemuxer {
 
   private getDecoderDescription(
     sample: any,
-  ): { description?: ArrayBuffer } | null {
+  ): { description?: ArrayBufferLike } | null {
     const avcConfiguration = sample?.description?.avcC
     if (!avcConfiguration) return null
 

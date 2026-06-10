@@ -4,9 +4,14 @@ export class WebGPURenderer {
   private context!: GPUCanvasContext
   private pipeline!: GPURenderPipeline
   private format: GPUTextureFormat = 'bgra8unorm'
+  private disposed: boolean = false
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
+  }
+
+  public dispose() {
+    this.disposed = true
   }
 
   public async initialize() {
@@ -71,7 +76,10 @@ export class WebGPURenderer {
   }
 
   public draw(frame: VideoFrame) {
-    if (!this.device || !this.pipeline) return
+    if (this.disposed || !this.device || !this.pipeline) {
+      frame.close()
+      return
+    }
 
     // Securely blast the VideoFrame into GPU memory
     const externalTexture = this.device.importExternalTexture({ source: frame })

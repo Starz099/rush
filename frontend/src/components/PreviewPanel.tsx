@@ -6,12 +6,21 @@ import { FileIcon, FilmStripIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { VideoDemuxer } from '../engine/Demuxer'
 import { WebGPURenderer } from '../engine/Renderer'
+import { AudioEngine } from '../engine/AudioEngine'
 
 export const PreviewPanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
   const assets = useProjectStore((state) => state.assets)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Use Refs for engines to ensure we can dispose them IMMEDIATELY
+  const demuxerRef = useRef<VideoDemuxer | null>(null)
+  const audioEngineRef = useRef<AudioEngine | null>(null)
+
   const [demuxer, setDemuxer] = useState<VideoDemuxer | null>(null)
+  const [audioEngine, setAudioEngine] = useState<AudioEngine | null>(null)
+  const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null)
+  const [isInitializing, setIsInitializing] = useState(false)
 
   const isPlaying = useAppStore((state) => state.isPlaying)
   const playheadPosition = useAppStore((state) => state.playhead_position)
@@ -33,21 +42,60 @@ export const PreviewPanel = () => {
   const previewHeight = activeProject?.viewport_height ?? 1080
 
   // Attach the engine to the metronome clock
-  usePlaybackLoop(demuxer)
+  usePlaybackLoop(demuxer, audioEngine, audioCtx)
+
+  // Initialize AudioContext on mount
+  useEffect(() => {
+    if (!audioCtx) {
+      const ctx = new AudioContext({ sampleRate: 48000 })
+      setAudioCtx(ctx)
+    }
+  }, [audioCtx])
+
+  // Resume AudioContext on play
+  useEffect(() => {
+    if (isPlaying && audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume()
+    }
+  }, [isPlaying, audioCtx])
 
   useEffect(() => {
-    if (!isPlaying && demuxer && activeClip) {
+    if (!isPlaying && activeClip) {
       const targetFrame =
         playheadPosition - activeClip.timeline_in + activeClip.source_in
-      demuxer.seekAndDisplay(targetFrame)
+
+      if (demuxer) {
+        demuxer.seekAndDisplay(targetFrame)
+      }
+
+      if (audioEngine) {
+        audioEngine.seekByTime(targetFrame / (activeProject?.framerate || 30))
+      }
     }
-  }, [playheadPosition, isPlaying, demuxer, activeClip])
+  }, [
+    playheadPosition,
+    isPlaying,
+    demuxer,
+    audioEngine,
+    activeClip,
+    activeProject?.framerate,
+  ])
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !activeAsset || activeAsset.media_type !== 'video') {
-      demuxer?.dispose()
+
+    // Cleanup helper
+    const cleanupEngines = () => {
+      demuxerRef.current?.dispose()
+      audioEngineRef.current?.dispose()
+      demuxerRef.current = null
+      audioEngineRef.current = null
       setDemuxer(null)
+      setAudioEngine(null)
+    }
+
+    if (!canvas || !activeAsset || activeAsset.media_type !== 'video') {
+      cleanupEngines()
       return
     }
 
@@ -55,13 +103,20 @@ export const PreviewPanel = () => {
 
     const initEngine = async () => {
       try {
+        setIsInitializing(true)
+        // 1. DISPOSE OLD ENGINES IMMEDIATELY before initializing new ones
+        cleanupEngines()
+
         canvas.width = previewWidth
         canvas.height = previewHeight
 
         const renderer = new WebGPURenderer(canvas)
         await renderer.initialize()
 
-        if (cancelled) return
+        if (cancelled) {
+          renderer.dispose()
+          return
+        }
 
         const newDemuxer = new VideoDemuxer(activeAsset.file_path, renderer)
         await newDemuxer.initialize()
@@ -71,9 +126,46 @@ export const PreviewPanel = () => {
           return
         }
 
+        // PRE-SEEK demuxer to current playhead
+        if (activeClip) {
+          const targetFrame =
+            playheadPosition - activeClip.timeline_in + activeClip.source_in
+          await newDemuxer.seekAndDisplay(targetFrame)
+        }
+
+        demuxerRef.current = newDemuxer
         setDemuxer(newDemuxer)
+
+        // Initialize Audio Engine if we have a context
+        if (audioCtx) {
+          const newAudioEngine = new AudioEngine(
+            activeAsset.file_path,
+            audioCtx,
+          )
+          await newAudioEngine.initialize()
+          if (cancelled) {
+            newAudioEngine.dispose()
+            return
+          }
+
+          // PRE-SEEK audio engine
+          if (activeClip) {
+            const targetFrame =
+              playheadPosition - activeClip.timeline_in + activeClip.source_in
+            newAudioEngine.seekByTime(
+              targetFrame / (activeProject?.framerate || 30),
+            )
+          }
+
+          audioEngineRef.current = newAudioEngine
+          setAudioEngine(newAudioEngine)
+        }
       } catch (error) {
-        console.error('Failed to initialize WebGPU preview:', error)
+        console.error('Failed to initialize preview engines:', error)
+      } finally {
+        if (!cancelled) {
+          setIsInitializing(false)
+        }
       }
     }
 
@@ -88,20 +180,33 @@ export const PreviewPanel = () => {
     activeAsset?.media_type,
     previewWidth,
     previewHeight,
+    audioCtx,
+    activeProject?.framerate,
   ])
 
-  // Cleanup demuxer on unmount
+  // Real cleanup on unmount
   useEffect(() => {
     return () => {
-      demuxer?.dispose()
+      demuxerRef.current?.dispose()
+      audioEngineRef.current?.dispose()
     }
-  }, [demuxer])
+  }, [])
 
   if (!activeProject) return null
 
   return (
     <div className="flex h-full flex-col bg-black/40 p-4">
       <div className="relative mx-auto flex aspect-video w-full max-w-[90%] flex-1 items-center justify-center overflow-hidden border border-white/5 bg-black text-white/20 shadow-2xl">
+        {isInitializing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <div className="border-primary size-8 animate-spin rounded-full border-2 border-t-transparent" />
+              <span className="text-[10px] font-medium tracking-widest uppercase opacity-50">
+                Initializing Engine...
+              </span>
+            </div>
+          </div>
+        )}
         {activeAsset ? (
           activeAsset.media_type === 'video' ? (
             <canvas
