@@ -1,18 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../store/timelineStore'
-import { getSourceFrameForPlayhead } from '../helpers/timeline'
 import { useProjectStore } from '../store/projectStore'
+import { fpsToNumeric } from '../helpers/fps'
 
+/**
+ * usePlaybackLoop drives the frame-by-frame progression of the project.
+ * It synchronizes the video engine and audio engine based on the hardware clock.
+ */
 export function usePlaybackLoop(
   videoEngine: any,
   audioEngine?: any,
   audioCtx?: AudioContext | null,
 ) {
   const isPlaying = useAppStore((state) => state.isPlaying)
-  const framerate = useAppStore((state) => state.framerate)
   const setPlayhead = useAppStore((state) => state.setPlayhead)
 
   const activeProject = useProjectStore((state) => state.activeProject)
+  const framerate = fpsToNumeric(activeProject?.framerate)
 
   const requestRef = useRef<number>(null)
   const lastActiveClipId = useRef<string | null>(null)
@@ -20,109 +24,89 @@ export function usePlaybackLoop(
   // A/V Sync Refs
   const playbackStartTime = useRef<number>(0)
   const playbackStartPlayhead = useRef<number>(0)
+  const playheadFloatRef = useRef<number>(0)
+  const lastTickTime = useRef<number>(0)
 
   useEffect(() => {
-    const tick = () => {
+    const tick = (now: number) => {
       if (!isPlaying) return
 
-      let currentPlayhead = useAppStore.getState().playhead_position
-
       if (audioCtx) {
-        // MATH SLAVE: The playhead is now a function of the hardware audio clock
+        // Master clock derived from hardware audio context
         const elapsedSeconds = audioCtx.currentTime - playbackStartTime.current
-        currentPlayhead =
-          playbackStartPlayhead.current + Math.floor(elapsedSeconds * framerate)
+        playheadFloatRef.current =
+          playbackStartPlayhead.current + elapsedSeconds * framerate
       } else {
-        // Fallback to RAF clock if no audio
-        currentPlayhead += 1
+        // Fallback to high-precision performance clock
+        const delta = (now - lastTickTime.current) / 1000
+        playheadFloatRef.current += delta * framerate
       }
 
+      lastTickTime.current = now
+
+      const currentPlayhead = Math.floor(playheadFloatRef.current)
+
+      // 1. UPDATE UI (Integer-based)
       if (currentPlayhead !== useAppStore.getState().playhead_position) {
         setPlayhead(currentPlayhead)
+      }
 
-        const timeline = activeProject?.timeline_state
-        const videoTrack = timeline?.tracks.find(
-          (t: any) => t.track_type === 'video',
-        )
-        const activeClip = videoTrack?.clips.find(
-          (clip: any) =>
-            currentPlayhead >= clip.timeline_in &&
-            currentPlayhead < clip.timeline_out,
-        )
+      // 2. UPDATE VIDEO (High-precision every tick)
+      const timeline = activeProject?.timeline_state
+      const videoTrack = timeline?.tracks.find(
+        (t: any) => t.track_type === 'video',
+      )
+      const activeVideoClip = videoTrack?.clips.find(
+        (clip: any) =>
+          playheadFloatRef.current >= clip.timeline_in &&
+          playheadFloatRef.current < clip.timeline_out,
+      )
 
-        if (activeClip && videoEngine) {
-          const targetFrame = getSourceFrameForPlayhead(
-            currentPlayhead,
-            activeClip,
-          )
+      if (activeVideoClip && videoEngine) {
+        // Use the high-precision float for the physical source time
+        const sourceTime =
+          (playheadFloatRef.current -
+            activeVideoClip.timeline_in +
+            activeVideoClip.source_in) /
+          framerate
 
-          if (targetFrame !== null) {
-            if (activeClip.id !== lastActiveClipId.current) {
-              videoEngine.seekAndDisplay(targetFrame)
-
-              // RE-SYNC AUDIO FOR NEW CLIP
-              if (audioEngine) {
-                const sourceTime = targetFrame / framerate
-                audioEngine.setPlaybackSync(
-                  audioCtx ? audioCtx.currentTime : performance.now() / 1000,
-                  targetFrame,
-                  framerate,
-                )
-                audioEngine.seekByTime(sourceTime)
-
-                // Update the local sync refs so the loop stays consistent
-                playbackStartTime.current = audioCtx
-                  ? audioCtx.currentTime
-                  : performance.now() / 1000
-                playbackStartPlayhead.current = currentPlayhead
-              }
-
-              lastActiveClipId.current = activeClip.id
-            } else {
-              videoEngine.decodeNextFrame()
-            }
-          }
+        if (activeVideoClip.id !== lastActiveClipId.current) {
+          lastActiveClipId.current = activeVideoClip.id
+          videoEngine.seekByTime(sourceTime)
         } else {
-          lastActiveClipId.current = null
+          videoEngine.displayAtTime(sourceTime)
         }
+      } else {
+        lastActiveClipId.current = null
+      }
 
-        // Also drive the audio engine if present
-        if (audioEngine) {
-          audioEngine.decodeNextBatch(5)
-        }
+      // UPDATE AUDIO
+      if (audioEngine) {
+        audioEngine.decodeNextBatch(10) // Increase look-ahead depth to 10 samples per tick
       }
 
       requestRef.current = requestAnimationFrame(tick) as any
     }
 
     if (isPlaying) {
-      const timeline = activeProject?.timeline_state
-      const videoTrack = timeline?.tracks.find(
-        (t: any) => t.track_type === 'video',
-      )
       const currentPos = useAppStore.getState().playhead_position
-      const activeClip = videoTrack?.clips.find(
-        (clip: any) =>
-          currentPos >= clip.timeline_in && currentPos < clip.timeline_out,
-      )
+      playheadFloatRef.current = currentPos
+      lastTickTime.current = performance.now()
 
       if (audioCtx) {
         playbackStartTime.current = audioCtx.currentTime
         playbackStartPlayhead.current = currentPos
 
         if (audioEngine) {
-          const targetFrame = activeClip
-            ? (getSourceFrameForPlayhead(currentPos, activeClip) ?? currentPos)
-            : currentPos
-
+          // Sync all tracks to the new start point
           audioEngine.setPlaybackSync(
             playbackStartTime.current,
-            targetFrame,
+            playbackStartPlayhead.current,
             framerate,
           )
-          audioEngine.seekByTime(targetFrame / framerate)
         }
       }
+
       requestRef.current = requestAnimationFrame(tick) as any
     } else if (requestRef.current) {
       if (audioEngine) {

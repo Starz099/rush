@@ -9,6 +9,7 @@ import {
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { fpsToNumeric } from '@/helpers/fps'
 
 // Constants for timeline scaling
 const PIXELS_PER_SECOND = 20
@@ -54,7 +55,7 @@ export const TimelinePanel = () => {
   const togglePlayback = useAppStore((state) => state.togglePlayback)
   const playheadPosition = useAppStore((state) => state.playhead_position)
   const setPlayhead = useAppStore((state) => state.setPlayhead)
-  const framerate = useAppStore((state) => state.framerate)
+  const framerate = fpsToNumeric(activeProject?.framerate)
 
   const timelineContentRef = useRef<HTMLDivElement>(null)
 

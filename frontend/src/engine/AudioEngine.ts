@@ -21,7 +21,12 @@ export class AudioEngine {
    * @param trackId Unique identifier for the track (usually the Clip ID)
    * @param provider An implementation of IAudioProvider (MP4, Standalone, etc.)
    */
-  public async addTrack(trackId: string, provider: IAudioProvider) {
+  public async addTrack(
+    trackId: string,
+    provider: IAudioProvider,
+    timelineStart: number = 0,
+    sourceStart: number = 0,
+  ) {
     if (this.disposed) return
 
     // Initialize the provider (demuxing/metadata)
@@ -30,8 +35,11 @@ export class AudioEngine {
     // Create a new pipeline for this track
     const pipeline = new AudioPipeline(provider, this.audioCtx)
 
-    // If we are already playing, sync the new track immediately
-    pipeline.setPlaybackSync(
+    // Setup the spatial position immediately
+    pipeline.setClipPosition(timelineStart, sourceStart)
+
+    // Sync the master clock
+    pipeline.setMasterSync(
       this.playbackStartTime,
       this.playbackStartPlayheadTime,
     )
@@ -73,6 +81,7 @@ export class AudioEngine {
 
   /**
    * Sets the master synchronization point for all tracks.
+   * This updates the master clock without affecting individual clip positions.
    */
   public setPlaybackSync(
     startTime: number,
@@ -83,7 +92,7 @@ export class AudioEngine {
     this.playbackStartPlayheadTime = startPlayheadFrame / framerate
 
     this.pipelines.forEach((pipeline) => {
-      pipeline.setPlaybackSync(
+      pipeline.setMasterSync(
         this.playbackStartTime,
         this.playbackStartPlayheadTime,
       )
@@ -93,7 +102,11 @@ export class AudioEngine {
   /**
    * Seeks all tracks to a specific time.
    */
-  public seekByTime(timeInSeconds: number) {
+  public seekByTime(
+    timeInSeconds: number,
+    timelineStart: number = 0,
+    sourceStart: number = 0,
+  ) {
     if (this.disposed) return
     this.pipelines.forEach((pipeline) => {
       pipeline.seek(timeInSeconds)
@@ -107,8 +120,17 @@ export class AudioEngine {
       pipeline.setPlaybackSync(
         this.playbackStartTime,
         this.playbackStartPlayheadTime,
+        timelineStart,
+        sourceStart,
       )
     })
+  }
+
+  /**
+   * Returns a specific track pipeline.
+   */
+  public getTrack(trackId: string): AudioPipeline | undefined {
+    return this.pipelines.get(trackId)
   }
 
   /**

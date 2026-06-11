@@ -12,6 +12,8 @@ export class AudioPipeline {
   private activeSources: AudioBufferSourceNode[] = []
   private playbackStartTime: number = 0
   private playbackStartPlayheadTime: number = 0
+  private timelineStartInSeconds: number = 0
+  private sourceStartInSeconds: number = 0
   private decoderConfigured: boolean = false
   private disposed: boolean = false
 
@@ -26,6 +28,28 @@ export class AudioPipeline {
 
   public decodeNextBatch(count: number = 5) {
     if (this.disposed || this.decoder.state === 'closed') return
+
+    // PREVENT BACKLOG: If we've already scheduled more than 500ms of audio,
+    // don't decode more. This keeps the engine lean while avoiding silence.
+    const lastSampleIndex = this.currentSampleIndex - 1
+    if (lastSampleIndex >= 0) {
+      const lastSample = this.provider.getSample(lastSampleIndex)
+      if (lastSample) {
+        const meta = this.provider.getMetadata()
+        const audioTimeInSource = lastSample.cts / meta.timescale
+        const timelinePos =
+          this.timelineStartInSeconds +
+          (audioTimeInSource - this.sourceStartInSeconds)
+        const playtime =
+          this.playbackStartTime +
+          (timelinePos - this.playbackStartPlayheadTime)
+
+        // If the last scheduled sample is more than 0.5s in the future, chill.
+        if (playtime > this.audioCtx.currentTime + 0.5) {
+          return
+        }
+      }
+    }
 
     const remainingSamples =
       this.provider.getSampleCount() - this.currentSampleIndex
@@ -79,7 +103,7 @@ export class AudioPipeline {
     }
   }
 
-  private scheduleAudioData(data: AudioData) {
+  public scheduleAudioData(data: AudioData) {
     if (this.disposed) {
       data.close()
       return
@@ -102,10 +126,20 @@ export class AudioPipeline {
     source.buffer = buffer
     source.connect(this.audioCtx.destination)
 
-    const audioTimeInSeconds = data.timestamp / 1e6
+    // THE MASTER TIMELINE FORMULA:
+    // 1. How far is this sample from the start of the source file?
+    const audioTimeInSource = data.timestamp / 1e6
+
+    // 2. Where should this sit on the project timeline?
+    // TimelinePos = ClipTimelineStart + (AudioTimeInSource - ClipSourceStart)
+    const timelinePos =
+      this.timelineStartInSeconds +
+      (audioTimeInSource - this.sourceStartInSeconds)
+
+    // 3. When should this play on the hardware clock?
+    // PlayTime = MasterStartTime + (TimelinePos - MasterStartPlayhead)
     const playtime =
-      this.playbackStartTime +
-      (audioTimeInSeconds - this.playbackStartPlayheadTime)
+      this.playbackStartTime + (timelinePos - this.playbackStartPlayheadTime)
 
     // Track source so we can stop it if the user pauses
     this.activeSources.push(source)
@@ -114,19 +148,51 @@ export class AudioPipeline {
     }
 
     // Only start if it's in the future or very recent past
-    if (playtime >= this.audioCtx.currentTime) {
+    const currentTime = this.audioCtx.currentTime
+    // LOOK-AHEAD: We schedule slightly into the future to absorb main-thread jitter
+    if (playtime >= currentTime) {
       source.start(playtime)
-    } else if (playtime > this.audioCtx.currentTime - 0.1) {
-      const offset = this.audioCtx.currentTime - playtime
-      source.start(this.audioCtx.currentTime, offset)
+    } else if (playtime > currentTime - 0.2) {
+      // Increased tolerance for lag
+      // If it's slightly in the past, start with an offset
+      const offset = currentTime - playtime
+      source.start(currentTime, offset)
     }
 
     data.close()
   }
 
-  public setPlaybackSync(startTime: number, startPlayheadTime: number) {
+  /**
+   * Updates the master clock synchronization point.
+   * Called when the user hits Play or when the clock drifts.
+   */
+  public setMasterSync(startTime: number, startPlayheadTime: number) {
     this.playbackStartTime = startTime
     this.playbackStartPlayheadTime = startPlayheadTime
+  }
+
+  /**
+   * Updates the clip's physical position on the project timeline.
+   * Called by the Orchestrator when a clip is moved or resized.
+   */
+  public setClipPosition(timelineStart: number, sourceStart: number) {
+    this.timelineStartInSeconds = timelineStart
+    this.sourceStartInSeconds = sourceStart
+  }
+
+  /**
+   * Legacy method for compatibility - now redirects to both sync types.
+   */
+  public setPlaybackSync(
+    startTime: number,
+    startPlayheadTime: number,
+    timelineStart?: number,
+    sourceStart?: number,
+  ) {
+    this.setMasterSync(startTime, startPlayheadTime)
+    if (timelineStart !== undefined && sourceStart !== undefined) {
+      this.setClipPosition(timelineStart, sourceStart)
+    }
   }
 
   public stop() {

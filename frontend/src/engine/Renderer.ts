@@ -32,12 +32,20 @@ export class WebGPURenderer {
       alphaMode: 'premultiplied',
     })
 
-    this.setupPipeline(this.canvas.width, this.canvas.height)
+    this.setupPipeline()
   }
 
-  public setupPipeline(width: number, height: number) {
+  public setupPipeline() {
     const shaderCode = `
-      // The Vertex Shader: Draws a full-screen rectangle
+      struct Uniforms {
+        canvasResolution: vec2<f32>,
+        frameResolution: vec2<f32>,
+      }
+
+      @group(0) @binding(0) var mySampler: sampler;
+      @group(0) @binding(1) var myTexture: texture_external;
+      @group(0) @binding(2) var<uniform> uniforms: Uniforms;
+
       @vertex
       fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> @builtin(position) vec4<f32> {
           var pos = array<vec2<f32>, 6>(
@@ -47,15 +55,43 @@ export class WebGPURenderer {
           return vec4<f32>(pos[VertexIndex], 0.0, 1.0);
       }
 
-      // The Fragment Shader: Paints the VideoFrame onto the rectangle
-      @group(0) @binding(0) var mySampler: sampler;
-      @group(0) @binding(1) var myTexture: texture_external;
-
       @fragment
       fn fs_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
-          // Convert screen coordinates to texture UV coordinates
-          let resolution = vec2<f32>(${width}.0, ${height}.0);
-          let uv = vec2<f32>(coord.x / resolution.x, coord.y / resolution.y);
+          let canvasRes = uniforms.canvasResolution;
+          let frameRes = uniforms.frameResolution;
+
+          let canvasAspect = canvasRes.x / canvasRes.y;
+          let frameAspect = frameRes.x / frameRes.y;
+
+          var uv: vec2<f32>;
+
+          if (frameAspect > canvasAspect) {
+              // Asset is wider than canvas (Letterbox)
+              // We fit to canvas width.
+              let scale = canvasAspect / frameAspect;
+              let verticalOffset = (1.0 - scale) * 0.5;
+              
+              uv = vec2<f32>(
+                  coord.x / canvasRes.x,
+                  ((coord.y / canvasRes.y) - verticalOffset) / scale
+              );
+          } else {
+              // Asset is taller than canvas (Pillarbox)
+              // We fit to canvas height.
+              let scale = frameAspect / canvasAspect;
+              let horizontalOffset = (1.0 - scale) * 0.5;
+              
+              uv = vec2<f32>(
+                  ((coord.x / canvasRes.x) - horizontalOffset) / scale,
+                  coord.y / canvasRes.y
+              );
+          }
+
+          // Strict bound check for letterboxing/pillarboxing
+          if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+              return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+          }
+
           return textureSampleBaseClampToEdge(myTexture, mySampler, uv);
       }
     `
@@ -75,48 +111,75 @@ export class WebGPURenderer {
     })
   }
 
+  private isDrawing = false
+
   public draw(frame: VideoFrame) {
     if (this.disposed || !this.device || !this.pipeline) {
       frame.close()
       return
     }
 
-    // Securely blast the VideoFrame into GPU memory
-    const externalTexture = this.device.importExternalTexture({ source: frame })
-    const sampler = this.device.createSampler()
+    // If the GPU queue is already busy with a previous frame from this tick,
+    // skip this one to maintain 60fps fluidity (avoiding backlog).
+    if (this.isDrawing) {
+      frame.close()
+      return
+    }
 
-    // Bind the texture to the shader
-    const bindGroup = this.device.createBindGroup({
-      layout: this.pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: sampler },
-        { binding: 1, resource: externalTexture },
-      ],
-    })
+    this.isDrawing = true
 
-    // Instruct the GPU to draw
-    const commandEncoder = this.device.createCommandEncoder()
-    const textureView = this.context.getCurrentTexture().createView()
+    try {
+      const externalTexture = this.device.importExternalTexture({
+        source: frame,
+      })
+      const sampler = this.device.createSampler()
 
-    const renderPass = commandEncoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: textureView,
-          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-      ],
-    })
+      // Create uniform buffer
+      const uniformData = new Float32Array([
+        this.canvas.width,
+        this.canvas.height,
+        frame.displayWidth,
+        frame.displayHeight,
+      ])
+      const uniformBuffer = this.device.createBuffer({
+        size: uniformData.byteLength,
+        // GPUBufferUsage.UNIFORM (64) | GPUBufferUsage.COPY_DST (8)
+        usage: 64 | 8,
+      })
+      this.device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 
-    renderPass.setPipeline(this.pipeline)
-    renderPass.setBindGroup(0, bindGroup)
-    renderPass.draw(6) // Draw our 6 vertices
-    renderPass.end()
+      const bindGroup = this.device.createBindGroup({
+        layout: this.pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: sampler },
+          { binding: 1, resource: externalTexture },
+          { binding: 2, resource: { buffer: uniformBuffer } },
+        ],
+      })
 
-    this.device.queue.submit([commandEncoder.finish()])
+      const commandEncoder = this.device.createCommandEncoder()
+      const textureView = this.context.getCurrentTexture().createView()
 
-    // CRITICAL MEMORY MANAGEMENT: Now that the GPU has it, clear the RAM.
-    frame.close()
+      const renderPass = commandEncoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: textureView,
+            clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      })
+
+      renderPass.setPipeline(this.pipeline)
+      renderPass.setBindGroup(0, bindGroup)
+      renderPass.draw(6)
+      renderPass.end()
+
+      this.device.queue.submit([commandEncoder.finish()])
+    } finally {
+      frame.close()
+      this.isDrawing = false
+    }
   }
 }

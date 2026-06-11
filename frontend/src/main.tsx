@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -16,9 +15,7 @@ try {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <TooltipProvider>
-      <Router />
-    </TooltipProvider>
-  </StrictMode>,
+  <TooltipProvider>
+    <Router />
+  </TooltipProvider>,
 )

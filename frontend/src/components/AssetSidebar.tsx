@@ -6,6 +6,7 @@ import { AssetCell } from './AssetCell'
 import { assetApi } from '@/api/asset'
 import type { Asset } from '@/api/bindings'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { fpsToNumeric } from '@/helpers/fps'
 
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
@@ -45,21 +46,22 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
   const getMediaDuration = (filePath: string): Promise<number | null> => {
     return new Promise((resolve) => {
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.onloadedmetadata = () => {
-        resolve(Math.round(video.duration * 1000))
+      // Use audio element for all probes as it's lighter and handles mp3 better
+      const media = document.createElement('audio')
+      media.preload = 'metadata'
+      media.onloadedmetadata = () => {
+        resolve(Math.round(media.duration * 1000))
       }
-      video.onerror = () => {
+      media.onerror = () => {
         resolve(null)
       }
-      video.src = convertFileSrc(filePath)
+      media.src = convertFileSrc(filePath)
     })
   }
 
   const handleAddAsset = async () => {
     const filePath = window.prompt(
-      'Enter absolute file path to an image or video:',
+      'Enter absolute file path to an image, video, or MP3:',
     )
     if (!filePath) return
 
@@ -101,23 +103,17 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   const handleAddToTimeline = async (asset: Asset) => {
     if (!activeProject) return
 
-    const isMP4 = asset.file_path.toLowerCase().endsWith('.mp4')
-    if (!isMP4) {
-      alert(
-        'Currently, only MP4 demuxing is supported. Audio and other formats cannot be added to the timeline yet.',
-      )
-      return
-    }
-
     const timeline = activeProject.timeline_state
 
     // Determine target tracks for this asset type
     const isVideo = asset.media_type === 'video'
-    const isAudio = asset.media_type === 'audio'
+    const isAudio =
+      asset.media_type === 'audio' ||
+      asset.file_path.toLowerCase().endsWith('.mp3')
     const isImage = asset.media_type === 'image'
 
-    // Duration calculation
-    const framerate = activeProject.framerate
+    // Duration calculation (Convert ms to project frames)
+    const framerate = fpsToNumeric(activeProject.framerate)
     const durationMs = asset.duration_ms || 5000
     const durationFrames = Math.round((durationMs / 1000) * framerate)
 
@@ -155,7 +151,9 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
     await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
 
-    void prepareAsset(asset.id, asset.file_path)
+    if (isVideo) {
+      void prepareAsset(asset.id, asset.file_path)
+    }
   }
 
   if (isLoading) {
