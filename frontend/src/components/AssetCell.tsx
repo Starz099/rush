@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import {
   FileVideoIcon,
   FileImageIcon,
+  FileAudioIcon,
   FileIcon,
   TrashIcon,
   PencilSimpleIcon,
@@ -37,6 +38,9 @@ export const AssetCell = ({
         <FileVideoIcon className="size-4 shrink-0 text-blue-500" />
       ) : asset.media_type === 'image' ? (
         <FileImageIcon className="size-4 shrink-0 text-green-500" />
+      ) : asset.media_type === 'audio' ||
+        asset.file_path.toLowerCase().endsWith('.mp3') ? (
+        <FileAudioIcon className="size-4 shrink-0 text-purple-500" />
       ) : (
         <FileIcon className="text-muted-foreground size-4 shrink-0" />
       )}

@@ -9,6 +9,7 @@ import {
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { fpsToNumeric } from '@/helpers/fps'
 
 // Constants for timeline scaling
 const PIXELS_PER_SECOND = 20
@@ -20,6 +21,11 @@ interface TimelineTrackProps {
 }
 
 const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
+  const isVideo = track.track_type === 'video'
+  const bgColor = isVideo ? 'bg-blue-500/20' : 'bg-green-500/20'
+  const borderColor = isVideo ? 'border-blue-500/50' : 'border-green-500/50'
+  const textColor = isVideo ? 'text-blue-200' : 'text-green-200'
+
   return (
     <div className="flex h-16 border-b border-white/5 bg-white/[0.02]">
       {/* Track Content */}
@@ -27,7 +33,7 @@ const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
         {track.clips.map((clip: any) => (
           <div
             key={clip.id}
-            className="absolute top-1 bottom-1 flex items-center justify-center rounded border border-blue-500/50 bg-blue-500/20 px-2 text-[9px] text-blue-200"
+            className={`absolute top-1 bottom-1 flex items-center justify-center rounded border ${borderColor} ${bgColor} px-2 text-[9px] ${textColor}`}
             style={{
               left: `${(clip.timeline_in / framerate) * PIXELS_PER_SECOND}px`,
               width: `${((clip.timeline_out - clip.timeline_in) / framerate) * PIXELS_PER_SECOND}px`,
@@ -49,7 +55,7 @@ export const TimelinePanel = () => {
   const togglePlayback = useAppStore((state) => state.togglePlayback)
   const playheadPosition = useAppStore((state) => state.playhead_position)
   const setPlayhead = useAppStore((state) => state.setPlayhead)
-  const framerate = useAppStore((state) => state.framerate)
+  const framerate = fpsToNumeric(activeProject?.framerate)
 
   const timelineContentRef = useRef<HTMLDivElement>(null)
 

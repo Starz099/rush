@@ -6,6 +6,7 @@ import { AssetCell } from './AssetCell'
 import { assetApi } from '@/api/asset'
 import type { Asset } from '@/api/bindings'
 import { convertFileSrc } from '@tauri-apps/api/core'
+import { fpsToNumeric } from '@/helpers/fps'
 
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
@@ -45,21 +46,22 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
   const getMediaDuration = (filePath: string): Promise<number | null> => {
     return new Promise((resolve) => {
-      const video = document.createElement('video')
-      video.preload = 'metadata'
-      video.onloadedmetadata = () => {
-        resolve(Math.round(video.duration * 1000))
+      // Use audio element for all probes as it's lighter and handles mp3 better
+      const media = document.createElement('audio')
+      media.preload = 'metadata'
+      media.onloadedmetadata = () => {
+        resolve(Math.round(media.duration * 1000))
       }
-      video.onerror = () => {
+      media.onerror = () => {
         resolve(null)
       }
-      video.src = convertFileSrc(filePath)
+      media.src = convertFileSrc(filePath)
     })
   }
 
   const handleAddAsset = async () => {
     const filePath = window.prompt(
-      'Enter absolute file path to an image or video:',
+      'Enter absolute file path to an image, video, or MP3:',
     )
     if (!filePath) return
 
@@ -100,39 +102,58 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
   const handleAddToTimeline = async (asset: Asset) => {
     if (!activeProject) return
+
     const timeline = activeProject.timeline_state
-    const videoTrack = timeline.tracks.find(
-      (t: any) => t.track_type === 'video',
-    )
-    if (!videoTrack) {
-      alert('Please create a new project to get the default tracks.')
-      return
-    }
 
-    const lastClip = videoTrack.clips[videoTrack.clips.length - 1]
-    const timelineIn = lastClip ? lastClip.timeline_out : 0
-    const framerate = activeProject.framerate
-    const durationMs = asset.duration_ms || 5000 // Use asset duration or default to 5s (for images/unknowns)
-    const durationFrames = Math.round((durationMs / 1000) * framerate) // Use asset duration or default to 5s (for images/unknowns)
+    // Determine target tracks for this asset type
+    const isVideo = asset.media_type === 'video'
+    const isAudio =
+      asset.media_type === 'audio' ||
+      asset.file_path.toLowerCase().endsWith('.mp3')
+    const isImage = asset.media_type === 'image'
 
-    const timelineOut = timelineIn + durationFrames
-
-    const newClip = {
-      id: crypto.randomUUID(),
-      asset_id: asset.id,
-      timeline_in: timelineIn,
-      timeline_out: timelineOut,
-      source_in: 0,
-      source_out: durationFrames,
-    }
+    // Duration calculation (Convert ms to project frames)
+    const framerate = fpsToNumeric(activeProject.framerate)
+    const durationMs = asset.duration_ms || 5000
+    const durationFrames = Math.round((durationMs / 1000) * framerate)
 
     const updatedTracks = timeline.tracks.map((t: any) => {
-      if (t.id === videoTrack.id) return { ...t, clips: [...t.clips, newClip] }
+      const shouldAddToThisTrack =
+        (t.track_type === 'video' && (isVideo || isImage)) ||
+        (t.track_type === 'audio' && (isVideo || isAudio))
+
+      if (shouldAddToThisTrack) {
+        // Find the next available position on THIS specific track
+        const lastClip = t.clips[t.clips.length - 1]
+        const timelineIn = lastClip ? lastClip.timeline_out : 0
+        const timelineOut = timelineIn + durationFrames
+
+        const newClip = {
+          id: crypto.randomUUID(),
+          asset_id: asset.id,
+          timeline_in: timelineIn,
+          timeline_out: timelineOut,
+          source_in: 0,
+          source_out: durationFrames,
+        }
+        return { ...t, clips: [...t.clips, newClip] }
+      }
+
       return t
     })
 
+    // Verify if any tracks were actually updated
+    const tracksUpdated = updatedTracks.some((t, i) => t !== timeline.tracks[i])
+    if (!tracksUpdated) {
+      alert(`Could not find a suitable track for ${asset.media_type} asset.`)
+      return
+    }
+
     await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
-    void prepareAsset(asset.id, asset.file_path)
+
+    if (isVideo) {
+      void prepareAsset(asset.id, asset.file_path)
+    }
   }
 
   if (isLoading) {

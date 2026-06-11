@@ -36,6 +36,12 @@ pub fn register_asset(
         || file_name_lower.ends_with(".gif")
     {
         "image"
+    } else if file_name_lower.ends_with(".mp3")
+        || file_name_lower.ends_with(".wav")
+        || file_name_lower.ends_with(".aac")
+        || file_name_lower.ends_with(".m4a")
+    {
+        "audio"
     } else {
         "unknown"
     }
