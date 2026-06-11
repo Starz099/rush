@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { VideoDemuxer } from '../engine/Demuxer'
 import { WebGPURenderer } from '../engine/Renderer'
 import { AudioEngine } from '../engine/AudioEngine'
+import { MP4AudioProvider } from '@/engine/providers/MP4AudioProvider'
 
 export const PreviewPanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
@@ -138,11 +139,10 @@ export const PreviewPanel = () => {
 
         // Initialize Audio Engine if we have a context
         if (audioCtx) {
-          const newAudioEngine = new AudioEngine(
-            activeAsset.file_path,
-            audioCtx,
-          )
-          await newAudioEngine.initialize()
+          const newAudioEngine = new AudioEngine(audioCtx)
+          const audioProvider = new MP4AudioProvider(activeAsset.file_path)
+          await newAudioEngine.addTrack(activeAsset.id, audioProvider)
+
           if (cancelled) {
             newAudioEngine.dispose()
             return
