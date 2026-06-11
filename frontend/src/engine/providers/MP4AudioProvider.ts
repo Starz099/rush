@@ -34,7 +34,7 @@ export class MP4AudioProvider implements IAudioProvider {
           channels: this.audioTrack.audio.channel_count,
           timescale: timescale,
           duration: info.duration,
-          // Description will be extracted on demand or during first sample
+          isEncoded: true,
         }
 
         resolve(this.metadata)

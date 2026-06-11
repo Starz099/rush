@@ -45,24 +45,38 @@ export class AudioPipeline {
 
     const meta: AudioMetadata = this.provider.getMetadata()
 
-    if (!this.decoderConfigured) {
-      this.decoder.configure({
-        codec: meta.codec,
+    if (meta.isEncoded) {
+      if (!this.decoderConfigured) {
+        this.decoder.configure({
+          codec: meta.codec,
+          sampleRate: meta.sampleRate,
+          numberOfChannels: meta.channels,
+          description: meta.description,
+        })
+        this.decoderConfigured = true
+      }
+
+      const chunk = new EncodedAudioChunk({
+        type: sample.is_sync ? 'key' : 'delta',
+        timestamp: (sample.cts * 1e6) / meta.timescale,
+        duration: (sample.duration * 1e6) / meta.timescale,
+        data: sample.data,
+      })
+
+      this.decoder.decode(chunk)
+    } else {
+      // For unencoded PCM data, we can directly create an AudioData object
+      const audioData = new AudioData({
+        format: 'f32-planar',
         sampleRate: meta.sampleRate,
         numberOfChannels: meta.channels,
-        description: meta.description,
+        numberOfFrames: sample.duration, // duration is in frames for unencoded
+        timestamp: (sample.cts * 1e6) / meta.timescale,
+        data: sample.data,
       })
-      this.decoderConfigured = true
+
+      this.scheduleAudioData(audioData)
     }
-
-    const chunk = new EncodedAudioChunk({
-      type: sample.is_sync ? 'key' : 'delta',
-      timestamp: (sample.cts * 1e6) / meta.timescale,
-      duration: (sample.duration * 1e6) / meta.timescale,
-      data: sample.data,
-    })
-
-    this.decoder.decode(chunk)
   }
 
   private scheduleAudioData(data: AudioData) {

@@ -8,6 +8,7 @@ export interface AudioMetadata {
   timescale: number
   duration?: number
   description?: ArrayBuffer // For AAC and other codecs requiring extradata
+  isEncoded: boolean
 }
 
 /**
