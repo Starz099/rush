@@ -111,6 +111,26 @@ export class WebGPURenderer {
     })
   }
 
+  public clear() {
+    if (this.disposed || !this.device || !this.context) return
+
+    const commandEncoder = this.device.createCommandEncoder()
+    const textureView = this.context.getCurrentTexture().createView()
+
+    const renderPass = commandEncoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: textureView,
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    })
+    renderPass.end()
+    this.device.queue.submit([commandEncoder.finish()])
+  }
+
   private isDrawing = false
 
   public draw(frame: VideoFrame) {
@@ -164,8 +184,8 @@ export class WebGPURenderer {
         colorAttachments: [
           {
             view: textureView,
-            clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-            loadOp: 'clear',
+            // Use 'load' so we don't clear what was drawn by other clips in this same tick
+            loadOp: 'load',
             storeOp: 'store',
           },
         ],
