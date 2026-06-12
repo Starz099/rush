@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { projectApi } from '@/api/project'
 import { assetApi } from '@/api/asset'
 import type { Project, ResolutionValue, FPSValue } from '@/types/project'
-import type { Asset } from '@/api/bindings'
+import type { Asset, Clip } from '@/api/bindings'
 
 interface ProjectState {
   projects: Project[]
@@ -26,6 +26,11 @@ interface ProjectState {
   addAsset: (asset: Asset) => void
   removeAsset: (assetId: string) => void
   updateAsset: (asset: Asset) => void
+  updateClipProperties: (
+    trackId: string,
+    clipId: string,
+    properties: Partial<Clip>,
+  ) => Promise<void>
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -102,4 +107,52 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set((state) => ({
       assets: state.assets.map((a) => (a.id === asset.id ? asset : a)),
     })),
+
+  updateClipProperties: async (
+    trackId: string,
+    clipId: string,
+    properties: Partial<Clip>,
+  ) => {
+    const project = get().activeProject
+    if (!project) return
+
+    const timeline = project.timeline_state
+
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      if (track.id !== trackId) return track
+      return {
+        ...track,
+        clips: track.clips.map((clip: Clip) => {
+          if (clip.id !== clipId) return clip
+
+          const updatedClip = { ...clip, ...properties }
+
+          if (
+            properties.timeline_in !== undefined &&
+            properties.timeline_out === undefined
+          ) {
+            const duration = clip.timeline_out - clip.timeline_in
+            updatedClip.timeline_out = updatedClip.timeline_in + duration
+          }
+
+          const timelineDuration =
+            updatedClip.timeline_out - updatedClip.timeline_in
+          updatedClip.source_out = updatedClip.source_in + timelineDuration
+
+          return updatedClip
+        }),
+      }
+    })
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks }
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    })
+
+    await get().saveTimeline(project.id, updatedTimeline)
+  },
 }))
