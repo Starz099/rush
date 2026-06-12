@@ -18,6 +18,7 @@ export function useAudioOrchestrator(
   // Track which clip IDs are currently loaded in the engine
   const mountedClipIds = useRef<Set<string>>(new Set())
   const isInitializing = useRef<Set<string>>(new Set())
+  const failedClipIds = useRef<Set<string>>(new Set())
 
   // Track readiness for the UI
   const [isReady, setIsReady] = useState(true)
@@ -35,7 +36,8 @@ export function useAudioOrchestrator(
       track.clips.filter(
         (clip) =>
           playhead < clip.timeline_out + trailingBufferFrames &&
-          playhead > clip.timeline_in - preloadBufferFrames,
+          playhead > clip.timeline_in - preloadBufferFrames &&
+          !failedClipIds.current.has(clip.id),
       ),
     )
 
@@ -60,7 +62,8 @@ export function useAudioOrchestrator(
     clipsToMount.forEach(async (clip) => {
       if (
         !mountedClipIds.current.has(clip.id) &&
-        !isInitializing.current.has(clip.id)
+        !isInitializing.current.has(clip.id) &&
+        !failedClipIds.current.has(clip.id)
       ) {
         const asset = assets.find((a) => a.id === clip.asset_id)
         if (!asset) return
@@ -102,6 +105,7 @@ export function useAudioOrchestrator(
           mountedClipIds.current.add(clip.id)
         } catch (e) {
           console.error(`[Orchestrator] Preload failed for ${clip.id}:`, e)
+          failedClipIds.current.add(clip.id)
         } finally {
           isInitializing.current.delete(clip.id)
 

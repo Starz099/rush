@@ -19,7 +19,6 @@ export function usePlaybackLoop(
   const framerate = fpsToNumeric(activeProject?.framerate)
 
   const requestRef = useRef<number>(null)
-  const lastActiveClipId = useRef<string | null>(null)
 
   // A/V Sync Refs
   const playbackStartTime = useRef<number>(0)
@@ -53,31 +52,24 @@ export function usePlaybackLoop(
 
       // 2. UPDATE VIDEO (High-precision every tick)
       const timeline = activeProject?.timeline_state
-      const videoTrack = timeline?.tracks.find(
-        (t: any) => t.track_type === 'video',
-      )
-      const activeVideoClip = videoTrack?.clips.find(
-        (clip: any) =>
-          playheadFloatRef.current >= clip.timeline_in &&
-          playheadFloatRef.current < clip.timeline_out,
-      )
+      const videoTracks =
+        timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
 
-      if (activeVideoClip && videoEngine) {
-        // Use the high-precision float for the physical source time
-        const sourceTime =
-          (playheadFloatRef.current -
-            activeVideoClip.timeline_in +
-            activeVideoClip.source_in) /
-          framerate
+      if (videoEngine) {
+        videoTracks.forEach((track: any) => {
+          const activeClips = track.clips.filter(
+            (clip: any) =>
+              playheadFloatRef.current >= clip.timeline_in &&
+              playheadFloatRef.current < clip.timeline_out,
+          )
 
-        if (activeVideoClip.id !== lastActiveClipId.current) {
-          lastActiveClipId.current = activeVideoClip.id
-          videoEngine.seekByTime(sourceTime)
-        } else {
-          videoEngine.displayAtTime(sourceTime)
-        }
-      } else {
-        lastActiveClipId.current = null
+          activeClips.forEach((clip: any) => {
+            const sourceTime =
+              (playheadFloatRef.current - clip.timeline_in + clip.source_in) /
+              framerate
+            videoEngine.displayAtTime(clip.id, sourceTime)
+          })
+        })
       }
 
       // UPDATE AUDIO

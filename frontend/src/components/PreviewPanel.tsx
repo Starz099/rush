@@ -4,10 +4,11 @@ import { usePlaybackLoop } from '@/hooks/usePlaybackLoop'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { FileIcon, FilmStripIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
-import { VideoDemuxer } from '../engine/Demuxer'
 import { WebGPURenderer } from '../engine/Renderer'
+import { VideoEngine } from '../engine/VideoEngine'
 import { AudioEngine } from '../engine/AudioEngine'
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator'
+import { useVideoOrchestrator } from '@/hooks/useVideoOrchestrator'
 import { fpsToNumeric } from '@/helpers/fps'
 
 export const PreviewPanel = () => {
@@ -16,10 +17,10 @@ export const PreviewPanel = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // Engine Refs
-  const demuxerRef = useRef<VideoDemuxer | null>(null)
+  const videoEngineRef = useRef<VideoEngine | null>(null)
   const audioEngineRef = useRef<AudioEngine | null>(null)
 
-  const [demuxer, setDemuxer] = useState<VideoDemuxer | null>(null)
+  const [videoEngine, setVideoEngine] = useState<VideoEngine | null>(null)
   const [audioEngine, setAudioEngine] = useState<AudioEngine | null>(null)
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null)
   const [isInitializing, setIsInitializing] = useState(false)
@@ -28,43 +29,94 @@ export const PreviewPanel = () => {
   const playheadPosition = useAppStore((state) => state.playhead_position)
 
   const timeline = activeProject?.timeline_state
-  const videoTrack = timeline?.tracks.find((t: any) => t.track_type === 'video')
+  const videoTracks =
+    timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
 
-  const activeClip = videoTrack?.clips.find(
-    (clip: any) =>
-      playheadPosition >= clip.timeline_in &&
-      playheadPosition < clip.timeline_out,
+  // Active clips for scrubbing and UI hints
+  const activeClips = videoTracks.flatMap((track: any) =>
+    track.clips.filter(
+      (clip: any) =>
+        playheadPosition >= clip.timeline_in &&
+        playheadPosition < clip.timeline_out,
+    ),
   )
 
-  const activeAsset = activeClip
-    ? assets.find((a) => a.id === activeClip.asset_id)
-    : null
+  const activeAsset =
+    activeClips.length > 0
+      ? assets.find((a) => a.id === activeClips[0].asset_id)
+      : null
 
   const previewWidth = activeProject?.viewport_width ?? 1920
   const previewHeight = activeProject?.viewport_height ?? 1080
   const projectFps = fpsToNumeric(activeProject?.framerate)
 
-  // Initialize Audio Engine once on mount
+  // Initialize Engines once on mount
   useEffect(() => {
-    if (!audioCtx) {
-      const ctx = new AudioContext({ sampleRate: 48000 })
-      setAudioCtx(ctx)
+    let cancelled = false
 
-      const engine = new AudioEngine(ctx)
-      audioEngineRef.current = engine
-      setAudioEngine(engine)
+    const initEngines = async () => {
+      // Wait for canvas to be available in the DOM
+      if (!canvasRef.current) {
+        // Retry in next tick if not ready
+        setTimeout(initEngines, 50)
+        return
+      }
+
+      try {
+        setIsInitializing(true)
+
+        // 1. Audio Engine
+        if (!audioEngineRef.current) {
+          const ctx = new AudioContext({ sampleRate: 48000 })
+          setAudioCtx(ctx)
+          const aEngine = new AudioEngine(ctx)
+          audioEngineRef.current = aEngine
+          setAudioEngine(aEngine)
+        }
+
+        // 2. Video Engine (with shared Renderer)
+        if (canvasRef.current && !videoEngineRef.current) {
+          canvasRef.current.width = previewWidth
+          canvasRef.current.height = previewHeight
+
+          const renderer = new WebGPURenderer(canvasRef.current)
+          await renderer.initialize()
+
+          if (cancelled) {
+            renderer.dispose()
+            return
+          }
+
+          const vEngine = new VideoEngine(renderer)
+          videoEngineRef.current = vEngine
+          setVideoEngine(vEngine)
+        }
+      } catch (error) {
+        console.error('Failed to initialize engines:', error)
+      } finally {
+        if (!cancelled) {
+          setIsInitializing(false)
+        }
+      }
     }
+
+    initEngines()
 
     return () => {
+      cancelled = true
       audioEngineRef.current?.dispose()
+      videoEngineRef.current?.dispose()
+      audioEngineRef.current = null
+      videoEngineRef.current = null
     }
-  }, [])
+  }, []) // Mount-only
 
   // Attach the engine to the playback loop
-  usePlaybackLoop(demuxer, audioEngine, audioCtx)
+  usePlaybackLoop(videoEngine, audioEngine, audioCtx)
 
-  // Attach the Orchestrator to manage tracks
+  // Attach Orchestrators to manage tracks/clips
   useAudioOrchestrator(audioEngine, audioCtx)
+  useVideoOrchestrator(videoEngine)
 
   // Resume AudioContext on user interaction (Play)
   useEffect(() => {
@@ -75,100 +127,33 @@ export const PreviewPanel = () => {
 
   // Scrubbing logic (Sync when NOT playing)
   useEffect(() => {
-    if (!isPlaying && activeClip) {
-      const sourceTime =
-        (playheadPosition - activeClip.timeline_in + activeClip.source_in) /
-        projectFps
+    if (!isPlaying && videoEngine) {
+      // Clear before seeking multiple overlapping clips
+      videoEngine.clear()
 
-      if (demuxer) {
-        demuxer.seekByTime(sourceTime)
-      }
+      activeClips.forEach((clip: any) => {
+        const sourceTime =
+          (playheadPosition - clip.timeline_in + clip.source_in) / projectFps
+        videoEngine.seekByTime(clip.id, sourceTime)
+      })
 
       if (audioEngine) {
-        // Global seek for scrubbing
-        audioEngine.seekByTime(sourceTime)
+        // Audio engine still handles global sync for now
+        const firstClip = activeClips[0]
+        if (firstClip) {
+          const sourceTime =
+            (playheadPosition - firstClip.timeline_in + firstClip.source_in) /
+            projectFps
+          audioEngine.seekByTime(sourceTime)
+        }
       }
     }
   }, [
     playheadPosition,
     isPlaying,
-    demuxer,
+    videoEngine,
     audioEngine,
-    activeClip,
-    projectFps,
-  ])
-
-  // Video Demuxer Lifecycle
-  useEffect(() => {
-    const canvas = canvasRef.current
-
-    const cleanupDemuxer = () => {
-      demuxerRef.current?.dispose()
-      demuxerRef.current = null
-      setDemuxer(null)
-    }
-
-    if (!canvas || !activeAsset || activeAsset.media_type !== 'video') {
-      cleanupDemuxer()
-      return
-    }
-
-    let cancelled = false
-
-    const initVideo = async () => {
-      try {
-        setIsInitializing(true)
-        cleanupDemuxer()
-
-        canvas.width = previewWidth
-        canvas.height = previewHeight
-
-        const renderer = new WebGPURenderer(canvas)
-        await renderer.initialize()
-
-        if (cancelled) {
-          renderer.dispose()
-          return
-        }
-
-        const newDemuxer = new VideoDemuxer(activeAsset.file_path, renderer)
-        await newDemuxer.initialize()
-
-        if (cancelled) {
-          newDemuxer.dispose()
-          return
-        }
-
-        // PRE-SEEK demuxer to current playhead
-        if (activeClip) {
-          const sourceTime =
-            (playheadPosition - activeClip.timeline_in + activeClip.source_in) /
-            projectFps
-          await newDemuxer.seekByTime(sourceTime)
-        }
-
-        demuxerRef.current = newDemuxer
-        setDemuxer(newDemuxer)
-      } catch (error) {
-        console.error('Failed to initialize video engine:', error)
-      } finally {
-        if (!cancelled) {
-          setIsInitializing(false)
-        }
-      }
-    }
-
-    initVideo()
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    activeAsset?.file_path,
-    activeAsset?.id,
-    activeAsset?.media_type,
-    previewWidth,
-    previewHeight,
+    activeClips.length,
     projectFps,
   ])
 
@@ -187,28 +172,29 @@ export const PreviewPanel = () => {
             </div>
           </div>
         )}
-        {activeAsset ? (
-          activeAsset.media_type === 'video' ? (
-            <canvas
-              ref={canvasRef}
-              key={activeAsset.id}
-              className="h-full w-full object-contain"
-              width={previewWidth}
-              height={previewHeight}
-            />
-          ) : activeAsset.media_type === 'image' ? (
-            <img
-              src={convertFileSrc(activeAsset.file_path)}
-              alt={activeAsset.name}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <div className="text-center">
-              <FileIcon className="mx-auto mb-2 size-12 opacity-20" />
-              <p className="text-xs">Preview not available</p>
-            </div>
-          )
-        ) : (
+
+        {/* VIDEO LAYER - Always mounted to keep WebGPU context alive */}
+        <canvas
+          ref={canvasRef}
+          style={{
+            display: activeAsset?.media_type === 'video' ? 'block' : 'none',
+          }}
+          className="h-full w-full object-contain"
+          width={previewWidth}
+          height={previewHeight}
+        />
+
+        {/* IMAGE LAYER */}
+        {activeAsset?.media_type === 'image' && (
+          <img
+            src={convertFileSrc(activeAsset.file_path)}
+            alt={activeAsset.name}
+            className="h-full w-full object-contain"
+          />
+        )}
+
+        {/* FALLBACKS */}
+        {!activeAsset && !isInitializing && (
           <div className="flex flex-col items-center gap-2">
             <FilmStripIcon className="size-12 opacity-10" />
             <span className="text-[10px] font-medium tracking-widest uppercase opacity-20">
@@ -216,6 +202,15 @@ export const PreviewPanel = () => {
             </span>
           </div>
         )}
+
+        {activeAsset &&
+          activeAsset.media_type !== 'video' &&
+          activeAsset.media_type !== 'image' && (
+            <div className="text-center">
+              <FileIcon className="mx-auto mb-2 size-12 opacity-20" />
+              <p className="text-xs">Preview not available</p>
+            </div>
+          )}
       </div>
     </div>
   )

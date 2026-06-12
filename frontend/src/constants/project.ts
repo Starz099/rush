@@ -24,5 +24,5 @@ export const FPS_OPTIONS: { label: string; value: FPSValue }[] = [
 
 export const DEFAULT_PROJECT_CONFIG = {
   RESOLUTION: '1080p' as ResolutionValue,
-  FPS: '30' as FPSValue,
+  FPS: '60' as FPSValue,
 } as const
