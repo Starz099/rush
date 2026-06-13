@@ -30,6 +30,7 @@ interface ProjectState {
     trackId: string,
     clipId: string,
     properties: Partial<Clip>,
+    persist?: boolean,
   ) => Promise<void>
 }
 
@@ -112,6 +113,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     trackId: string,
     clipId: string,
     properties: Partial<Clip>,
+    persist: boolean = true,
   ) => {
     const project = get().activeProject
     if (!project) return
@@ -153,6 +155,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       },
     })
 
-    await get().saveTimeline(project.id, updatedTimeline)
+    if (persist === true) {
+      await get().saveTimeline(project.id, updatedTimeline)
+    }
   },
 }))

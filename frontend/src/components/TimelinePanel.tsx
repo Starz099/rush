@@ -6,65 +6,14 @@ import {
   SpeakerHighIcon,
   PlayIcon,
   PauseIcon,
+  MagnetIcon,
 } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { fpsToNumeric } from '@/helpers/fps'
-import type { Clip } from '@/api/bindings'
-
-// Constants for timeline scaling
-const PIXELS_PER_SECOND = 20
-const TICK_INTERVAL_SECONDS = 5 // Mark every 5 seconds
-
-interface TimelineTrackProps {
-  track: any
-  framerate: number
-}
-
-const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
-  const isVideo = track.track_type === 'video'
-  const bgColor = isVideo ? 'bg-blue-500/20' : 'bg-green-500/20'
-  const borderColor = isVideo ? 'border-blue-500/40' : 'border-green-500/40'
-  const textColor = isVideo ? 'text-blue-200/70' : 'text-green-200/70'
-
-  const { selectedClipId, setClipSelection } = useWorkspaceStore()
-  const setPlayhead = useAppStore((state) => state.setPlayhead)
-
-  const handleClipClick = (e: React.MouseEvent, clip: Clip) => {
-    e.stopPropagation() // Prevent timeline seek
-    setClipSelection(track.id, clip.id)
-    setPlayhead(clip.timeline_in)
-  }
-
-  return (
-    <div className="flex h-16 border-b border-white/5 bg-white/[0.02]">
-      {/* Track Content */}
-      <div className="relative flex-1 bg-black/20">
-        {track.clips.map((clip: Clip) => {
-          const isSelected = selectedClipId === clip.id
-          return (
-            <div
-              key={clip.id}
-              onClick={(e) => handleClipClick(e, clip)}
-              className={`absolute top-1 bottom-1 flex cursor-default items-center justify-center rounded border transition-all ${
-                isSelected
-                  ? 'z-10 border-blue-400 bg-blue-500/40 ring-1 ring-blue-400/50'
-                  : `${borderColor} ${bgColor} hover:border-white/20`
-              } px-2 text-[9px] font-medium ${isSelected ? 'text-white' : textColor}`}
-              style={{
-                left: `${(clip.timeline_in / framerate) * PIXELS_PER_SECOND}px`,
-                width: `${((clip.timeline_out - clip.timeline_in) / framerate) * PIXELS_PER_SECOND}px`,
-              }}
-            >
-              <span className="truncate">{clip.id.slice(0, 8)}</span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+import { PIXELS_PER_SECOND, TICK_INTERVAL_SECONDS } from '@/constants/timeline'
+import { TimelineTrack } from './TimelineTrack'
 
 export const TimelinePanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
@@ -76,7 +25,7 @@ export const TimelinePanel = () => {
   const setPlayhead = useAppStore((state) => state.setPlayhead)
   const framerate = fpsToNumeric(activeProject?.framerate)
 
-  const { clearSelection } = useWorkspaceStore()
+  const { clearSelection, allowOverlap, setAllowOverlap } = useWorkspaceStore()
 
   const timelineContentRef = useRef<HTMLDivElement>(null)
 
@@ -143,18 +92,33 @@ export const TimelinePanel = () => {
           <span className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
             Timeline
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 hover:bg-white/10"
-            onClick={togglePlayback}
-          >
-            {isPlaying ? (
-              <PauseIcon weight="fill" className="size-3 text-white" />
-            ) : (
-              <PlayIcon weight="fill" className="size-3 text-white" />
-            )}
-          </Button>
+          <div className="flex items-center gap-1 border-l border-white/5 pl-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 hover:bg-white/10"
+              onClick={togglePlayback}
+            >
+              {isPlaying ? (
+                <PauseIcon weight="fill" className="size-3 text-white" />
+              ) : (
+                <PlayIcon weight="fill" className="size-3 text-white" />
+              )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              title={allowOverlap ? 'Overlap Allowed' : 'No Overlap (Magnetic)'}
+              className={`size-6 hover:bg-white/10 ${!allowOverlap ? 'bg-blue-500/10 text-blue-400' : 'text-white/40'}`}
+              onClick={() => setAllowOverlap(!allowOverlap)}
+            >
+              <MagnetIcon
+                weight={!allowOverlap ? 'fill' : 'bold'}
+                className="size-3"
+              />
+            </Button>
+          </div>
         </div>
 
         <div className="text-muted-foreground rounded bg-white/5 px-2 py-0.5 font-mono text-[10px]">
