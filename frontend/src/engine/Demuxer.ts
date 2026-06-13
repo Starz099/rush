@@ -5,21 +5,17 @@ export class VideoDemuxer {
   private mp4boxfile: any
   decoder: VideoDecoder
   private filePath: string
-  private renderer?: { draw: (frame: VideoFrame) => void; dispose?: () => void }
   private decoderConfigured = false
   private disposed = false
 
   private samples: any[] = []
   private currentSampleIndex = 0
-  public videoTrack: any
   private seekTargetTimestamp: number | null = null
+  public videoTrack: any
+  public currentFrame: VideoFrame | null = null
 
-  constructor(
-    filePath: string,
-    renderer?: { draw: (frame: VideoFrame) => void; dispose?: () => void },
-  ) {
+  constructor(filePath: string) {
     this.filePath = filePath
-    this.renderer = renderer
     this.mp4boxfile = MP4Box.createFile()
     this.decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
@@ -30,7 +26,6 @@ export class VideoDemuxer {
 
         // QUIET SEEK: If we are seeking to a specific time,
         // skip rendering all intermediate frames.
-        // We use a 100 microsecond epsilon to avoid precision issues.
         if (
           this.seekTargetTimestamp !== null &&
           frame.timestamp < this.seekTargetTimestamp - 100
@@ -39,18 +34,14 @@ export class VideoDemuxer {
           return
         }
 
-        // Once we hit or pass our target, we stop filtering
         this.seekTargetTimestamp = null
 
-        if (this.renderer) {
-          this.renderer.draw(frame)
-          return
+        // Buffer the frame for the master loop to collect.
+        // We MUST close the old frame to prevent GPU memory leaks.
+        if (this.currentFrame) {
+          this.currentFrame.close()
         }
-
-        console.log(
-          `Decoded Frame at ${frame.timestamp}ms. Size: ${frame.codedWidth}x${frame.codedHeight}`,
-        )
-        frame.close()
+        this.currentFrame = frame
       },
       error: (e) => console.error('Decoder error:', e),
     })
@@ -58,6 +49,7 @@ export class VideoDemuxer {
 
   public dispose() {
     this.disposed = true
+    this.currentFrame?.close()
     if (this.decoder.state !== 'closed') {
       this.decoder.close()
     }

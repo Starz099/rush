@@ -61,6 +61,7 @@ export type Clip = {
   timeline_out: number
   source_in: number
   source_out: number
+  transform: Transform | null
 }
 
 export type FpsPreset = '15' | '30' | '60'
@@ -88,6 +89,12 @@ export type Track = {
   name: string
   track_type: string
   clips: Clip[]
+}
+
+export type Transform = {
+  x: number | null
+  y: number | null
+  scale: number | null
 }
 
 /* Tauri Specta runtime */

@@ -56,7 +56,12 @@ export function usePlaybackLoop(
         timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
 
       if (videoEngine) {
-        videoTracks.forEach((track: any) => {
+        // Collect all active clips across all tracks
+        // Important: Reverse the tracks so they are processed from bottom to top for Z-index
+        const reversedTracks = [...videoTracks].reverse()
+        const activeClipsToRender: any[] = []
+
+        reversedTracks.forEach((track: any) => {
           const activeClips = track.clips.filter(
             (clip: any) =>
               playheadFloatRef.current >= clip.timeline_in &&
@@ -67,9 +72,17 @@ export function usePlaybackLoop(
             const sourceTime =
               (playheadFloatRef.current - clip.timeline_in + clip.source_in) /
               framerate
+
+            // First, trigger decoding for this clip
             videoEngine.displayAtTime(clip.id, sourceTime)
+
+            // Add to the render list
+            activeClipsToRender.push(clip)
           })
         })
+
+        // Finally, render everything in one synchronized batch
+        videoEngine.renderFrame(activeClipsToRender)
       }
 
       // UPDATE AUDIO

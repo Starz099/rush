@@ -1,3 +1,4 @@
+import type { Clip } from '@/api/bindings'
 import { VideoDemuxer } from './Demuxer'
 import type { WebGPURenderer } from './Renderer'
 
@@ -15,13 +16,6 @@ export class VideoEngine {
   }
 
   /**
-   * Clears the canvas. Should be called at the start of every frame/tick.
-   */
-  public clear() {
-    this.renderer.clear()
-  }
-
-  /**
    * Adds and initializes a new video clip.
    * @param clipId Unique identifier for the clip.
    * @param filePath Path to the video file.
@@ -29,7 +23,7 @@ export class VideoEngine {
   public async addClip(clipId: string, filePath: string) {
     if (this.disposed || this.demuxers.has(clipId)) return
 
-    const demuxer = new VideoDemuxer(filePath, this.renderer)
+    const demuxer = new VideoDemuxer(filePath)
 
     // Initialize (fetch metadata, start demuxing)
     await demuxer.initialize()
@@ -87,5 +81,24 @@ export class VideoEngine {
       demuxer.dispose()
     })
     this.demuxers.clear()
+  }
+
+  public renderFrame(activeClips: Clip[]) {
+    this.renderer.beginFrame()
+
+    for (const clip of activeClips) {
+      const demuxer = this.demuxers.get(clip.id)
+      if (demuxer && demuxer.currentFrame) {
+        this.renderer.drawClip(demuxer.currentFrame, clip.transform)
+      }
+    }
+    this.renderer.endFrame()
+  }
+
+  /**
+   * Dummy clear method to prevent crashes from stale calls during refactoring.
+   */
+  public clear() {
+    this.renderFrame([])
   }
 }
