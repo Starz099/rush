@@ -20,9 +20,6 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
   const [isDragging, setIsDragging] = useState(false)
 
   const { selectedClipId, setClipSelection } = useWorkspaceStore()
-  const updateClipProperties = useProjectStore(
-    (state) => state.updateClipProperties,
-  )
   const setPlayhead = useAppStore((state) => state.setPlayhead)
 
   const handleMouseDown = (e: React.MouseEvent, clip: Clip) => {
@@ -34,7 +31,6 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
 
     const startPixelX = e.clientX
     const startTimelineIn = clip.timeline_in
-    const duration = clip.timeline_out - clip.timeline_in
 
     // GATHER SNAP POINTS (Edges of all other clips + Playhead + Start)
     const project = useProjectStore.getState().activeProject
@@ -53,12 +49,24 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
       const deltaX = moveEvent.clientX - startPixelX
       const deltaFrames = Math.round((deltaX / PIXELS_PER_SECOND) * framerate)
 
-      const rawTimelineIn = Math.max(0, startTimelineIn + deltaFrames)
-      const rawTimelineOut = rawTimelineIn + duration
+      // Get latest state to avoid stale closure issues
+      const project = useProjectStore.getState().activeProject
+      if (!project) return
 
+      const latestTrack = project.timeline_state.tracks.find(
+        (t) => t.id === track.id,
+      )
+      if (!latestTrack) return
+
+      const latestClip = latestTrack.clips.find((c) => c.id === clip.id)
+      if (!latestClip) return
+
+      const duration = latestClip.timeline_out - latestClip.timeline_in
+      const rawTimelineIn = Math.max(0, startTimelineIn + deltaFrames)
+
+      const rawTimelineOut = rawTimelineIn + duration
       let finalTimelineIn = rawTimelineIn
 
-      // APPLY SNAPPING
       // Check if head snaps
       const headSnap = snapPoints.find(
         (p) => Math.abs(rawTimelineIn - p) <= snapThresholdFrames,
@@ -75,11 +83,12 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
         }
       }
 
-      await updateClipProperties(
+      // Use updateClipProperties which already handles Sync Locking
+      await useProjectStore.getState().updateClipProperties(
         track.id,
         clip.id,
         { timeline_in: finalTimelineIn },
-        false,
+        false, // Don't persist on every move
       )
     }
 

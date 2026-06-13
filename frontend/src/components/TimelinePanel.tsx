@@ -6,7 +6,6 @@ import {
   SpeakerHighIcon,
   PlayIcon,
   PauseIcon,
-  MagnetIcon,
 } from '@phosphor-icons/react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useRef } from 'react'
@@ -25,7 +24,7 @@ export const TimelinePanel = () => {
   const setPlayhead = useAppStore((state) => state.setPlayhead)
   const framerate = fpsToNumeric(activeProject?.framerate)
 
-  const { clearSelection, allowOverlap, setAllowOverlap } = useWorkspaceStore()
+  const { clearSelection } = useWorkspaceStore()
 
   const timelineContentRef = useRef<HTMLDivElement>(null)
 
@@ -96,7 +95,7 @@ export const TimelinePanel = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="size-6 hover:bg-white/10"
+              className="size-6 text-white/40 hover:bg-white/10"
               onClick={togglePlayback}
             >
               {isPlaying ? (
@@ -104,19 +103,6 @@ export const TimelinePanel = () => {
               ) : (
                 <PlayIcon weight="fill" className="size-3 text-white" />
               )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              title={allowOverlap ? 'Overlap Allowed' : 'No Overlap (Magnetic)'}
-              className={`size-6 hover:bg-white/10 ${!allowOverlap ? 'bg-blue-500/10 text-blue-400' : 'text-white/40'}`}
-              onClick={() => setAllowOverlap(!allowOverlap)}
-            >
-              <MagnetIcon
-                weight={!allowOverlap ? 'fill' : 'bold'}
-                className="size-3"
-              />
             </Button>
           </div>
         </div>
