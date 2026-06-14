@@ -95,6 +95,7 @@ export type Transform = {
   x: number | null
   y: number | null
   scale: number | null
+  z_index: number
 }
 
 /* Tauri Specta runtime */

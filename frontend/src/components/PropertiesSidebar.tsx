@@ -4,21 +4,50 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Slider } from '@/components/ui/slider'
+import { Button } from '@/components/ui/button'
+import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react'
 
 export const PropertiesSidebar = () => {
   const { selectedAsset, selectedClipId, selectedTrackId } = useWorkspaceStore()
   const { activeProject, updateClipProperties } = useProjectStore()
 
   // Find the selected clip object if one exists
-  const selectedClip = activeProject?.timeline_state.tracks
-    .find((t) => t.id === selectedTrackId)
-    ?.clips.find((c) => c.id === selectedClipId)
+  const track = activeProject?.timeline_state.tracks.find(
+    (t) => t.id === selectedTrackId,
+  )
+  const selectedClip = track?.clips.find((c) => c.id === selectedClipId)
 
   const handleClipUpdate = (props: any) => {
     if (selectedTrackId && selectedClipId) {
       updateClipProperties(selectedTrackId, selectedClipId, props)
     }
   }
+
+  const handleTransformUpdate = (key: string, value: number) => {
+    const currentTransform = selectedClip?.transform || {
+      x: 0,
+      y: 0,
+      scale: 1,
+      z_index: 0,
+    }
+    handleClipUpdate({
+      transform: {
+        ...currentTransform,
+        [key]: value,
+      },
+    })
+  }
+
+  const handleZIndexUpdate = (delta: number) => {
+    if (selectedClip) {
+      const currentZ = selectedClip.transform?.z_index || 0
+      handleTransformUpdate('z_index', currentZ + delta)
+    }
+  }
+
+  const clamp = (val: number, min: number, max: number) =>
+    Math.min(Math.max(val, min), max)
 
   return (
     <div className="flex h-full flex-col bg-[#0a0a0a]">
@@ -73,17 +102,154 @@ export const PropertiesSidebar = () => {
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="rounded-md border border-white/5 bg-white/[0.02] p-2.5">
-                  <Label className="text-[9px] font-semibold text-white/30 uppercase">
-                    Duration
+              <Separator className="bg-white/5" />
+
+              {/* Transform Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-emerald-500" />
+                  <h3 className="text-[10px] font-bold tracking-tight text-emerald-400/80 uppercase">
+                    Transform
+                  </h3>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Position X */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                        Position X
+                      </Label>
+                      <Input
+                        type="number"
+                        className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                        value={selectedClip.transform?.x ?? 0}
+                        onChange={(e) =>
+                          handleTransformUpdate(
+                            'x',
+                            clamp(parseInt(e.target.value) || 0, -1920, 1920),
+                          )
+                        }
+                      />
+                    </div>
+                    <Slider
+                      value={[selectedClip.transform?.x ?? 0]}
+                      min={-1920}
+                      max={1920}
+                      step={1}
+                      onValueChange={([val]) => handleTransformUpdate('x', val)}
+                    />
+                  </div>
+
+                  {/* Position Y */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                        Position Y
+                      </Label>
+                      <Input
+                        type="number"
+                        className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                        value={selectedClip.transform?.y ?? 0}
+                        onChange={(e) =>
+                          handleTransformUpdate(
+                            'y',
+                            clamp(parseInt(e.target.value) || 0, -1080, 1080),
+                          )
+                        }
+                      />
+                    </div>
+                    <Slider
+                      value={[selectedClip.transform?.y ?? 0]}
+                      min={-1080}
+                      max={1080}
+                      step={1}
+                      onValueChange={([val]) => handleTransformUpdate('y', val)}
+                    />
+                  </div>
+
+                  {/* Scale */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                        Scale (%)
+                      </Label>
+                      <Input
+                        type="number"
+                        className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                        value={Math.round(
+                          (selectedClip.transform?.scale ?? 1) * 100,
+                        )}
+                        onChange={(e) =>
+                          handleTransformUpdate(
+                            'scale',
+                            clamp(parseInt(e.target.value) || 0, 1, 200) / 100,
+                          )
+                        }
+                      />
+                    </div>
+                    <Slider
+                      value={[selectedClip.transform?.scale ?? 1]}
+                      min={0.01}
+                      max={2}
+                      step={0.01}
+                      onValueChange={([val]) =>
+                        handleTransformUpdate('scale', val)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="bg-white/5" />
+
+              {/* Layer Order Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-orange-500" />
+                  <h3 className="text-[10px] font-bold tracking-tight text-orange-400/80 uppercase">
+                    Layer Order
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
+                    onClick={() => handleZIndexUpdate(1)}
+                  >
+                    <ArrowUpIcon className="mr-1.5 h-3 w-3" />
+                    Bring Forward
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
+                    onClick={() => handleZIndexUpdate(-1)}
+                  >
+                    <ArrowDownIcon className="mr-1.5 h-3 w-3" />
+                    Send Backward
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between px-1">
+                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                    Current Z-Index
                   </Label>
-                  <p className="mt-0.5 font-mono text-xs font-medium text-white/70">
-                    {selectedClip.timeline_out - selectedClip.timeline_in}{' '}
-                    <span className="text-[9px] text-white/20 uppercase">
-                      frames
-                    </span>
-                  </p>
+                  <Input
+                    type="number"
+                    className="h-6 w-12 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                    value={selectedClip.transform?.z_index || 0}
+                    onChange={(e) =>
+                      handleTransformUpdate(
+                        'z_index',
+                        parseInt(e.target.value) || 0,
+                      )
+                    }
+                  />
                 </div>
               </div>
 
@@ -126,9 +292,6 @@ export const PropertiesSidebar = () => {
                     />
                   </div>
                 </div>
-                <p className="text-[9px] text-white/20 italic">
-                  Source End is calculated automatically.
-                </p>
               </div>
 
               <Separator className="bg-white/5" />

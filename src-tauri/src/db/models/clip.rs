@@ -19,6 +19,7 @@ pub struct Transform {
     pub x: f32,
     pub y: f32,
     pub scale: f32,
+    pub z_index: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]

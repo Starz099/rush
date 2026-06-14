@@ -57,11 +57,9 @@ export function usePlaybackLoop(
 
       if (videoEngine) {
         // Collect all active clips across all tracks
-        // Important: Reverse the tracks so they are processed from bottom to top for Z-index
-        const reversedTracks = [...videoTracks].reverse()
         const activeClipsToRender: any[] = []
 
-        reversedTracks.forEach((track: any) => {
+        videoTracks.forEach((track: any) => {
           const activeClips = track.clips.filter(
             (clip: any) =>
               playheadFloatRef.current >= clip.timeline_in &&
@@ -80,6 +78,11 @@ export function usePlaybackLoop(
             activeClipsToRender.push(clip)
           })
         })
+
+        // Sort by z_index so clips with higher z_index are drawn later (on top)
+        activeClipsToRender.sort(
+          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
+        )
 
         // Finally, render everything in one synchronized batch
         videoEngine.renderFrame(activeClipsToRender)
