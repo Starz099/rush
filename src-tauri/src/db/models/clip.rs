@@ -15,6 +15,14 @@ pub struct Track {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+pub struct Transform {
+    pub x: f32,
+    pub y: f32,
+    pub scale: f32,
+    pub z_index: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 pub struct Clip {
     pub id: String,
     pub asset_id: String,
@@ -22,4 +30,5 @@ pub struct Clip {
     pub timeline_out: i32,
     pub source_in: i32,
     pub source_out: i32,
+    pub transform: Option<Transform>,
 }

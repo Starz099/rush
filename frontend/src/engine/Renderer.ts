@@ -1,3 +1,5 @@
+import type { Transform } from '@/api/bindings'
+
 export class WebGPURenderer {
   private canvas: HTMLCanvasElement
   private device!: GPUDevice
@@ -5,13 +7,11 @@ export class WebGPURenderer {
   private pipeline!: GPURenderPipeline
   private format: GPUTextureFormat = 'bgra8unorm'
   private disposed: boolean = false
+  private currentCommandEncoder: GPUCommandEncoder | null = null
+  private currentRenderPass: GPURenderPassEncoder | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
-  }
-
-  public dispose() {
-    this.disposed = true
   }
 
   public async initialize() {
@@ -34,12 +34,81 @@ export class WebGPURenderer {
 
     this.setupPipeline()
   }
+  public beginFrame() {
+    if (this.disposed || !this.device || !this.context) return
+    this.currentCommandEncoder = this.device.createCommandEncoder()
+
+    const textureView = this.context.getCurrentTexture().createView()
+    this.currentRenderPass = this.currentCommandEncoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: textureView,
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    })
+
+    // Set the pipeline once at the start of the frame
+    this.currentRenderPass.setPipeline(this.pipeline)
+  }
+
+  public drawClip(frame: VideoFrame, transform: Transform | null) {
+    if (!this.currentRenderPass || !this.device) {
+      return
+    }
+
+    // prepare the texture from the VideoFrame
+    const externalTexture = this.device.importExternalTexture({ source: frame })
+    const sampler = this.device.createSampler()
+
+    // Prepare the Uniform Data (MUST match the Shader struct above)
+    const uniformData = new Float32Array([
+      this.canvas.width, // canvasResolution.x
+      this.canvas.height, // canvasResolution.y
+      frame.displayWidth, // frameResolution.x
+      frame.displayHeight, // frameResolution.y
+      transform?.x ?? 0, // position.x
+      transform?.y ?? 0, // position.y
+      transform?.scale ?? 1, // scale
+      0, // Padding (for 16-byte alignment)
+    ])
+
+    const uniformBuffer = this.device.createBuffer({
+      size: uniformData.byteLength,
+      // usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: 64 | 8,
+    })
+    this.device.queue.writeBuffer(uniformBuffer, 0, uniformData)
+
+    // Create the Bind Group for this specific clip
+    const bindGroup = this.device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: sampler },
+        { binding: 1, resource: externalTexture },
+        { binding: 2, resource: { buffer: uniformBuffer } },
+      ],
+    })
+
+    // Record the draw command into the current pass
+    this.currentRenderPass.setBindGroup(0, bindGroup)
+    this.currentRenderPass.draw(6)
+  }
 
   public setupPipeline() {
     const shaderCode = `
       struct Uniforms {
         canvasResolution: vec2<f32>,
         frameResolution: vec2<f32>,
+        position: vec2<f32>,
+        scale: f32,
+      }
+
+      struct VertexOutput {
+        @builtin(position) Position : vec4<f32>,
+        @location(0) uv : vec2<f32>,
       }
 
       @group(0) @binding(0) var mySampler: sampler;
@@ -47,54 +116,41 @@ export class WebGPURenderer {
       @group(0) @binding(2) var<uniform> uniforms: Uniforms;
 
       @vertex
-      fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> @builtin(position) vec4<f32> {
+      fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
           var pos = array<vec2<f32>, 6>(
               vec2<f32>(-1.0, -1.0), vec2<f32>( 1.0, -1.0), vec2<f32>(-1.0,  1.0),
               vec2<f32>(-1.0,  1.0), vec2<f32>( 1.0, -1.0), vec2<f32>( 1.0,  1.0)
           );
-          return vec4<f32>(pos[VertexIndex], 0.0, 1.0);
+
+          var uv_coords = array<vec2<f32>, 6>(
+              vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0),
+              vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0), vec2<f32>(1.0, 0.0)
+          );
+
+          var p = pos[VertexIndex];
+          var out: VertexOutput;
+
+          out.uv = uv_coords[VertexIndex];
+
+          // Apply transformation: Scale then Translate
+          p = p * uniforms.scale;
+          
+          // Convert pixel position to NDC (-1 to 1)
+          let offset = vec2<f32>(
+            (uniforms.position.x / uniforms.canvasResolution.x) * 2.0,
+            -(uniforms.position.y / uniforms.canvasResolution.y) * 2.0
+          );
+
+          out.Position = vec4<f32>(p + offset, 0.0, 1.0);
+          return out;
       }
 
       @fragment
-      fn fs_main(@builtin(position) coord: vec4<f32>) -> @location(0) vec4<f32> {
-          let canvasRes = uniforms.canvasResolution;
-          let frameRes = uniforms.frameResolution;
-
-          let canvasAspect = canvasRes.x / canvasRes.y;
-          let frameAspect = frameRes.x / frameRes.y;
-
-          var uv: vec2<f32>;
-
-          if (frameAspect > canvasAspect) {
-              // Asset is wider than canvas (Letterbox)
-              // We fit to canvas width.
-              let scale = canvasAspect / frameAspect;
-              let verticalOffset = (1.0 - scale) * 0.5;
-              
-              uv = vec2<f32>(
-                  coord.x / canvasRes.x,
-                  ((coord.y / canvasRes.y) - verticalOffset) / scale
-              );
-          } else {
-              // Asset is taller than canvas (Pillarbox)
-              // We fit to canvas height.
-              let scale = frameAspect / canvasAspect;
-              let horizontalOffset = (1.0 - scale) * 0.5;
-              
-              uv = vec2<f32>(
-                  ((coord.x / canvasRes.x) - horizontalOffset) / scale,
-                  coord.y / canvasRes.y
-              );
-          }
-
-          // Strict bound check for letterboxing/pillarboxing
-          if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-              return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-          }
-
+      fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
           return textureSampleBaseClampToEdge(myTexture, mySampler, uv);
       }
     `
+
     const module = this.device.createShaderModule({ code: shaderCode })
     this.pipeline = this.device.createRenderPipeline({
       layout: 'auto',
@@ -111,95 +167,17 @@ export class WebGPURenderer {
     })
   }
 
-  public clear() {
-    if (this.disposed || !this.device || !this.context) return
+  public endFrame() {
+    if (!this.currentCommandEncoder || !this.currentRenderPass) return
 
-    const commandEncoder = this.device.createCommandEncoder()
-    const textureView = this.context.getCurrentTexture().createView()
+    this.currentRenderPass.end()
+    this.device.queue.submit([this.currentCommandEncoder.finish()])
 
-    const renderPass = commandEncoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: textureView,
-          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-      ],
-    })
-    renderPass.end()
-    this.device.queue.submit([commandEncoder.finish()])
+    this.currentCommandEncoder = null
+    this.currentRenderPass = null
   }
 
-  private isDrawing = false
-
-  public draw(frame: VideoFrame) {
-    if (this.disposed || !this.device || !this.pipeline) {
-      frame.close()
-      return
-    }
-
-    // If the GPU queue is already busy with a previous frame from this tick,
-    // skip this one to maintain 60fps fluidity (avoiding backlog).
-    if (this.isDrawing) {
-      frame.close()
-      return
-    }
-
-    this.isDrawing = true
-
-    try {
-      const externalTexture = this.device.importExternalTexture({
-        source: frame,
-      })
-      const sampler = this.device.createSampler()
-
-      // Create uniform buffer
-      const uniformData = new Float32Array([
-        this.canvas.width,
-        this.canvas.height,
-        frame.displayWidth,
-        frame.displayHeight,
-      ])
-      const uniformBuffer = this.device.createBuffer({
-        size: uniformData.byteLength,
-        // GPUBufferUsage.UNIFORM (64) | GPUBufferUsage.COPY_DST (8)
-        usage: 64 | 8,
-      })
-      this.device.queue.writeBuffer(uniformBuffer, 0, uniformData)
-
-      const bindGroup = this.device.createBindGroup({
-        layout: this.pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: sampler },
-          { binding: 1, resource: externalTexture },
-          { binding: 2, resource: { buffer: uniformBuffer } },
-        ],
-      })
-
-      const commandEncoder = this.device.createCommandEncoder()
-      const textureView = this.context.getCurrentTexture().createView()
-
-      const renderPass = commandEncoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: textureView,
-            // Use 'load' so we don't clear what was drawn by other clips in this same tick
-            loadOp: 'load',
-            storeOp: 'store',
-          },
-        ],
-      })
-
-      renderPass.setPipeline(this.pipeline)
-      renderPass.setBindGroup(0, bindGroup)
-      renderPass.draw(6)
-      renderPass.end()
-
-      this.device.queue.submit([commandEncoder.finish()])
-    } finally {
-      frame.close()
-      this.isDrawing = false
-    }
+  public dispose() {
+    this.disposed = true
   }
 }

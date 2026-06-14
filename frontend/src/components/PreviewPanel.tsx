@@ -128,14 +128,14 @@ export const PreviewPanel = () => {
   // Scrubbing logic (Sync when NOT playing)
   useEffect(() => {
     if (!isPlaying && videoEngine) {
-      // Clear before seeking multiple overlapping clips
-      videoEngine.clear()
-
       activeClips.forEach((clip: any) => {
         const sourceTime =
           (playheadPosition - clip.timeline_in + clip.source_in) / projectFps
-        videoEngine.seekByTime(clip.id, sourceTime)
+        videoEngine.displayAtTime(clip.id, sourceTime)
       })
+
+      // Trigger a synchronized render for the current scrubbed position
+      videoEngine.renderFrame(activeClips)
 
       if (audioEngine) {
         // Audio engine still handles global sync for now

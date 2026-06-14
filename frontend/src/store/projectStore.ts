@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { projectApi } from '@/api/project'
 import { assetApi } from '@/api/asset'
 import type { Project, ResolutionValue, FPSValue } from '@/types/project'
-import type { Asset } from '@/api/bindings'
+import type { Asset, Clip } from '@/api/bindings'
 
 interface ProjectState {
   projects: Project[]
@@ -25,7 +25,12 @@ interface ProjectState {
   setPlayheadOnly: (position: number) => void
   addAsset: (asset: Asset) => void
   removeAsset: (assetId: string) => void
-  updateAsset: (asset: Asset) => void
+  updateClipProperties: (
+    trackId: string,
+    clipId: string,
+    properties: Partial<Clip>,
+    persist?: boolean,
+  ) => Promise<void>
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -98,8 +103,79 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   addAsset: (asset) => set((state) => ({ assets: [...state.assets, asset] })),
   removeAsset: (assetId) =>
     set((state) => ({ assets: state.assets.filter((a) => a.id !== assetId) })),
-  updateAsset: (asset) =>
+  updateAsset: (asset: any) =>
     set((state) => ({
       assets: state.assets.map((a) => (a.id === asset.id ? asset : a)),
     })),
+
+  updateClipProperties: async (
+    trackId: string,
+    clipId: string,
+    properties: Partial<Clip>,
+    persist: boolean = true,
+  ) => {
+    const project = get().activeProject
+    if (!project) return
+
+    const timeline = project.timeline_state
+
+    // Find the target clip's info for syncing
+    let targetAssetId: string | null = null
+    let targetOriginalTimelineIn: number | null = null
+
+    const sourceTrack = timeline.tracks.find((t: any) => t.id === trackId)
+    if (sourceTrack) {
+      const sourceClip = sourceTrack.clips.find((c: Clip) => c.id === clipId)
+      if (sourceClip) {
+        targetAssetId = sourceClip.asset_id
+        targetOriginalTimelineIn = sourceClip.timeline_in
+      }
+    }
+
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      // Logic: Update if it's the target clip OR if it's a "linked" clip
+      // Linked = same asset_id and same original timeline_in
+      return {
+        ...track,
+        clips: track.clips.map((clip: Clip) => {
+          const isTargetClip = track.id === trackId && clip.id === clipId
+          const isLinkedClip =
+            targetAssetId &&
+            clip.asset_id === targetAssetId &&
+            clip.timeline_in === targetOriginalTimelineIn
+
+          if (!isTargetClip && !isLinkedClip) return clip
+
+          const updatedClip = { ...clip, ...properties }
+
+          if (
+            properties.timeline_in !== undefined &&
+            properties.timeline_out === undefined
+          ) {
+            const duration = clip.timeline_out - clip.timeline_in
+            updatedClip.timeline_out = updatedClip.timeline_in + duration
+          }
+
+          const timelineDuration =
+            updatedClip.timeline_out - updatedClip.timeline_in
+          updatedClip.source_out = updatedClip.source_in + timelineDuration
+
+          return updatedClip
+        }),
+      }
+    })
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks }
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    })
+
+    if (persist === true) {
+      await get().saveTimeline(project.id, updatedTimeline)
+    }
+  },
 }))
