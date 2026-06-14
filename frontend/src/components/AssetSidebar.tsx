@@ -26,7 +26,7 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   const fetchAssets = useProjectStore((state) => state.fetchAssets)
   const addAsset = useProjectStore((state) => state.addAsset)
   const removeAsset = useProjectStore((state) => state.removeAsset)
-  const updateAsset = useProjectStore((state) => state.updateAsset)
+  const renameAsset = useProjectStore((state) => state.renameAsset)
   const saveTimeline = useProjectStore((state) => state.saveTimeline)
 
   const prepareAsset = useAppStore((state) => state.prepareAsset)
@@ -90,10 +90,10 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
     const newName = window.prompt('Enter new name for asset:', asset.name)
     if (!newName || newName === asset.name) return
     try {
-      await assetApi.rename(asset.id, newName)
-      const updated = { ...asset, name: newName }
-      updateAsset(updated)
-      if (selectedAsset?.id === asset.id) setSelectedAsset(updated)
+      await renameAsset(asset.id, newName)
+      if (selectedAsset?.id === asset.id) {
+        setSelectedAsset({ ...asset, name: newName })
+      }
     } catch (error) {
       console.error('Failed to rename asset:', error)
       alert('Error renaming asset: ' + error)

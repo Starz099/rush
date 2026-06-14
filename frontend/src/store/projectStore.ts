@@ -25,6 +25,7 @@ interface ProjectState {
   setPlayheadOnly: (position: number) => void
   addAsset: (asset: Asset) => void
   removeAsset: (assetId: string) => void
+  renameAsset: (assetId: string, newName: string) => Promise<void>
   updateClipProperties: (
     trackId: string,
     clipId: string,
@@ -103,10 +104,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   addAsset: (asset) => set((state) => ({ assets: [...state.assets, asset] })),
   removeAsset: (assetId) =>
     set((state) => ({ assets: state.assets.filter((a) => a.id !== assetId) })),
-  updateAsset: (asset: any) =>
+
+  renameAsset: async (assetId: string, newName: string) => {
+    await assetApi.rename(assetId, newName)
     set((state) => ({
-      assets: state.assets.map((a) => (a.id === asset.id ? asset : a)),
-    })),
+      assets: state.assets.map((a) =>
+        a.id === assetId ? { ...a, name: newName } : a,
+      ),
+    }))
+  },
 
   updateClipProperties: async (
     trackId: string,
