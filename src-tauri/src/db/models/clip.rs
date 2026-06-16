@@ -1,3 +1,4 @@
+use crate::models::TrackType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
@@ -10,7 +11,7 @@ pub struct TimelineState {
 pub struct Track {
     pub id: String,
     pub name: String,
-    pub track_type: String, // "video" or "audio"
+    pub track_type: TrackType,
     pub clips: Vec<Clip>,
 }
 

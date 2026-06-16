@@ -1,6 +1,9 @@
 use crate::db::models::clip::{TimelineState, Track};
 use crate::db::models::project::Project;
-use crate::models::{FpsPreset, ResolutionPreset};
+use crate::models::{FpsPreset, ResolutionPreset, TrackType};
+use crate::render::models::RenderTimeline;
+use crate::render::RenderEngine;
+
 use crate::state::AppState;
 use tauri::State;
 use uuid::Uuid;
@@ -18,20 +21,20 @@ pub fn create_project(
     let id = Uuid::new_v4().to_string();
     let (width, height) = resolution.dimensions();
     let fps_val = fps.value();
-    
+
     let initial_timeline = TimelineState {
         playhead_position: 0,
         tracks: vec![
             Track {
                 id: "video-1".to_string(),
                 name: "Video 1".to_string(),
-                track_type: "video".to_string(),
+                track_type: TrackType::Video,
                 clips: vec![],
             },
             Track {
                 id: "audio-1".to_string(),
                 name: "Audio 1".to_string(),
-                track_type: "audio".to_string(),
+                track_type: TrackType::Audio,
                 clips: vec![],
             },
         ],
@@ -146,6 +149,37 @@ pub fn save_project_timeline(
         (&timeline_json, &id),
     )
     .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn export_project(
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+    project_id: String,
+    output_path: String,
+) -> Result<(), String> {
+    // 1. Get database connection
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // 2. Fetch the project by ID
+    let project = db
+            .query_row(
+                "SELECT id, name, viewport_width, viewport_height, framerate, timeline_state, created_at, updated_at
+             FROM projects WHERE id = ?1",
+                [&project_id],
+                Project::from_row,
+            )
+            .map_err(|e| e.to_string())?;
+
+    // 3. Compile timeline data from project
+    let render_timeline = RenderTimeline::from_project(&project, &db)?;
+
+    // 4. Instantiate RenderEngine and run it
+    let engine = RenderEngine::new(render_timeline);
+    engine.start_render(&app_handle, &output_path)?;
 
     Ok(())
 }

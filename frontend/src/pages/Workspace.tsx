@@ -26,6 +26,44 @@ const Workspace = () => {
   const saveTimeline = useProjectStore((state) => state.saveTimeline)
   const [project, setProject] = useState<Project | null>(activeProject)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRendering, setIsRendering] = useState(false)
+  const [renderProgress, setRenderProgress] = useState(0)
+
+  const handleExport = async () => {
+    if (!project) return
+
+    const outputPath = window.prompt(
+      'Enter absolute output file path (e.g. C:/videos/output.mp4):',
+      '',
+    )
+    if (!outputPath) return
+
+    setIsRendering(true)
+    setRenderProgress(0)
+
+    let unlisten: (() => void) | null = null
+
+    try {
+      const { listen } = await import('@tauri-apps/api/event')
+      unlisten = await listen<{ progress: number }>(
+        'render-progress',
+        (event) => {
+          setRenderProgress(event.payload.progress)
+        },
+      )
+
+      await projectApi.export(project.id, outputPath)
+      alert('Project exported successfully!')
+    } catch (error) {
+      console.error('Export failed:', error)
+      alert('Export failed: ' + error)
+    } finally {
+      setIsRendering(false)
+      if (unlisten) {
+        unlisten()
+      }
+    }
+  }
 
   useEffect(() => {
     if (!projectId) {
@@ -95,8 +133,15 @@ const Workspace = () => {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline">
-            Export
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isRendering}
+            onClick={handleExport}
+          >
+            {isRendering
+              ? `Exporting (${Math.round(renderProgress)}%)`
+              : 'Export'}
           </Button>
           <Button
             size="sm"

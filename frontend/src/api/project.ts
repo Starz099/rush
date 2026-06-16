@@ -24,4 +24,8 @@ export const projectApi = {
   saveTimeline: async (id: string, timelineState: any): Promise<void> => {
     await unwrap(commands.saveProjectTimeline(id, timelineState))
   },
+
+  export: async (id: string, outputPath: string): Promise<void> => {
+    await unwrap(commands.exportProject(id, outputPath))
+  },
 }

@@ -179,7 +179,7 @@ export const PreviewPanel = () => {
           style={{
             display: activeAsset?.media_type === 'video' ? 'block' : 'none',
           }}
-          className="h-full w-full object-contain"
+          className="h-full w-full bg-white/5 object-contain"
           width={previewWidth}
           height={previewHeight}
         />
@@ -189,7 +189,7 @@ export const PreviewPanel = () => {
           <img
             src={convertFileSrc(activeAsset.file_path)}
             alt={activeAsset.name}
-            className="h-full w-full object-contain"
+            className="h-full w-full bg-white/5 object-contain"
           />
         )}
 

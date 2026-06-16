@@ -5,22 +5,28 @@ import { invoke as __TAURI_INVOKE } from '@tauri-apps/api/core'
 /** Commands */
 export const commands = {
   createProject: (name: string, resolution: ResolutionPreset, fps: FpsPreset) =>
-    typedError<Project, string>(
+    typedError<Project_Serialize, string>(
       __TAURI_INVOKE('create_project', { name, resolution, fps }),
     ),
   getProjects: () =>
-    typedError<Project[], string>(__TAURI_INVOKE('get_projects')),
+    typedError<Project_Serialize[], string>(__TAURI_INVOKE('get_projects')),
   getProject: (id: string) =>
-    typedError<Project, string>(__TAURI_INVOKE('get_project', { id })),
+    typedError<Project_Serialize, string>(
+      __TAURI_INVOKE('get_project', { id }),
+    ),
   deleteProject: (id: string) =>
     typedError<null, string>(__TAURI_INVOKE('delete_project', { id })),
   updateProjectName: (id: string, newName: string) =>
     typedError<null, string>(
       __TAURI_INVOKE('update_project_name', { id, newName }),
     ),
-  saveProjectTimeline: (id: string, timelineState: TimelineState) =>
+  saveProjectTimeline: (id: string, timelineState: TimelineState_Deserialize) =>
     typedError<null, string>(
       __TAURI_INVOKE('save_project_timeline', { id, timelineState }),
+    ),
+  exportProject: (projectId: string, outputPath: string) =>
+    typedError<null, string>(
+      __TAURI_INVOKE('export_project', { projectId, outputPath }),
     ),
   registerAsset: (
     projectId: string,
@@ -66,28 +72,63 @@ export type Clip = {
 
 export type FpsPreset = '15' | '30' | '60'
 
-export type Project = {
+export type Project = Project_Serialize | Project_Deserialize
+
+export type Project_Deserialize = {
   id: string
   name: string
   viewport_width: number
   viewport_height: number
   framerate: number
-  timeline_state: TimelineState
+  timeline_state: TimelineState_Deserialize
+  created_at: string
+  updated_at: string
+}
+
+export type Project_Serialize = {
+  id: string
+  name: string
+  viewport_width: number
+  viewport_height: number
+  framerate: number
+  timeline_state: TimelineState_Serialize
   created_at: string
   updated_at: string
 }
 
 export type ResolutionPreset = '1080p' | '4k' | 'vertical'
 
-export type TimelineState = {
+export type TimelineState = TimelineState_Serialize | TimelineState_Deserialize
+
+export type TimelineState_Deserialize = {
   playhead_position: number
-  tracks: Track[]
+  tracks: Track_Deserialize[]
 }
 
-export type Track = {
+export type TimelineState_Serialize = {
+  playhead_position: number
+  tracks: Track_Serialize[]
+}
+
+export type Track = Track_Serialize | Track_Deserialize
+
+export type TrackType = TrackType_Serialize | TrackType_Deserialize
+
+export type TrackType_Deserialize = 'video' | 'Video' | 'audio' | 'Audio'
+
+export type TrackType_Serialize = 'video' | 'audio'
+
+export type Track_Deserialize = {
   id: string
   name: string
-  track_type: string
+  track_type: TrackType_Deserialize
+  clips: Clip[]
+}
+
+export type Track_Serialize = {
+  id: string
+  name: string
+  track_type: TrackType_Serialize
   clips: Clip[]
 }
 

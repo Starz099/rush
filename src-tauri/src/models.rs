@@ -39,3 +39,12 @@ impl FpsPreset {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum TrackType {
+    #[serde(alias = "Video")]
+    Video,
+    #[serde(alias = "Audio")]
+    Audio,
+}
