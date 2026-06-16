@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod models;
+mod render;
 mod state;
 
 use specta_typescript::Typescript;
@@ -17,6 +18,7 @@ pub fn run() {
         commands::project::delete_project,
         commands::project::update_project_name,
         commands::project::save_project_timeline,
+        commands::project::export_project,
         commands::asset::register_asset,
         commands::asset::get_assets,
         commands::asset::delete_asset,
