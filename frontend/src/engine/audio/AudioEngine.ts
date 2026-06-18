@@ -1,4 +1,4 @@
-import { AudioPipeline } from './AudioPipeline'
+import { AudioPipeline } from '../decoders/AudioPipeline'
 import type { IAudioProvider } from './providers/types'
 
 /**
@@ -102,26 +102,29 @@ export class AudioEngine {
   /**
    * Seeks all tracks to a specific time.
    */
-  public seekByTime(
-    timeInSeconds: number,
-    timelineStart: number = 0,
-    sourceStart: number = 0,
-  ) {
+  public seekByTime(timelinePlayheadInSeconds: number) {
     if (this.disposed) return
-    this.pipelines.forEach((pipeline) => {
-      pipeline.seek(timeInSeconds)
-    })
 
     // After seeking, we update the internal sync so Play continues correctly
     this.playbackStartTime = this.audioCtx.currentTime
-    this.playbackStartPlayheadTime = timeInSeconds
+    this.playbackStartPlayheadTime = timelinePlayheadInSeconds
 
     this.pipelines.forEach((pipeline) => {
-      pipeline.setPlaybackSync(
+      // Calculate the source playhead for this specific track
+      // sourcePlayhead = timelinePlayhead - clipTimelineStart + clipSourceStart
+      const sourcePlayhead =
+        timelinePlayheadInSeconds -
+        pipeline.timelineStartInSeconds +
+        pipeline.sourceStartInSeconds
+
+      // Seek the pipeline to the calculated position (clamp to >= sourceStart)
+      const seekTarget = Math.max(pipeline.sourceStartInSeconds, sourcePlayhead)
+      pipeline.seek(seekTarget)
+
+      // Sync the master clock on the pipeline
+      pipeline.setMasterSync(
         this.playbackStartTime,
         this.playbackStartPlayheadTime,
-        timelineStart,
-        sourceStart,
       )
     })
   }

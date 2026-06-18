@@ -2,14 +2,16 @@ import { useEffect, useRef } from 'react'
 import { useAppStore } from '../store/timelineStore'
 import { useProjectStore } from '../store/projectStore'
 import { fpsToNumeric } from '../helpers/fps'
+import type { VideoEngine } from '@/engine/VideoEngine'
+import type { AudioEngine } from '@/engine/audio/AudioEngine'
 
 /**
  * usePlaybackLoop drives the frame-by-frame progression of the project.
  * It synchronizes the video engine and audio engine based on the hardware clock.
  */
 export function usePlaybackLoop(
-  videoEngine: any,
-  audioEngine?: any,
+  videoEngine: VideoEngine | null,
+  audioEngine?: AudioEngine | null,
   audioCtx?: AudioContext | null,
 ) {
   const isPlaying = useAppStore((state) => state.isPlaying)
@@ -17,6 +19,7 @@ export function usePlaybackLoop(
 
   const activeProject = useProjectStore((state) => state.activeProject)
   const framerate = fpsToNumeric(activeProject?.framerate)
+  const assets = useProjectStore((state) => state.assets)
 
   const requestRef = useRef<number>(null)
 
@@ -56,7 +59,12 @@ export function usePlaybackLoop(
         timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
 
       if (videoEngine) {
-        // Collect all active clips across all tracks
+        // Trigger look-ahead buffering in the background (Non-Blocking!)
+        if (activeProject) {
+          void videoEngine.tick(currentPlayhead, activeProject, assets)
+        }
+
+        // Identify all video clips that should be visible on screen right now
         const activeClipsToRender: any[] = []
 
         videoTracks.forEach((track: any) => {
@@ -65,27 +73,16 @@ export function usePlaybackLoop(
               playheadFloatRef.current >= clip.timeline_in &&
               playheadFloatRef.current < clip.timeline_out,
           )
-
-          activeClips.forEach((clip: any) => {
-            const sourceTime =
-              (playheadFloatRef.current - clip.timeline_in + clip.source_in) /
-              framerate
-
-            // First, trigger decoding for this clip
-            videoEngine.displayAtTime(clip.id, sourceTime)
-
-            // Add to the render list
-            activeClipsToRender.push(clip)
-          })
+          activeClipsToRender.push(...activeClips)
         })
 
-        // Sort by z_index so clips with higher z_index are drawn later (on top)
+        // Sort by z_index so overlays are drawn on top of backgrounds
         activeClipsToRender.sort(
           (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
         )
 
-        // Finally, render everything in one synchronized batch
-        videoEngine.renderFrame(activeClipsToRender)
+        // Render the pre-decoded frames to the WebGPU canvas
+        videoEngine.renderFrame(currentPlayhead, activeClipsToRender, framerate)
       }
 
       // UPDATE AUDIO
@@ -137,5 +134,6 @@ export function usePlaybackLoop(
     audioCtx,
     activeProject,
     setPlayhead,
+    assets,
   ])
 }

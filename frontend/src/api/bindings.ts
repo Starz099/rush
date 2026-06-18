@@ -46,6 +46,16 @@ export const commands = {
     typedError<number[], string>(
       __TAURI_INVOKE('read_asset_bytes', { filePath }),
     ),
+  extractAudio: (filePath: string) =>
+    typedError<string, string>(__TAURI_INVOKE('extract_audio', { filePath })),
+  readAssetRange: (filePath: string, offset: number | null, length: number) =>
+    typedError<RangeResult, string>(
+      __TAURI_INVOKE('read_asset_range', { filePath, offset, length }),
+    ),
+  readMoovBox: (filePath: string) =>
+    typedError<RangeResult, string>(
+      __TAURI_INVOKE('read_moov_box', { filePath }),
+    ),
 }
 
 /* Types */
@@ -94,6 +104,12 @@ export type Project_Serialize = {
   timeline_state: TimelineState_Serialize
   created_at: string
   updated_at: string
+}
+
+export type RangeResult = {
+  bytes: number[]
+  file_start: number | null
+  total_length: number | null
 }
 
 export type ResolutionPreset = '1080p' | '4k' | 'vertical'

@@ -48,3 +48,10 @@ pub enum TrackType {
     #[serde(alias = "Audio")]
     Audio,
 }
+
+#[derive(serde::Serialize, specta::Type)]
+pub struct RangeResult {
+    pub bytes: Vec<u8>,
+    pub file_start: f64,
+    pub total_length: f64,
+}
