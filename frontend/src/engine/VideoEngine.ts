@@ -1,104 +1,69 @@
-import type { Clip } from '@/api/bindings'
-import { VideoDemuxer } from './Demuxer'
-import type { WebGPURenderer } from './Renderer'
+import type { WebGPURenderer } from './core/Renderer'
+import { LookAheadManager } from './buffering/LookAheadManager'
+import type { Project, Clip, Asset } from '@/api/bindings'
 
-/**
- * VideoEngine acts as the master registry for all video clips in the project.
- * It manages multiple VideoDemuxers concurrently, sharing a single WebGPURenderer.
- */
 export class VideoEngine {
   private renderer: WebGPURenderer
-  private demuxers: Map<string, VideoDemuxer> = new Map()
-  private disposed: boolean = false
+  private lookAhead: LookAheadManager
+  private disposed = false
 
   constructor(renderer: WebGPURenderer) {
     this.renderer = renderer
+    this.lookAhead = new LookAheadManager()
   }
 
   /**
-   * Adds and initializes a new video clip.
-   * @param clipId Unique identifier for the clip.
-   * @param filePath Path to the video file.
+   * Logical tick called by the playback loop to manage prefetching and background decoding.
    */
-  public async addClip(clipId: string, filePath: string) {
-    if (this.disposed || this.demuxers.has(clipId)) return
-
-    const demuxer = new VideoDemuxer(filePath)
-
-    // Initialize (fetch metadata, start demuxing)
-    await demuxer.initialize()
-
-    this.demuxers.set(clipId, demuxer)
-    console.log(`[VideoEngine] Added clip: ${clipId}`)
-    return demuxer
+  public async tick(
+    playheadFrame: number,
+    activeProject: Project,
+    assets: Asset[],
+  ) {
+    if (this.disposed) return
+    await this.lookAhead.tick(playheadFrame, activeProject, assets)
   }
 
   /**
-   * Removes and disposes of a clip.
+   * Render tick called by the playback loop to draw all active frames on screen.
    */
-  public removeClip(clipId: string) {
-    const demuxer = this.demuxers.get(clipId)
-    if (demuxer) {
-      demuxer.dispose()
-      this.demuxers.delete(clipId)
-      console.log(`[VideoEngine] Removed clip: ${clipId}`)
-    }
-  }
+  public renderFrame(
+    playheadFrame: number,
+    activeClips: Clip[],
+    framerate: number,
+  ) {
+    if (this.disposed) return
 
-  /**
-   * Returns a specific demuxer instance.
-   */
-  public getClip(clipId: string): VideoDemuxer | undefined {
-    return this.demuxers.get(clipId)
-  }
-
-  /**
-   * Seeks a specific clip to a time.
-   */
-  public async seekByTime(clipId: string, timeInSeconds: number) {
-    const demuxer = this.demuxers.get(clipId)
-    if (demuxer) {
-      await demuxer.seekByTime(timeInSeconds)
-    }
-  }
-
-  /**
-   * Decodes and renders a frame for a specific clip at a time.
-   */
-  public async displayAtTime(clipId: string, timeInSeconds: number) {
-    const demuxer = this.demuxers.get(clipId)
-    if (demuxer) {
-      await demuxer.displayAtTime(timeInSeconds)
-    }
-  }
-
-  /**
-   * Shuts down the engine and all demuxers.
-   */
-  public dispose() {
-    this.disposed = true
-    this.demuxers.forEach((demuxer) => {
-      demuxer.dispose()
-    })
-    this.demuxers.clear()
-  }
-
-  public renderFrame(activeClips: Clip[]) {
+    // 1. Start WebGPU frame recording
     this.renderer.beginFrame()
 
+    // 2. Render each active clip
     for (const clip of activeClips) {
-      const demuxer = this.demuxers.get(clip.id)
-      if (demuxer && demuxer.currentFrame) {
-        this.renderer.drawClip(demuxer.currentFrame, clip.transform)
+      // Pull the decoded frame from the LookAheadManager
+      const frame = this.lookAhead.getFrame(clip.id, playheadFrame, framerate)
+
+      if (frame) {
+        // Draw the frame onto the canvas using our WebGPU renderer
+        this.renderer.drawClip(frame, clip.transform)
       }
     }
+
+    // 3. Submit WebGPU commands to the GPU
     this.renderer.endFrame()
   }
 
   /**
-   * Dummy clear method to prevent crashes from stale calls during refactoring.
+   * Resets all buffer sessions. Called when playhead jumps/scrubs.
    */
-  public clear() {
-    this.renderFrame([])
+  public reset() {
+    this.lookAhead.reset()
+  }
+
+  /**
+   * Clean up everything when disposing the editor
+   */
+  public dispose() {
+    this.disposed = true
+    this.lookAhead.dispose()
   }
 }

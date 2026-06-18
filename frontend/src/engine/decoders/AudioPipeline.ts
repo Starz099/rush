@@ -2,7 +2,7 @@ import type {
   AudioMetadata,
   AudioSample,
   IAudioProvider,
-} from './providers/types'
+} from '../audio/providers/types'
 
 export class AudioPipeline {
   private provider: IAudioProvider
@@ -12,8 +12,8 @@ export class AudioPipeline {
   private activeSources: AudioBufferSourceNode[] = []
   private playbackStartTime: number = 0
   private playbackStartPlayheadTime: number = 0
-  private timelineStartInSeconds: number = 0
-  private sourceStartInSeconds: number = 0
+  public timelineStartInSeconds: number = 0
+  public sourceStartInSeconds: number = 0
   private decoderConfigured: boolean = false
   private disposed: boolean = false
 

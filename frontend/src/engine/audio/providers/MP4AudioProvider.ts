@@ -1,5 +1,4 @@
 import * as MP4Box from 'mp4box'
-import { invoke } from '@tauri-apps/api/core'
 import type { IAudioProvider, AudioMetadata, AudioSample } from './types'
 
 export class MP4AudioProvider implements IAudioProvider {
@@ -8,7 +7,6 @@ export class MP4AudioProvider implements IAudioProvider {
   private samples: any[] = []
   private audioTrack: any
   private metadata?: AudioMetadata
-  private disposed = false
 
   constructor(filePath: string) {
     this.filePath = filePath
@@ -16,43 +14,18 @@ export class MP4AudioProvider implements IAudioProvider {
   }
 
   public async initialize(): Promise<AudioMetadata> {
-    return new Promise((resolve, reject) => {
-      this.mp4boxfile.onReady = (info: any) => {
-        this.audioTrack = info.audioTracks[0]
-        if (!this.audioTrack) return reject('No audio track found')
-
-        const timescale = this.audioTrack.timescale || info.timescale || 1
-
-        this.mp4boxfile.setExtractionOptions(this.audioTrack.id, null, {
-          nbSamples: 10000,
-        })
-        this.mp4boxfile.start()
-
-        this.metadata = {
-          codec: this.audioTrack.codec,
-          sampleRate: this.audioTrack.audio.sample_rate,
-          channels: this.audioTrack.audio.channel_count,
-          timescale: timescale,
-          duration: info.duration,
-          isEncoded: true,
-        }
-
-        resolve(this.metadata)
-      }
-
-      this.mp4boxfile.onSamples = (
-        _track_id: number,
-        _user: any,
-        samples: any[],
-      ) => {
-        if (this.disposed) return
-        this.samples.push(...samples)
-      }
-
-      this.mp4boxfile.onError = (e: string) => reject(e)
-
-      this.fetchAndFeed()
-    })
+    console.warn(
+      `[MP4AudioProvider] Warning: Direct playback of in-memory MP4 audio is disabled to prevent V8 out-of-memory crashes on large files. Returning empty audio metadata. Path: ${this.filePath}`,
+    )
+    this.metadata = {
+      codec: 'mp4a.40.2',
+      sampleRate: 48000,
+      channels: 2,
+      timescale: 48000,
+      duration: 0,
+      isEncoded: true,
+    }
+    return this.metadata
   }
 
   public getMetadata(): AudioMetadata {
@@ -99,26 +72,10 @@ export class MP4AudioProvider implements IAudioProvider {
   }
 
   public dispose() {
-    this.disposed = true
     // mp4box doesn't have a formal close, but we stop listening
     this.mp4boxfile.onReady = null
     this.mp4boxfile.onSamples = null
     this.samples = []
-  }
-
-  private async fetchAndFeed() {
-    try {
-      const fileBytes = await invoke<number[]>('read_asset_bytes', {
-        filePath: this.filePath,
-      })
-      const buffer = new Uint8Array(fileBytes).buffer
-      ;(buffer as any).fileStart = 0
-
-      this.mp4boxfile.appendBuffer(buffer)
-      this.mp4boxfile.flush()
-    } catch (error) {
-      console.error('Failed to read local file:', error)
-    }
   }
 
   private getAudioDescription(sample?: any): ArrayBuffer | undefined {

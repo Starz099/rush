@@ -24,6 +24,10 @@
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]
+      },
+      "headers": {
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Range",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS"
       }
     }
   },

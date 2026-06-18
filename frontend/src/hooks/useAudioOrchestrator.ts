@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../store/timelineStore'
 import { useProjectStore } from '../store/projectStore'
-import { AudioEngine } from '../engine/AudioEngine'
-import { MP4AudioProvider } from '../engine/providers/MP4AudioProvider'
-import { StandaloneAudioProvider } from '../engine/providers/StandaloneAudioProvider'
+import { AudioEngine } from '../engine/audio/AudioEngine'
+import { MP4AudioProvider } from '../engine/audio/providers/MP4AudioProvider'
+import { StandaloneAudioProvider } from '../engine/audio/providers/StandaloneAudioProvider'
 import { fpsToNumeric } from '../helpers/fps'
 
 export function useAudioOrchestrator(
@@ -13,12 +13,14 @@ export function useAudioOrchestrator(
   const activeProject = useProjectStore((state) => state.activeProject)
   const assets = useProjectStore((state) => state.assets)
   const playhead = useAppStore((state) => state.playhead_position)
+  const readyAssets = useAppStore((state) => state.readyAssets)
   const framerate = fpsToNumeric(activeProject?.framerate)
 
   // Track which clip IDs are currently loaded in the engine
   const mountedClipIds = useRef<Set<string>>(new Set())
   const isInitializing = useRef<Set<string>>(new Set())
   const failedClipIds = useRef<Set<string>>(new Set())
+  const mountedClipMetadata = useRef<Map<string, any>>(new Map())
 
   // Track readiness for the UI
   const [isReady, setIsReady] = useState(true)
@@ -32,13 +34,20 @@ export function useAudioOrchestrator(
     const preloadBufferFrames = framerate * 5
     const trailingBufferFrames = framerate * 1
 
-    const clipsToMount = timeline.tracks.flatMap((track) =>
-      track.clips.filter(
-        (clip) =>
+    const audioTracks = timeline.tracks.filter(
+      (t: any) => t.track_type === 'audio',
+    )
+    const clipsToMount = audioTracks.flatMap((track: any) =>
+      track.clips.filter((clip: any) => {
+        const asset = assets.find((a) => a.id === clip.asset_id)
+        const isAssetReady = asset ? !!readyAssets[asset.id] : false
+        return (
+          isAssetReady &&
           playhead < clip.timeline_out + trailingBufferFrames &&
           playhead > clip.timeline_in - preloadBufferFrames &&
-          !failedClipIds.current.has(clip.id),
-      ),
+          !failedClipIds.current.has(clip.id)
+        )
+      }),
     )
 
     // AUDIBILITY CHECK: Which ones actually need to be ready for sound RIGHT NOW
@@ -54,7 +63,28 @@ export function useAudioOrchestrator(
       if (!requiredIds.has(id)) {
         audioEngine.removeTrack(id)
         mountedClipIds.current.delete(id)
+        mountedClipMetadata.current.delete(id)
         console.log(`[Orchestrator] Disposed distant track: ${id}`)
+      }
+    })
+
+    // REMOVE CLIPS that have been modified (to force remount)
+    mountedClipIds.current.forEach((id) => {
+      const activeClip = clipsToMount.find((c) => c.id === id)
+      const cachedClip = mountedClipMetadata.current.get(id)
+      if (activeClip && cachedClip) {
+        if (
+          cachedClip.asset_id !== activeClip.asset_id ||
+          cachedClip.timeline_in !== activeClip.timeline_in ||
+          cachedClip.timeline_out !== activeClip.timeline_out ||
+          cachedClip.source_in !== activeClip.source_in ||
+          cachedClip.source_out !== activeClip.source_out
+        ) {
+          console.log(`[Orchestrator] Remounting modified track: ${id}`)
+          audioEngine.removeTrack(id)
+          mountedClipIds.current.delete(id)
+          mountedClipMetadata.current.delete(id)
+        }
       }
     })
 
@@ -76,16 +106,19 @@ export function useAudioOrchestrator(
         }
 
         try {
+          const extractedAudioPath =
+            useAppStore.getState().extractedAudios[asset.id]
+          const audioPathToUse = extractedAudioPath || asset.file_path
           const isMp3 =
-            asset.file_path.toLowerCase().endsWith('.mp3') ||
+            audioPathToUse.toLowerCase().endsWith('.mp3') ||
             asset.media_type === 'audio'
 
           const provider = isMp3
-            ? new StandaloneAudioProvider(asset.file_path, audioCtx)
-            : new MP4AudioProvider(asset.file_path)
+            ? new StandaloneAudioProvider(audioPathToUse, audioCtx)
+            : new MP4AudioProvider(audioPathToUse)
 
           console.log(
-            `[Orchestrator] Preloading track: ${clip.id} (${isMp3 ? 'MP3' : 'MP4'})`,
+            `[Orchestrator] Preloading track: ${clip.id} (mode: ${isMp3 ? 'Standalone/MP3' : 'MP4'}) using path: ${audioPathToUse}`,
           )
 
           await audioEngine.addTrack(
@@ -103,6 +136,7 @@ export function useAudioOrchestrator(
           }
 
           mountedClipIds.current.add(clip.id)
+          mountedClipMetadata.current.set(clip.id, { ...clip })
         } catch (e) {
           console.error(`[Orchestrator] Preload failed for ${clip.id}:`, e)
           failedClipIds.current.add(clip.id)
@@ -126,7 +160,15 @@ export function useAudioOrchestrator(
       // If state needs flipping
       setIsReady(!loadingAudible)
     }
-  }, [playhead, activeProject, assets, audioEngine, audioCtx, framerate])
+  }, [
+    playhead,
+    activeProject,
+    assets,
+    audioEngine,
+    audioCtx,
+    framerate,
+    readyAssets,
+  ])
 
   return { isReady }
 }

@@ -4,11 +4,10 @@ import { usePlaybackLoop } from '@/hooks/usePlaybackLoop'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { FileIcon, FilmStripIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
-import { WebGPURenderer } from '../engine/Renderer'
+import { WebGPURenderer } from '../engine/core/Renderer'
 import { VideoEngine } from '../engine/VideoEngine'
-import { AudioEngine } from '../engine/AudioEngine'
+import { AudioEngine } from '../engine/audio/AudioEngine'
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator'
-import { useVideoOrchestrator } from '@/hooks/useVideoOrchestrator'
 import { fpsToNumeric } from '@/helpers/fps'
 
 export const PreviewPanel = () => {
@@ -27,6 +26,8 @@ export const PreviewPanel = () => {
 
   const isPlaying = useAppStore((state) => state.isPlaying)
   const playheadPosition = useAppStore((state) => state.playhead_position)
+  const readyAssets = useAppStore((state) => state.readyAssets)
+  const demuxingAssets = useAppStore((state) => state.demuxingAssets)
 
   const timeline = activeProject?.timeline_state
   const videoTracks =
@@ -116,7 +117,43 @@ export const PreviewPanel = () => {
 
   // Attach Orchestrators to manage tracks/clips
   useAudioOrchestrator(audioEngine, audioCtx)
-  useVideoOrchestrator(videoEngine)
+
+  const isActiveAssetLoading = activeAsset
+    ? activeAsset.media_type === 'video' &&
+      (!readyAssets[activeAsset.id] || demuxingAssets[activeAsset.id])
+    : false
+
+  // Auto-prepare assets present in the timeline
+  useEffect(() => {
+    if (!activeProject || assets.length === 0) return
+
+    const timeline = activeProject.timeline_state
+
+    // Find all unique asset IDs in the timeline (video and audio)
+    const timelineAssetIds = new Set<string>()
+    timeline.tracks.forEach((track: any) => {
+      track.clips.forEach((clip: any) => {
+        timelineAssetIds.add(clip.asset_id)
+      })
+    })
+
+    const prepareAsset = useAppStore.getState().prepareAsset
+
+    timelineAssetIds.forEach((assetId) => {
+      const asset = assets.find((a) => a.id === assetId)
+      if (asset) {
+        const isReady = useAppStore.getState().readyAssets[assetId]
+        const isDemuxing = useAppStore.getState().demuxingAssets[assetId]
+
+        if (!isReady && !isDemuxing) {
+          console.log(
+            `[PreviewPanel] Auto-preparing timeline asset: ${asset.name} (${assetId})`,
+          )
+          void prepareAsset(assetId, asset.file_path)
+        }
+      }
+    })
+  }, [activeProject, assets])
 
   // Resume AudioContext on user interaction (Play)
   useEffect(() => {
@@ -127,25 +164,24 @@ export const PreviewPanel = () => {
 
   // Scrubbing logic (Sync when NOT playing)
   useEffect(() => {
-    if (!isPlaying && videoEngine) {
-      activeClips.forEach((clip: any) => {
-        const sourceTime =
-          (playheadPosition - clip.timeline_in + clip.source_in) / projectFps
-        videoEngine.displayAtTime(clip.id, sourceTime)
-      })
+    if (!isPlaying && videoEngine && activeProject) {
+      videoEngine.reset() // Clear all buffers and decoders
 
-      // Trigger a synchronized render for the current scrubbed position
-      videoEngine.renderFrame(activeClips)
+      // Fetch and decode the frame at the new playhead position
+      void videoEngine
+        .tick(playheadPosition, activeProject, assets)
+        .then(() => {
+          // Sort by z_index so overlays are rendered correctly
+          const sortedClips = [...activeClips].sort(
+            (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
+          )
+
+          // Render the frame immediately
+          videoEngine.renderFrame(playheadPosition, sortedClips, projectFps)
+        })
 
       if (audioEngine) {
-        // Audio engine still handles global sync for now
-        const firstClip = activeClips[0]
-        if (firstClip) {
-          const sourceTime =
-            (playheadPosition - firstClip.timeline_in + firstClip.source_in) /
-            projectFps
-          audioEngine.seekByTime(sourceTime)
-        }
+        audioEngine.seekByTime(playheadPosition / projectFps)
       }
     }
   }, [
@@ -155,6 +191,8 @@ export const PreviewPanel = () => {
     audioEngine,
     activeClips.length,
     projectFps,
+    activeProject,
+    assets,
   ])
 
   if (!activeProject) return null
@@ -162,13 +200,20 @@ export const PreviewPanel = () => {
   return (
     <div className="flex h-full flex-col bg-black/40 p-4">
       <div className="relative mx-auto flex aspect-video w-full max-w-[90%] flex-1 items-center justify-center overflow-hidden border border-white/5 bg-black text-white/20 shadow-2xl">
-        {isInitializing && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3">
-              <div className="border-primary size-8 animate-spin rounded-full border-2 border-t-transparent" />
-              <span className="text-[10px] font-medium tracking-widest uppercase opacity-50">
-                Initializing...
+        {(isInitializing || isActiveAssetLoading) && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/70 backdrop-blur-md">
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-white/5 bg-black/50 p-6 shadow-2xl">
+              <div className="border-primary size-9 animate-spin rounded-full border-[3px] border-t-transparent shadow-inner" />
+              <span className="text-[11px] font-bold tracking-widest text-white/90 uppercase">
+                {isInitializing
+                  ? 'Initializing Engines...'
+                  : 'Preparing Video Asset...'}
               </span>
+              {isActiveAssetLoading && (
+                <span className="max-w-[200px] text-center text-[9px] tracking-wider text-white/40">
+                  Parsing frame layouts & optimizing audio for zero-lag playback
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -194,7 +239,7 @@ export const PreviewPanel = () => {
         )}
 
         {/* FALLBACKS */}
-        {!activeAsset && !isInitializing && (
+        {!activeAsset && !isInitializing && !isActiveAssetLoading && (
           <div className="flex flex-col items-center gap-2">
             <FilmStripIcon className="size-12 opacity-10" />
             <span className="text-[10px] font-medium tracking-widest uppercase opacity-20">
