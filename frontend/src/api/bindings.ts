@@ -70,15 +70,56 @@ export type Asset = {
   created_at: string
 }
 
+export type BackgroundConfig = {
+  background_type: BackgroundType
+  color_hex: string | null
+}
+
+export type BackgroundType = 'color' | 'blurred_input'
+
 export type Clip = {
   id: string
-  asset_id: string
+  asset_id: string | null
   timeline_in: number
   timeline_out: number
   source_in: number
   source_out: number
   transform: Transform | null
+  speed_factor: number | null
+  effects: EffectConfig[]
 }
+
+export type EaseCurve = 'linear' | 'ease_in' | 'ease_out'
+
+export type EffectConfig =
+  | {
+      type: 'zoom'
+      params: {
+        start_scale: number | null
+        end_scale: number | null
+        center_x: number | null
+        center_y: number | null
+        ease_curve: EaseCurve
+      }
+    }
+  | {
+      type: 'highlight'
+      params: {
+        shape: Shape
+        color_hex: string
+        stroke_width: number
+        animation: string
+      }
+    }
+  | {
+      type: 'text_overlay'
+      params: {
+        text: string
+        font_family: string
+        font_size: number
+        color_hex: string
+      }
+    }
 
 export type FpsPreset = '15' | '30' | '60'
 
@@ -114,16 +155,20 @@ export type RangeResult = {
 
 export type ResolutionPreset = '1080p' | '4k' | 'vertical'
 
+export type Shape = 'circle' | 'rectangle' | 'arrow' | 'highlighter'
+
 export type TimelineState = TimelineState_Serialize | TimelineState_Deserialize
 
 export type TimelineState_Deserialize = {
   playhead_position: number
   tracks: Track_Deserialize[]
+  background: BackgroundConfig | null
 }
 
 export type TimelineState_Serialize = {
   playhead_position: number
   tracks: Track_Serialize[]
+  background: BackgroundConfig | null
 }
 
 export type Track = Track_Serialize | Track_Deserialize
@@ -139,6 +184,9 @@ export type Track_Deserialize = {
   name: string
   track_type: TrackType_Deserialize
   clips: Clip[]
+  transitions: Transition[]
+  is_muted: boolean
+  is_locked: boolean
 }
 
 export type Track_Serialize = {
@@ -146,6 +194,9 @@ export type Track_Serialize = {
   name: string
   track_type: TrackType_Serialize
   clips: Clip[]
+  transitions: Transition[]
+  is_muted: boolean
+  is_locked: boolean
 }
 
 export type Transform = {
@@ -154,6 +205,17 @@ export type Transform = {
   scale: number | null
   z_index: number
 }
+
+export type Transition = {
+  id: string
+  from_clip_id: string
+  to_clip_id: string
+  transition_type: TransitionType
+  duration_frames: number
+  ease_curve: EaseCurve
+}
+
+export type TransitionType = 'fade' | 'slide' | 'wipe' | 'zoom'
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(

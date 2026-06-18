@@ -30,14 +30,21 @@ pub fn create_project(
                 name: "Video 1".to_string(),
                 track_type: TrackType::Video,
                 clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
             },
             Track {
                 id: "audio-1".to_string(),
                 name: "Audio 1".to_string(),
                 track_type: TrackType::Audio,
                 clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
             },
         ],
+        background: None,
     };
     let timeline_json = serde_json::to_string(&initial_timeline).map_err(|e| e.to_string())?;
 

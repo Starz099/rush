@@ -1,6 +1,6 @@
+use crate::db::models::clip::TimelineState;
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
-use crate::db::models::clip::TimelineState;
 
 #[derive(Debug, Serialize, Deserialize, specta::Type)]
 pub struct Project {
@@ -17,10 +17,12 @@ pub struct Project {
 impl Project {
     pub fn from_row(row: &Row) -> Result<Self, rusqlite::Error> {
         let timeline_state_str: String = row.get(5)?;
-        let timeline_state: TimelineState = serde_json::from_str(&timeline_state_str).unwrap_or(TimelineState {
-            playhead_position: 0,
-            tracks: vec![],
-        });
+        let timeline_state: TimelineState =
+            serde_json::from_str(&timeline_state_str).unwrap_or(TimelineState {
+                playhead_position: 0,
+                tracks: vec![],
+                background: None,
+            });
 
         Ok(Self {
             id: row.get(0)?,
