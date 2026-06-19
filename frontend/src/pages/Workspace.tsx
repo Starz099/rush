@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/resizable'
 import type { Project } from '@/types/project'
 import { projectApi } from '@/api/project'
-import { AssetSidebar } from '@/components/AssetSidebar'
+import { LeftPanel } from '@/components/left-panel'
 import { PreviewPanel } from '@/components/PreviewPanel'
 import { TimelinePanel } from '@/components/TimelinePanel'
 import { PropertiesSidebar } from '@/components/PropertiesSidebar'
@@ -158,7 +158,7 @@ const Workspace = () => {
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
         {/* Left Sidebar */}
         <ResizablePanel maxSize={15} className="border-r">
-          <AssetSidebar projectId={projectId!} />
+          <LeftPanel projectId={projectId!} />
         </ResizablePanel>
 
         <ResizableHandle />

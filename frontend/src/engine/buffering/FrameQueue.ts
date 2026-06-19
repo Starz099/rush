@@ -14,7 +14,7 @@ export class FrameQueue {
   public push(frame: VideoFrame) {
     if (
       this.minTimestamp !== null &&
-      frame.timestamp < this.minTimestamp - 1000
+      frame.timestamp < this.minTimestamp - 30000
     ) {
       console.log(
         `[FrameQueue] Discarding intermediate frame for seek at timestamp=${(frame.timestamp / 1e6).toFixed(3)}s (minTimestamp=${(this.minTimestamp / 1e6).toFixed(3)}s)`,
@@ -61,8 +61,8 @@ export class FrameQueue {
     while (this.queue.length > 0) {
       const nextFrame = this.queue[0]
 
-      // If the next frame is in the future, we stop looking.
-      if (nextFrame.timestamp > timeInMicroseconds) {
+      // If the next frame is in the future (with 30ms tolerance), we stop looking.
+      if (nextFrame.timestamp > timeInMicroseconds + 30000) {
         break
       }
 
@@ -89,7 +89,7 @@ export class FrameQueue {
    * Checks if the queue contains a frame with a timestamp >= targetTimestamp.
    */
   public hasDecodedFrame(targetTimestampMicros: number): boolean {
-    return this.queue.some((f) => f.timestamp >= targetTimestampMicros)
+    return this.queue.some((f) => f.timestamp >= targetTimestampMicros - 30000)
   }
 
   /**

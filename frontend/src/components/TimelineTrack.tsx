@@ -19,12 +19,31 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
     (SNAP_THRESHOLD_PX / PIXELS_PER_SECOND) * framerate
   const [isDragging, setIsDragging] = useState(false)
 
-  const { selectedClipId, setClipSelection } = useWorkspaceStore()
+  const { selectedClipId, setClipSelection, activeTool } = useWorkspaceStore()
   const setPlayhead = useAppStore((state) => state.setPlayhead)
+  const splitClip = useProjectStore((state) => state.splitClip)
+  const trimClip = useProjectStore((state) => state.trimClip)
 
-  const handleMouseDown = (e: React.MouseEvent, clip: Clip) => {
+  const handleClipMouseDown = (e: React.MouseEvent, clip: Clip) => {
     e.stopPropagation()
 
+    if (activeTool === 'split') {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const clickX = e.clientX - rect.left
+      const clickTimeSeconds = clickX / PIXELS_PER_SECOND
+      const clickFrames = Math.round(clickTimeSeconds * framerate)
+      const targetSplitFrame = clip.timeline_in + clickFrames
+
+      if (
+        targetSplitFrame > clip.timeline_in &&
+        targetSplitFrame < clip.timeline_out
+      ) {
+        void splitClip(track.id, clip.id, targetSplitFrame)
+      }
+      return
+    }
+
+    // Default drag-move logic
     setClipSelection(track.id, clip.id)
     setPlayhead(clip.timeline_in)
     setIsDragging(true)
@@ -109,6 +128,41 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
   }
+
+  const handleTrimMouseDown = (
+    e: React.MouseEvent,
+    clip: Clip,
+    edge: 'left' | 'right',
+  ) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const startPixelX = e.clientX
+    const startFrame = edge === 'left' ? clip.timeline_in : clip.timeline_out
+
+    const handleMouseMove = async (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startPixelX
+      const deltaFrames = Math.round((deltaX / PIXELS_PER_SECOND) * framerate)
+      const newFrameValue = startFrame + deltaFrames
+
+      await trimClip(track.id, clip.id, edge, newFrameValue)
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const getCursorClass = () => {
+    if (activeTool === 'split') return 'cursor-cell'
+    if (activeTool === 'trim') return 'cursor-ew-resize'
+    return 'cursor-grab active:cursor-grabbing'
+  }
+
   return (
     <div className="flex h-16 border-b border-white/5 bg-white/[0.02]">
       {/* Track Content */}
@@ -118,9 +172,9 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
           return (
             <div
               key={clip.id}
-              onMouseDown={(e) => handleMouseDown(e, clip)}
+              onMouseDown={(e) => handleClipMouseDown(e, clip)}
               onClick={(e) => e.stopPropagation()}
-              className={`absolute top-1 bottom-1 flex cursor-grab items-center justify-center rounded border active:cursor-grabbing ${
+              className={`group/clip absolute top-1 bottom-1 flex items-center justify-center rounded border ${getCursorClass()} ${
                 isSelected
                   ? 'z-10 border-blue-400 bg-blue-500/40 ring-1 ring-blue-400/50'
                   : `${borderColor} ${bgColor} hover:border-white/20`
@@ -130,7 +184,19 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
                 width: `${((clip.timeline_out - clip.timeline_in) / framerate) * PIXELS_PER_SECOND}px`,
               }}
             >
+              {/* Left Trim Handle */}
+              <div
+                className="absolute top-0 bottom-0 left-0 z-20 w-2 cursor-ew-resize bg-blue-500/40 opacity-0 transition-opacity group-hover/clip:opacity-100"
+                onMouseDown={(e) => handleTrimMouseDown(e, clip, 'left')}
+              />
+
               <span className="truncate">{clip.id.slice(0, 8)}</span>
+
+              {/* Right Trim Handle */}
+              <div
+                className="absolute top-0 right-0 bottom-0 z-20 w-2 cursor-ew-resize bg-blue-500/40 opacity-0 transition-opacity group-hover/clip:opacity-100"
+                onMouseDown={(e) => handleTrimMouseDown(e, clip, 'right')}
+              />
             </div>
           )
         })}

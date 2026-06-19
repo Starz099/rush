@@ -196,8 +196,10 @@ export class LookAheadManager {
       const timescale = session.demuxer.metadata?.timescale || 90000
 
       // Calculate where the playhead currently sits in terms of sample index
-      const playheadCts =
-        (playheadSeconds - clipInSec + clip.source_in) * timescale + firstCts
+      const playheadCts = Math.round(
+        (playheadSeconds - clipInSec + clip.source_in / framerate) * timescale +
+          firstCts,
+      )
       let playheadIdx = -1
 
       if (playheadCts <= session.demuxer.samples[0].cts) {
@@ -233,9 +235,10 @@ export class LookAheadManager {
 
       if (session.lastDecodedIndex === -1) {
         // Initial decode/Seek: start from playhead position and decode full GOP
-        let sourceTimeSeconds = playheadSeconds - clipInSec + clip.source_in
-        if (sourceTimeSeconds < clip.source_in) {
-          sourceTimeSeconds = clip.source_in
+        let sourceTimeSeconds =
+          playheadSeconds - clipInSec + clip.source_in / framerate
+        if (sourceTimeSeconds < clip.source_in / framerate) {
+          sourceTimeSeconds = clip.source_in / framerate
         }
 
         console.log(
@@ -275,7 +278,7 @@ export class LookAheadManager {
 
           const nextSample = session.demuxer.samples[nextIndex]
           const sourceTime = (nextSample.cts - firstCts) / timescale
-          if (sourceTime >= clip.source_out) {
+          if (sourceTime >= clip.source_out / framerate) {
             break // Past the clip's end time
           }
 
@@ -330,8 +333,9 @@ export class LookAheadManager {
     const clip = session.clip
     const clipInSec = clip.timeline_in / framerate
     const playheadSeconds = playheadFrame / framerate
-    const sourcePlayheadSeconds = playheadSeconds - clipInSec + clip.source_in
-    const sourcePlayheadMicroseconds = sourcePlayheadSeconds * 1e6
+    const sourcePlayheadSeconds =
+      playheadSeconds - clipInSec + clip.source_in / framerate
+    const sourcePlayheadMicroseconds = Math.round(sourcePlayheadSeconds * 1e6)
 
     let newFrame = session.queue.getFrameForTime(sourcePlayheadMicroseconds)
     if (!newFrame && !session.currentFrame && session.queue.size > 0) {

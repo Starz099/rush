@@ -85,8 +85,8 @@ export type Clip = {
   source_in: number
   source_out: number
   transform: Transform | null
-  speed_factor: number | null
-  effects: EffectConfig[]
+  speed_factor?: number | null
+  effects?: EffectConfig[]
 }
 
 export type EaseCurve = 'linear' | 'ease_in' | 'ease_out'
@@ -162,7 +162,7 @@ export type TimelineState = TimelineState_Serialize | TimelineState_Deserialize
 export type TimelineState_Deserialize = {
   playhead_position: number
   tracks: Track_Deserialize[]
-  background: BackgroundConfig | null
+  background?: BackgroundConfig | null
 }
 
 export type TimelineState_Serialize = {
@@ -184,9 +184,9 @@ export type Track_Deserialize = {
   name: string
   track_type: TrackType_Deserialize
   clips: Clip[]
-  transitions: Transition[]
-  is_muted: boolean
-  is_locked: boolean
+  transitions?: Transition[]
+  is_muted?: boolean
+  is_locked?: boolean
 }
 
 export type Track_Serialize = {

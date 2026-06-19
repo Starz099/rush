@@ -276,8 +276,9 @@ export class RangeDemuxer {
       chunks.push({ chunk, info: frameInfo })
     }
 
-    const targetTimestampMicros =
-      ((targetFrame.cts - firstCts) * 1e6) / this.metadata.timescale
+    const targetTimestampMicros = Math.round(
+      ((targetFrame.cts - firstCts) * 1e6) / this.metadata.timescale,
+    )
 
     return { chunks, targetTimestampMicros }
   }

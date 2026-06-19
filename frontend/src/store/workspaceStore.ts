@@ -6,6 +6,7 @@ interface WorkspaceState {
   selectedClipId: string | null
   selectedTrackId: string | null
   isPlaying: boolean
+  activeTool: 'select' | 'split' | 'trim'
 
   setSelectedAsset: (asset: Asset | null) => void
   setClipSelection: (trackId: string | null, clipId: string | null) => void
@@ -13,6 +14,7 @@ interface WorkspaceState {
 
   setIsPlaying: (playing: boolean) => void
   togglePlaying: () => void
+  setActiveTool: (tool: 'select' | 'split' | 'trim') => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -20,6 +22,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   selectedClipId: null,
   selectedTrackId: null,
   isPlaying: false,
+  activeTool: 'select',
 
   setSelectedAsset: (asset: Asset | null) =>
     set({
@@ -43,4 +46,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     }),
   setIsPlaying: (playing: boolean) => set({ isPlaying: playing }),
   togglePlaying: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  setActiveTool: (tool) => set({ activeTool: tool }),
 }))

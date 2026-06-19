@@ -14,6 +14,8 @@ export class AudioPipeline {
   private playbackStartPlayheadTime: number = 0
   public timelineStartInSeconds: number = 0
   public sourceStartInSeconds: number = 0
+  public timelineEndInSeconds: number = Infinity
+  public sourceEndInSeconds: number = Infinity
   private decoderConfigured: boolean = false
   private disposed: boolean = false
 
@@ -56,6 +58,15 @@ export class AudioPipeline {
     const actualCount = Math.min(count, remainingSamples)
 
     for (let i = 0; i < actualCount; i++) {
+      const sample = this.provider.getSample(this.currentSampleIndex)
+      if (!sample) break
+
+      const meta = this.provider.getMetadata()
+      const audioTimeInSource = sample.cts / meta.timescale
+      if (audioTimeInSource > this.sourceEndInSeconds) {
+        break // Do not decode past the clip's source end boundary
+      }
+
       this.decodeAtIndex(this.currentSampleIndex)
       this.currentSampleIndex++
     }
@@ -129,17 +140,35 @@ export class AudioPipeline {
     // THE MASTER TIMELINE FORMULA:
     // 1. How far is this sample from the start of the source file?
     const audioTimeInSource = data.timestamp / 1e6
+    if (audioTimeInSource > this.sourceEndInSeconds) {
+      data.close()
+      return
+    }
 
     // 2. Where should this sit on the project timeline?
     // TimelinePos = ClipTimelineStart + (AudioTimeInSource - ClipSourceStart)
     const timelinePos =
       this.timelineStartInSeconds +
       (audioTimeInSource - this.sourceStartInSeconds)
+    if (timelinePos > this.timelineEndInSeconds) {
+      data.close()
+      return
+    }
 
     // 3. When should this play on the hardware clock?
     // PlayTime = MasterStartTime + (TimelinePos - MasterStartPlayhead)
     const playtime =
       this.playbackStartTime + (timelinePos - this.playbackStartPlayheadTime)
+
+    const clipEndTimeline = this.timelineEndInSeconds
+    const clipEndPlaytime =
+      this.playbackStartTime +
+      (clipEndTimeline - this.playbackStartPlayheadTime)
+
+    if (playtime >= clipEndPlaytime) {
+      data.close()
+      return
+    }
 
     // Track source so we can stop it if the user pauses
     this.activeSources.push(source)
@@ -152,11 +181,13 @@ export class AudioPipeline {
     // LOOK-AHEAD: We schedule slightly into the future to absorb main-thread jitter
     if (playtime >= currentTime) {
       source.start(playtime)
+      source.stop(clipEndPlaytime)
     } else if (playtime > currentTime - 0.2) {
       // Increased tolerance for lag
       // If it's slightly in the past, start with an offset
       const offset = currentTime - playtime
       source.start(currentTime, offset)
+      source.stop(clipEndPlaytime)
     }
 
     data.close()
@@ -175,9 +206,16 @@ export class AudioPipeline {
    * Updates the clip's physical position on the project timeline.
    * Called by the Orchestrator when a clip is moved or resized.
    */
-  public setClipPosition(timelineStart: number, sourceStart: number) {
+  public setClipPosition(
+    timelineStart: number,
+    sourceStart: number,
+    timelineEnd: number = Infinity,
+    sourceEnd: number = Infinity,
+  ) {
     this.timelineStartInSeconds = timelineStart
     this.sourceStartInSeconds = sourceStart
+    this.timelineEndInSeconds = timelineEnd
+    this.sourceEndInSeconds = sourceEnd
   }
 
   /**
@@ -188,10 +226,17 @@ export class AudioPipeline {
     startPlayheadTime: number,
     timelineStart?: number,
     sourceStart?: number,
+    timelineEnd?: number,
+    sourceEnd?: number,
   ) {
     this.setMasterSync(startTime, startPlayheadTime)
-    if (timelineStart !== undefined && sourceStart !== undefined) {
-      this.setClipPosition(timelineStart, sourceStart)
+    if (
+      timelineStart !== undefined &&
+      sourceStart !== undefined &&
+      timelineEnd !== undefined &&
+      sourceEnd !== undefined
+    ) {
+      this.setClipPosition(timelineStart, sourceStart, timelineEnd, sourceEnd)
     }
   }
 
@@ -214,7 +259,8 @@ export class AudioPipeline {
     this.decoder.reset()
     this.decoderConfigured = false
 
-    this.currentSampleIndex = this.provider.findSampleIndex(timeInSeconds)
+    const clampedTime = Math.max(this.sourceStartInSeconds, timeInSeconds)
+    this.currentSampleIndex = this.provider.findSampleIndex(clampedTime)
   }
 
   public dispose() {

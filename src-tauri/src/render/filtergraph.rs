@@ -59,12 +59,45 @@ impl TimelineCompiler {
                             }
                         };
 
+                        let trim_filter = video::trim::TrimFilter {
+                            start: clip.source_in,
+                            end: clip.source_out,
+                            timeline_in: clip.timeline_in,
+                        };
+
                         filter_steps.push(format!(
-                            "[{}:v]{}[{}]",
+                            "[{}:v]{},{}[{}]",
                             input_idx,
+                            trim_filter.compile(),
                             scale_filter.compile(),
                             clip_label
                         ));
+
+                        // Extract and mix audio if the video asset contains an audio stream
+                        if clip.media_type == "video" && has_audio_stream(&clip.file_path) {
+                            let video_audio_label = format!("a_v_t{}c{}", track_idx, clip_idx);
+                            let delay_ms = (clip.timeline_in * 1000.0) as i64;
+
+                            let audio_trim = audio::trim::TrimFilter {
+                                start: clip.source_in,
+                                end: clip.source_out,
+                            };
+                            let delay_filter = audio::delay::DelayFilter { delay_ms };
+                            let volume_filter = audio::volume::VolumeFilter {
+                                factor: clip.volume,
+                            };
+
+                            filter_steps.push(format!(
+                                "[{}:a]{},{},{}[{}]",
+                                input_idx,
+                                audio_trim.compile(),
+                                delay_filter.compile(),
+                                volume_filter.compile(),
+                                video_audio_label
+                            ));
+
+                            audio_streams.push(video_audio_label);
+                        }
 
                         let next_video_stream = format!("v_canvas_t{}c{}", track_idx, clip_idx);
                         let (x, y) = if let Some(t) = &clip.transform {
@@ -98,14 +131,19 @@ impl TimelineCompiler {
                         let audio_label = format!("a_t{}c{}", track_idx, clip_idx);
                         let delay_ms = (clip.timeline_in * 1000.0) as i64;
 
+                        let trim_filter = audio::trim::TrimFilter {
+                            start: clip.source_in,
+                            end: clip.source_out,
+                        };
                         let delay_filter = audio::delay::DelayFilter { delay_ms };
                         let volume_filter = audio::volume::VolumeFilter {
                             factor: clip.volume,
                         };
 
                         filter_steps.push(format!(
-                            "[{}:a]{},{}[{}]",
+                            "[{}:a]{},{},{}[{}]",
                             input_idx,
+                            trim_filter.compile(),
                             delay_filter.compile(),
                             volume_filter.compile(),
                             audio_label
@@ -143,5 +181,29 @@ impl TimelineCompiler {
             current_video_stream,
             audio_label,
         ))
+    }
+}
+
+/// Helper function to check if a media file contains an audio stream using ffprobe
+fn has_audio_stream(file_path: &str) -> bool {
+    let output = std::process::Command::new("ffprobe")
+        .args(&[
+            "-v",
+            "error",
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "csv=p=0",
+            file_path,
+        ])
+        .output();
+
+    if let Ok(out) = output {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        !stdout.trim().is_empty()
+    } else {
+        false
     }
 }

@@ -58,6 +58,10 @@ pub enum EffectConfig {
     },
 }
 
+fn default_speed_factor() -> f32 {
+    1.0
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 pub struct BackgroundConfig {
     pub background_type: BackgroundType,
@@ -78,6 +82,7 @@ pub struct Transition {
 pub struct TimelineState {
     pub playhead_position: i32,
     pub tracks: Vec<Track>,
+    #[serde(default)]
     pub background: Option<BackgroundConfig>,
 }
 
@@ -87,8 +92,11 @@ pub struct Track {
     pub name: String,
     pub track_type: TrackType,
     pub clips: Vec<Clip>,
+    #[serde(default)]
     pub transitions: Vec<Transition>,
+    #[serde(default)]
     pub is_muted: bool,
+    #[serde(default)]
     pub is_locked: bool,
 }
 
@@ -109,6 +117,8 @@ pub struct Clip {
     pub source_in: i32,
     pub source_out: i32,
     pub transform: Option<Transform>,
+    #[serde(default = "default_speed_factor")]
     pub speed_factor: f32,
+    #[serde(default)]
     pub effects: Vec<EffectConfig>,
 }
