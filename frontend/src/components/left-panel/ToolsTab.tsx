@@ -1,13 +1,23 @@
-import { CursorClickIcon, ScissorsIcon, CropIcon } from '@phosphor-icons/react'
+import {
+  CursorClickIcon,
+  ScissorsIcon,
+  CropIcon,
+  EyedropperIcon,
+} from '@phosphor-icons/react'
 import { useWorkspaceStore } from '@/store/workspaceStore'
+import { BackgroundTool } from './tools/background/BackgroundTool'
 
 export const ToolsTab = () => {
-  const activeTool = useWorkspaceStore((state) => state.activeTool)
+  const activeTool: any = useWorkspaceStore((state) => state.activeTool)
   const setActiveTool = useWorkspaceStore((state) => state.setActiveTool)
+
+  if (activeTool === 'bg') {
+    return <BackgroundTool />
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-      <div className="flex items-center justify-between border-b pb-2">
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           Editing Tools
         </h2>
@@ -65,6 +75,25 @@ export const ToolsTab = () => {
             <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
               Hover on clip edges to reveal handles and drag to trim starting or
               ending frames.
+            </div>
+          </div>
+        </button>
+
+        {/* Background Tool Button */}
+        <button
+          onClick={() => setActiveTool('bg')}
+          className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+            activeTool === 'bg'
+              ? 'border-violet-500 bg-violet-500/10 text-white'
+              : 'border-white/5 bg-white/[0.01] text-white/60 hover:border-white/10 hover:bg-white/[0.02]'
+          }`}
+        >
+          <EyedropperIcon className="mt-0.5 size-4 shrink-0 text-violet-400" />
+          <div>
+            <div className="text-xs font-medium">Background Tool</div>
+            <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+              Click on the background to change its appearance, colors,
+              gradients, or blur.
             </div>
           </div>
         </button>

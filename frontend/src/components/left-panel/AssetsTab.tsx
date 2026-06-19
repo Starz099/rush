@@ -120,8 +120,8 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       const shouldAddToThisTrack =
-        (t.track_type === 'video' && (isVideo || isImage)) ||
-        (t.track_type === 'audio' && isAudio)
+        (t.track_type?.toLowerCase() === 'video' && (isVideo || isImage)) ||
+        (t.track_type?.toLowerCase() === 'audio' && isAudio)
 
       if (shouldAddToThisTrack) {
         // Find the next available position on THIS specific track

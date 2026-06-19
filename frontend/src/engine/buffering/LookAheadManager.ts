@@ -44,7 +44,7 @@ export class LookAheadManager {
 
       // 2. Identify all video clips intersecting with this window
       const videoTracks = timeline.tracks.filter(
-        (t) => t.track_type === 'video',
+        (t) => t.track_type?.toLowerCase() === 'video',
       )
       const clipsInWindow: Clip[] = []
 

@@ -10,7 +10,7 @@ interface TimelineTrackProps {
 }
 
 export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
-  const isVideo = track.track_type === 'video'
+  const isVideo = track.track_type?.toLowerCase() === 'video'
   const bgColor = isVideo ? 'bg-blue-500/20' : 'bg-green-500/20'
   const borderColor = isVideo ? 'border-blue-500/40' : 'border-green-500/40'
   const textColor = isVideo ? 'text-blue-200/70' : 'text-green-200/70'

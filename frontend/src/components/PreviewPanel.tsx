@@ -31,7 +31,9 @@ export const PreviewPanel = () => {
 
   const timeline = activeProject?.timeline_state
   const videoTracks =
-    timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
+    timeline?.tracks.filter(
+      (t: any) => t.track_type?.toLowerCase() === 'video',
+    ) || []
 
   // Active clips for scrubbing and UI hints
   const activeClips = videoTracks.flatMap((track: any) =>
@@ -177,7 +179,12 @@ export const PreviewPanel = () => {
           )
 
           // Render the frame immediately
-          videoEngine.renderFrame(playheadPosition, sortedClips, projectFps)
+          videoEngine.renderFrame(
+            playheadPosition,
+            sortedClips,
+            projectFps,
+            activeProject.timeline_state.background,
+          )
         })
 
       if (audioEngine) {
@@ -222,7 +229,7 @@ export const PreviewPanel = () => {
         <canvas
           ref={canvasRef}
           style={{
-            display: activeAsset?.media_type === 'video' ? 'block' : 'none',
+            display: activeAsset?.media_type === 'image' ? 'none' : 'block',
           }}
           className="h-full w-full bg-white/5 object-contain"
           width={previewWidth}

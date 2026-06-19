@@ -1,6 +1,6 @@
 import type { WebGPURenderer } from './core/Renderer'
 import { LookAheadManager } from './buffering/LookAheadManager'
-import type { Project, Clip, Asset } from '@/api/bindings'
+import type { Project, Clip, Asset, BackgroundConfig } from '@/api/bindings'
 
 export class VideoEngine {
   private renderer: WebGPURenderer
@@ -31,11 +31,12 @@ export class VideoEngine {
     playheadFrame: number,
     activeClips: Clip[],
     framerate: number,
+    background?: BackgroundConfig | null,
   ) {
     if (this.disposed) return
 
     // 1. Start WebGPU frame recording
-    this.renderer.beginFrame()
+    this.renderer.beginFrame(background)
 
     // 2. Render each active clip
     for (const clip of activeClips) {

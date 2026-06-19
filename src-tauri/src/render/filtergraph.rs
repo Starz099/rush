@@ -18,11 +18,15 @@ impl TimelineCompiler {
         let mut input_indices: HashMap<String, usize> = HashMap::new();
         let mut filter_steps = Vec::new();
 
-        // initialize with black canvas
-        filter_steps.push(format!(
-            "color=c=black:s={}x{}:d={}[v_base]",
-            self.timeline.width, self.timeline.height, self.timeline.duration_seconds
-        ));
+        // Initialize with background configuration
+        let bg_filter = video::background::BackgroundFilter {
+            width: self.timeline.width,
+            height: self.timeline.height,
+            duration_seconds: self.timeline.duration_seconds,
+            background: self.timeline.background.clone(),
+        };
+
+        filter_steps.push(format!("{}[v_base]", bg_filter.compile()));
 
         let mut current_video_stream = "v_base".to_string();
         let mut audio_streams: Vec<String> = Vec::new();

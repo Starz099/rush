@@ -27,7 +27,8 @@ pub fn run() {
         commands::asset::read_asset_bytes,
         commands::asset::extract_audio,
         commands::asset::read_asset_range,
-        commands::asset::read_moov_box
+        commands::asset::read_moov_box,
+        commands::project::dummy_tool_types
     ]);
 
     #[cfg(debug_assertions)]

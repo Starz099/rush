@@ -123,7 +123,7 @@ export const TimelinePanel = () => {
               key={track.id}
               className="flex h-16 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-3"
             >
-              {track.track_type === 'video' ? (
+              {track.track_type?.toLowerCase() === 'video' ? (
                 <FilmStripIcon className="size-4 text-blue-400" />
               ) : (
                 <SpeakerHighIcon className="size-4 text-green-400" />

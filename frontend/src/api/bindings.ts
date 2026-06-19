@@ -56,6 +56,7 @@ export const commands = {
     typedError<RangeResult, string>(
       __TAURI_INVOKE('read_moov_box', { filePath }),
     ),
+  dummyToolTypes: () => __TAURI_INVOKE<EditingTool[]>('dummy_tool_types'),
 }
 
 /* Types */
@@ -71,11 +72,25 @@ export type Asset = {
 }
 
 export type BackgroundConfig = {
-  background_type: BackgroundType
-  color_hex: string | null
+  source: BackgroundSource
+  blur_value?: number
 }
 
-export type BackgroundType = 'color' | 'blurred_input'
+export type BackgroundSource =
+  | {
+      type: 'solid'
+      params: {
+        color_hex: string
+      }
+    }
+  | {
+      type: 'gradient'
+      params: {
+        gradient_type: string
+        colors: string[]
+        angle_degrees: number | null
+      }
+    }
 
 export type Clip = {
   id: string
@@ -90,6 +105,8 @@ export type Clip = {
 }
 
 export type EaseCurve = 'linear' | 'ease_in' | 'ease_out'
+
+export type EditingTool = 'select' | 'split' | 'trim' | 'bg'
 
 export type EffectConfig =
   | {

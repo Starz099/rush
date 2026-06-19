@@ -1,3 +1,4 @@
+use crate::db::models::clip::BackgroundConfig;
 use crate::db::models::{clip::EffectConfig, project::Project as DbProject};
 use crate::models::TrackType;
 use rusqlite::Connection;
@@ -10,6 +11,7 @@ pub struct RenderTimeline {
     pub framerate: i32,
     pub duration_seconds: f32,
     pub tracks: Vec<RenderTrack>,
+    pub background: Option<BackgroundConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,7 +76,10 @@ impl RenderTimeline {
                         },
                     )
                     .map_err(|e| {
-                        format!("Failed to find file path and media type for asset {}: {}", asset_id, e)
+                        format!(
+                            "Failed to find file path and media type for asset {}: {}",
+                            asset_id, e
+                        )
                     })?
                 } else {
                     ("".to_string(), "".to_string())
@@ -117,6 +122,7 @@ impl RenderTimeline {
             framerate: project.framerate,
             duration_seconds: max_duration_seconds as f32,
             tracks: render_tracks,
+            background: project.timeline_state.background.clone(),
         })
     }
 }

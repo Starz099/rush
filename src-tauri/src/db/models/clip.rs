@@ -3,9 +3,24 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
 #[serde(rename_all = "snake_case")]
-pub enum BackgroundType {
-    Color,
-    BlurredInput,
+pub enum EditingTool {
+    Select,
+    Split,
+    Trim,
+    Bg,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[serde(tag = "type", content = "params", rename_all = "snake_case")]
+pub enum BackgroundSource {
+    Solid {
+        color_hex: String,
+    },
+    Gradient {
+        gradient_type: String,
+        colors: Vec<String>,
+        angle_degrees: Option<f32>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
@@ -62,10 +77,15 @@ fn default_speed_factor() -> f32 {
     1.0
 }
 
+fn default_blur_value() -> u32 {
+    0
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 pub struct BackgroundConfig {
-    pub background_type: BackgroundType,
-    pub color_hex: Option<String>,
+    pub source: BackgroundSource,
+    #[serde(default = "default_blur_value")]
+    pub blur_value: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
@@ -76,6 +96,15 @@ pub struct Transition {
     pub transition_type: TransitionType,
     pub duration_frames: i32,
     pub ease_curve: EaseCurve,
+}
+
+pub fn default_background() -> BackgroundConfig {
+    BackgroundConfig {
+        source: BackgroundSource::Solid {
+            color_hex: "#000000".to_string(),
+        },
+        blur_value: 0,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]

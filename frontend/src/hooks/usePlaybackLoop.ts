@@ -56,7 +56,9 @@ export function usePlaybackLoop(
       // 2. UPDATE VIDEO (High-precision every tick)
       const timeline = activeProject?.timeline_state
       const videoTracks =
-        timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
+        timeline?.tracks.filter(
+          (t: any) => t.track_type?.toLowerCase() === 'video',
+        ) || []
 
       if (videoEngine) {
         // Trigger look-ahead buffering in the background (Non-Blocking!)
@@ -82,7 +84,12 @@ export function usePlaybackLoop(
         )
 
         // Render the pre-decoded frames to the WebGPU canvas
-        videoEngine.renderFrame(currentPlayhead, activeClipsToRender, framerate)
+        videoEngine.renderFrame(
+          currentPlayhead,
+          activeClipsToRender,
+          framerate,
+          activeProject?.timeline_state.background,
+        )
       }
 
       // UPDATE AUDIO

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { projectApi } from '@/api/project'
 import { assetApi } from '@/api/asset'
 import type { Project, ResolutionValue, FPSValue } from '@/types/project'
-import type { Asset, Clip } from '@/api/bindings'
+import type { Asset, BackgroundConfig, Clip } from '@/api/bindings'
 
 interface ProjectState {
   projects: Project[]
@@ -42,6 +42,10 @@ interface ProjectState {
     clipId: string,
     edge: 'left' | 'right',
     newFrameValue: number,
+  ) => Promise<void>
+  updateBackground: (
+    background: BackgroundConfig,
+    persist?: boolean,
   ) => Promise<void>
 }
 
@@ -397,5 +401,29 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     })
 
     await get().saveTimeline(project.id, updatedTimeline)
+  },
+
+  updateBackground: async (
+    background: BackgroundConfig,
+    persist: boolean = true,
+  ) => {
+    const project = get().activeProject
+    if (!project) return
+
+    const updatedTimeline = {
+      ...project.timeline_state,
+      background,
+    }
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    })
+
+    if (persist) {
+      await get().saveTimeline(project.id, updatedTimeline)
+    }
   },
 }))
