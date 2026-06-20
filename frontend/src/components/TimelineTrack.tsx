@@ -4,16 +4,17 @@ import { useProjectStore } from '@/store/projectStore'
 import { useAppStore } from '@/store/timelineStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useState } from 'react'
+import { getTrackUIConfig } from '@/constants/trackConfig'
 interface TimelineTrackProps {
   track: any
   framerate: number
 }
 
 export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
-  const isVideo = track.track_type?.toLowerCase() === 'video'
-  const bgColor = isVideo ? 'bg-blue-500/20' : 'bg-green-500/20'
-  const borderColor = isVideo ? 'border-blue-500/40' : 'border-green-500/40'
-  const textColor = isVideo ? 'text-blue-200/70' : 'text-green-200/70'
+  const config = getTrackUIConfig(track)
+  const bgColor = config?.bgClass || 'bg-white/5'
+  const borderColor = config?.borderClass || 'border-white/10'
+  const textColor = config?.textClass || 'text-white/70'
 
   const snapThresholdFrames =
     (SNAP_THRESHOLD_PX / PIXELS_PER_SECOND) * framerate
@@ -190,7 +191,11 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
                 onMouseDown={(e) => handleTrimMouseDown(e, clip, 'left')}
               />
 
-              <span className="truncate">{clip.id.slice(0, 8)}</span>
+              <span className="truncate">
+                {config?.type === 'effects'
+                  ? 'Zoom Effect'
+                  : clip.id.slice(0, 8)}
+              </span>
 
               {/* Right Trim Handle */}
               <div

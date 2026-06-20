@@ -24,6 +24,7 @@ impl TimelineCompiler {
             height: self.timeline.height,
             duration_seconds: self.timeline.duration_seconds,
             background: self.timeline.background.clone(),
+            framerate: self.timeline.framerate,
         };
 
         filter_steps.push(format!("{}[v_base]", bg_filter.compile()));
@@ -44,6 +45,9 @@ impl TimelineCompiler {
 
         // Loop through all tracks and compile clips
         for (track_idx, track) in self.timeline.tracks.iter().enumerate() {
+            if track.track_type == TrackType::Effects {
+                continue;
+            }
             for (clip_idx, clip) in track.clips.iter().enumerate() {
                 let input_idx = get_input_index(&clip.file_path);
 
@@ -154,6 +158,43 @@ impl TimelineCompiler {
                         ));
 
                         audio_streams.push(audio_label);
+                    }
+                    TrackType::Effects => {}
+                }
+            }
+        }
+
+        // Apply global zoom effects from the effects tracks to the final composite video stream
+        let mut effect_clip_idx = 0;
+        for track in &self.timeline.tracks {
+            if track.track_type == TrackType::Effects {
+                for clip in &track.clips {
+                    let scale = clip
+                        .transform
+                        .as_ref()
+                        .map(|t| t.width as f64 / self.timeline.width as f64)
+                        .unwrap_or(1.0);
+
+                    // Only apply if the scale/zoom is different from 1.0
+                    if (scale - 1.0).abs() > 0.001 {
+                        let next_video_stream = format!("v_effect_{}", effect_clip_idx);
+                        effect_clip_idx += 1;
+
+                        // Apply global zoompan filter with timeline-enabled zoom factor expression using frame index (in)
+                        filter_steps.push(format!(
+                            "[{}]zoompan=z='if(between((in-1)/{},{:.3},{:.3}),{:.4},1)':x='iw/2-(iw/zoom)/2':y='ih/2-(ih/zoom)/2':d=1:s={}x{}:fps={}[{}]",
+                            current_video_stream,
+                            self.timeline.framerate,
+                            clip.timeline_in,
+                            clip.timeline_out,
+                            scale,
+                            self.timeline.width,
+                            self.timeline.height,
+                            self.timeline.framerate,
+                            next_video_stream
+                        ));
+
+                        current_video_stream = next_video_stream;
                     }
                 }
             }

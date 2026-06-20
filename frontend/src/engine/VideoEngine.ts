@@ -32,6 +32,7 @@ export class VideoEngine {
     activeClips: Clip[],
     framerate: number,
     background?: BackgroundConfig | null,
+    globalZoom: number = 1.0,
   ) {
     if (this.disposed) return
 
@@ -44,8 +45,24 @@ export class VideoEngine {
       const frame = this.lookAhead.getFrame(clip.id, playheadFrame, framerate)
 
       if (frame) {
+        // Adjust the individual clip transform by the global zoom multiplier
+        const originalTransform = clip.transform
+        const modifiedTransform = originalTransform
+          ? {
+              x: (originalTransform.x ?? 0) * globalZoom,
+              y: (originalTransform.y ?? 0) * globalZoom,
+              scale: (originalTransform.scale ?? 1.0) * globalZoom,
+              z_index: originalTransform.z_index,
+            }
+          : {
+              x: 0,
+              y: 0,
+              scale: globalZoom,
+              z_index: 0,
+            }
+
         // Draw the frame onto the canvas using our WebGPU renderer
-        this.renderer.drawClip(frame, clip.transform)
+        this.renderer.drawClip(frame, modifiedTransform)
       }
     }
 

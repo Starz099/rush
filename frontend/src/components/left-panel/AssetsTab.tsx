@@ -11,6 +11,7 @@ import { fpsToNumeric } from '@/helpers/fps'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
 import { useAppStore } from '@/store/timelineStore'
+import { isVideoTrack, isAudioTrack } from '@/constants/trackConfig'
 
 interface AssetsTabProps {
   projectId: string
@@ -120,8 +121,8 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       const shouldAddToThisTrack =
-        (t.track_type?.toLowerCase() === 'video' && (isVideo || isImage)) ||
-        (t.track_type?.toLowerCase() === 'audio' && isAudio)
+        (isVideoTrack(t) && (isVideo || isImage)) ||
+        (isAudioTrack(t) && isAudio)
 
       if (shouldAddToThisTrack) {
         // Find the next available position on THIS specific track

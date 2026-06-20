@@ -3,16 +3,58 @@ import {
   ScissorsIcon,
   CropIcon,
   EyedropperIcon,
+  SparkleIcon,
 } from '@phosphor-icons/react'
 import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useProjectStore } from '@/store/projectStore'
+import { useAppStore } from '@/store/timelineStore'
 import { BackgroundTool } from './tools/background/BackgroundTool'
 
 export const ToolsTab = () => {
   const activeTool: any = useWorkspaceStore((state) => state.activeTool)
   const setActiveTool = useWorkspaceStore((state) => state.setActiveTool)
 
+  const activeProject = useProjectStore((state) => state.activeProject)
+  const saveTimeline = useProjectStore((state) => state.saveTimeline)
+  const playheadPosition = useAppStore((state) => state.playhead_position)
+
   if (activeTool === 'bg') {
     return <BackgroundTool />
+  }
+
+  const handleAddZoomEffect = async () => {
+    if (!activeProject) return
+    const timeline = activeProject.timeline_state
+    const effectsTrack = timeline.tracks.find(
+      (t: any) => t.track_type?.toLowerCase() === 'effects',
+    )
+    if (!effectsTrack) {
+      alert('No effects track found on the timeline.')
+      return
+    }
+
+    const duration = 150 // default to 5 seconds (assuming 30fps)
+    const newClip = {
+      id: crypto.randomUUID(),
+      asset_id: null,
+      timeline_in: playheadPosition,
+      timeline_out: playheadPosition + duration,
+      source_in: 0,
+      source_out: duration,
+      transform: { x: 0, y: 0, scale: 1.2, z_index: 0 },
+    }
+
+    const updatedTracks = timeline.tracks.map((t: any) => {
+      if (t.id === effectsTrack.id) {
+        return { ...t, clips: [...t.clips, newClip] }
+      }
+      return t
+    })
+
+    await saveTimeline(activeProject.id, {
+      ...timeline,
+      tracks: updatedTracks,
+    })
   }
 
   return (
@@ -94,6 +136,23 @@ export const ToolsTab = () => {
             <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
               Click on the background to change its appearance, colors,
               gradients, or blur.
+            </div>
+          </div>
+        </button>
+
+        {/* Zoom Effect Button */}
+        <button
+          onClick={handleAddZoomEffect}
+          className="flex items-start gap-3 rounded-lg border border-white/5 bg-white/[0.01] p-3 text-left text-white/60 transition-all hover:border-white/10 hover:bg-white/[0.02]"
+        >
+          <SparkleIcon className="mt-0.5 size-4 shrink-0 text-purple-400" />
+          <div>
+            <div className="text-xs font-medium text-white">
+              Add Zoom Effect
+            </div>
+            <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+              Adds a global composition zoom clip on the effects track at the
+              current playhead position.
             </div>
           </div>
         </button>

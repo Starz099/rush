@@ -3,6 +3,7 @@ import { VideoDecoderWrapper } from '../decoders/VideoDecoder'
 import { FrameQueue } from './FrameQueue'
 import type { Project, Clip, Asset } from '@/api/bindings'
 import { fpsToNumeric } from '../../helpers/fps'
+import { isVideoTrack } from '@/constants/trackConfig'
 
 interface ActiveClipSession {
   clip: Clip
@@ -43,9 +44,7 @@ export class LookAheadManager {
       const lookAheadEnd = playheadSeconds + 5.0
 
       // 2. Identify all video clips intersecting with this window
-      const videoTracks = timeline.tracks.filter(
-        (t) => t.track_type?.toLowerCase() === 'video',
-      )
+      const videoTracks = timeline.tracks.filter(isVideoTrack)
       const clipsInWindow: Clip[] = []
 
       for (const track of videoTracks) {

@@ -4,6 +4,7 @@ import { useProjectStore } from '../store/projectStore'
 import { fpsToNumeric } from '../helpers/fps'
 import type { VideoEngine } from '@/engine/VideoEngine'
 import type { AudioEngine } from '@/engine/audio/AudioEngine'
+import { isVideoTrack } from '@/constants/trackConfig'
 
 /**
  * usePlaybackLoop drives the frame-by-frame progression of the project.
@@ -55,10 +56,7 @@ export function usePlaybackLoop(
 
       // 2. UPDATE VIDEO (High-precision every tick)
       const timeline = activeProject?.timeline_state
-      const videoTracks =
-        timeline?.tracks.filter(
-          (t: any) => t.track_type?.toLowerCase() === 'video',
-        ) || []
+      const videoTracks = timeline?.tracks.filter(isVideoTrack) || []
 
       if (videoEngine) {
         // Trigger look-ahead buffering in the background (Non-Blocking!)
@@ -83,12 +81,27 @@ export function usePlaybackLoop(
           (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
         )
 
+        // Find active global zoom multiplier
+        const effectsTracks =
+          timeline?.tracks.filter(
+            (t: any) => t.track_type?.toLowerCase() === 'effects',
+          ) || []
+        const activeEffectsClip = effectsTracks
+          .flatMap((t: any) => t.clips)
+          .find(
+            (clip: any) =>
+              playheadFloatRef.current >= clip.timeline_in &&
+              playheadFloatRef.current < clip.timeline_out,
+          )
+        const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0
+
         // Render the pre-decoded frames to the WebGPU canvas
         videoEngine.renderFrame(
           currentPlayhead,
           activeClipsToRender,
           framerate,
           activeProject?.timeline_state.background,
+          globalZoom,
         )
       }
 

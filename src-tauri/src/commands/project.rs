@@ -43,6 +43,15 @@ pub fn create_project(
                 is_muted: false,
                 is_locked: false,
             },
+            Track {
+                id: "effects-1".to_string(),
+                name: "Effects 1".to_string(),
+                track_type: TrackType::Effects,
+                clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
+            },
         ],
         background: Some(default_background()),
     };

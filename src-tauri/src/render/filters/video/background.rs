@@ -6,6 +6,7 @@ pub struct BackgroundFilter {
     pub height: i32,
     pub duration_seconds: f32,
     pub background: Option<BackgroundConfig>,
+    pub framerate: i32,
 }
 
 fn format_ffmpeg_color(hex: &str) -> String {
@@ -88,6 +89,6 @@ impl VideoFilter for BackgroundFilter {
             }
         }
 
-        base_filter
+        format!("{},fps=fps={}", base_filter, self.framerate)
     }
 }
