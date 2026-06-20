@@ -1,37 +1,37 @@
-import { useProjectStore } from '@/store/projectStore'
-import { useAppStore } from '@/store/timelineStore'
-import { usePlaybackLoop } from '@/hooks/usePlaybackLoop'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { FileIcon, FilmStripIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
-import { WebGPURenderer } from '../engine/core/Renderer'
-import { VideoEngine } from '../engine/VideoEngine'
-import { AudioEngine } from '../engine/audio/AudioEngine'
-import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator'
-import { fpsToNumeric } from '@/helpers/fps'
-import { isVideoTrack } from '@/constants/trackConfig'
+import { useProjectStore } from '@/store/projectStore';
+import { useAppStore } from '@/store/timelineStore';
+import { usePlaybackLoop } from '@/hooks/usePlaybackLoop';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { FileIcon, FilmStripIcon } from '@phosphor-icons/react';
+import { useEffect, useRef, useState } from 'react';
+import { WebGPURenderer } from '../engine/core/Renderer';
+import { VideoEngine } from '../engine/VideoEngine';
+import { AudioEngine } from '../engine/audio/AudioEngine';
+import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
+import { fpsToNumeric } from '@/helpers/fps';
+import { isVideoTrack } from '@/constants/trackConfig';
 
 export const PreviewPanel = () => {
-  const activeProject = useProjectStore((state) => state.activeProject)
-  const assets = useProjectStore((state) => state.assets)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const activeProject = useProjectStore((state) => state.activeProject);
+  const assets = useProjectStore((state) => state.assets);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Engine Refs
-  const videoEngineRef = useRef<VideoEngine | null>(null)
-  const audioEngineRef = useRef<AudioEngine | null>(null)
+  const videoEngineRef = useRef<VideoEngine | null>(null);
+  const audioEngineRef = useRef<AudioEngine | null>(null);
 
-  const [videoEngine, setVideoEngine] = useState<VideoEngine | null>(null)
-  const [audioEngine, setAudioEngine] = useState<AudioEngine | null>(null)
-  const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null)
-  const [isInitializing, setIsInitializing] = useState(false)
+  const [videoEngine, setVideoEngine] = useState<VideoEngine | null>(null);
+  const [audioEngine, setAudioEngine] = useState<AudioEngine | null>(null);
+  const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  const isPlaying = useAppStore((state) => state.isPlaying)
-  const playheadPosition = useAppStore((state) => state.playhead_position)
-  const readyAssets = useAppStore((state) => state.readyAssets)
-  const demuxingAssets = useAppStore((state) => state.demuxingAssets)
+  const isPlaying = useAppStore((state) => state.isPlaying);
+  const playheadPosition = useAppStore((state) => state.playhead_position);
+  const readyAssets = useAppStore((state) => state.readyAssets);
+  const demuxingAssets = useAppStore((state) => state.demuxingAssets);
 
-  const timeline = activeProject?.timeline_state
-  const videoTracks = timeline?.tracks.filter(isVideoTrack) || []
+  const timeline = activeProject?.timeline_state;
+  const videoTracks = timeline?.tracks.filter(isVideoTrack) || [];
 
   // Active clips for scrubbing and UI hints
   const activeClips = videoTracks.flatMap((track: any) =>
@@ -40,132 +40,132 @@ export const PreviewPanel = () => {
         playheadPosition >= clip.timeline_in &&
         playheadPosition < clip.timeline_out,
     ),
-  )
+  );
 
   const activeAsset =
     activeClips.length > 0
       ? assets.find((a) => a.id === activeClips[0].asset_id)
-      : null
+      : null;
 
-  const previewWidth = activeProject?.viewport_width ?? 1920
-  const previewHeight = activeProject?.viewport_height ?? 1080
-  const projectFps = fpsToNumeric(activeProject?.framerate)
+  const previewWidth = activeProject?.viewport_width ?? 1920;
+  const previewHeight = activeProject?.viewport_height ?? 1080;
+  const projectFps = fpsToNumeric(activeProject?.framerate);
 
   // Initialize Engines once on mount
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     const initEngines = async () => {
       // Wait for canvas to be available in the DOM
       if (!canvasRef.current) {
         // Retry in next tick if not ready
-        setTimeout(initEngines, 50)
-        return
+        setTimeout(initEngines, 50);
+        return;
       }
 
       try {
-        setIsInitializing(true)
+        setIsInitializing(true);
 
         // 1. Audio Engine
         if (!audioEngineRef.current) {
-          const ctx = new AudioContext({ sampleRate: 48000 })
-          setAudioCtx(ctx)
-          const aEngine = new AudioEngine(ctx)
-          audioEngineRef.current = aEngine
-          setAudioEngine(aEngine)
+          const ctx = new AudioContext({ sampleRate: 48000 });
+          setAudioCtx(ctx);
+          const aEngine = new AudioEngine(ctx);
+          audioEngineRef.current = aEngine;
+          setAudioEngine(aEngine);
         }
 
         // 2. Video Engine (with shared Renderer)
         if (canvasRef.current && !videoEngineRef.current) {
-          canvasRef.current.width = previewWidth
-          canvasRef.current.height = previewHeight
+          canvasRef.current.width = previewWidth;
+          canvasRef.current.height = previewHeight;
 
-          const renderer = new WebGPURenderer(canvasRef.current)
-          await renderer.initialize()
+          const renderer = new WebGPURenderer(canvasRef.current);
+          await renderer.initialize();
 
           if (cancelled) {
-            renderer.dispose()
-            return
+            renderer.dispose();
+            return;
           }
 
-          const vEngine = new VideoEngine(renderer)
-          videoEngineRef.current = vEngine
-          setVideoEngine(vEngine)
+          const vEngine = new VideoEngine(renderer);
+          videoEngineRef.current = vEngine;
+          setVideoEngine(vEngine);
         }
       } catch (error) {
-        console.error('Failed to initialize engines:', error)
+        console.error('Failed to initialize engines:', error);
       } finally {
         if (!cancelled) {
-          setIsInitializing(false)
+          setIsInitializing(false);
         }
       }
-    }
+    };
 
-    initEngines()
+    initEngines();
 
     return () => {
-      cancelled = true
-      audioEngineRef.current?.dispose()
-      videoEngineRef.current?.dispose()
-      audioEngineRef.current = null
-      videoEngineRef.current = null
-    }
-  }, []) // Mount-only
+      cancelled = true;
+      audioEngineRef.current?.dispose();
+      videoEngineRef.current?.dispose();
+      audioEngineRef.current = null;
+      videoEngineRef.current = null;
+    };
+  }, []); // Mount-only
 
   // Attach the engine to the playback loop
-  usePlaybackLoop(videoEngine, audioEngine, audioCtx)
+  usePlaybackLoop(videoEngine, audioEngine, audioCtx);
 
   // Attach Orchestrators to manage tracks/clips
-  useAudioOrchestrator(audioEngine, audioCtx)
+  useAudioOrchestrator(audioEngine, audioCtx);
 
   const isActiveAssetLoading = activeAsset
     ? activeAsset.media_type === 'video' &&
       (!readyAssets[activeAsset.id] || demuxingAssets[activeAsset.id])
-    : false
+    : false;
 
   // Auto-prepare assets present in the timeline
   useEffect(() => {
-    if (!activeProject || assets.length === 0) return
+    if (!activeProject || assets.length === 0) return;
 
-    const timeline = activeProject.timeline_state
+    const timeline = activeProject.timeline_state;
 
     // Find all unique asset IDs in the timeline (video and audio)
-    const timelineAssetIds = new Set<string>()
+    const timelineAssetIds = new Set<string>();
     timeline.tracks.forEach((track: any) => {
       track.clips.forEach((clip: any) => {
-        timelineAssetIds.add(clip.asset_id)
-      })
-    })
+        timelineAssetIds.add(clip.asset_id);
+      });
+    });
 
-    const prepareAsset = useAppStore.getState().prepareAsset
+    const prepareAsset = useAppStore.getState().prepareAsset;
 
     timelineAssetIds.forEach((assetId) => {
-      const asset = assets.find((a) => a.id === assetId)
+      const asset = assets.find((a) => a.id === assetId);
       if (asset) {
-        const isReady = useAppStore.getState().readyAssets[assetId]
-        const isDemuxing = useAppStore.getState().demuxingAssets[assetId]
+        const isReady = useAppStore.getState().readyAssets[assetId];
+        const isDemuxing = useAppStore.getState().demuxingAssets[assetId];
 
         if (!isReady && !isDemuxing) {
           console.log(
             `[PreviewPanel] Auto-preparing timeline asset: ${asset.name} (${assetId})`,
-          )
-          void prepareAsset(assetId, asset.file_path)
+          );
+          void prepareAsset(assetId, asset.file_path);
         }
       }
-    })
-  }, [activeProject, assets])
+    });
+  }, [activeProject, assets]);
 
   // Resume AudioContext on user interaction (Play)
   useEffect(() => {
     if (isPlaying && audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume()
+      audioCtx.resume();
     }
-  }, [isPlaying, audioCtx])
+  }, [isPlaying, audioCtx]);
 
   // Scrubbing logic (Sync when NOT playing)
   useEffect(() => {
     if (!isPlaying && videoEngine && activeProject) {
-      videoEngine.reset() // Clear all buffers and decoders
+      videoEngine.reset(); // Clear all buffers and decoders
 
       // Fetch and decode the frame at the new playhead position
       void videoEngine
@@ -174,21 +174,21 @@ export const PreviewPanel = () => {
           // Sort by z_index so overlays are rendered correctly
           const sortedClips = [...activeClips].sort(
             (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-          )
+          );
 
           // Find active global zoom multiplier
           const effectsTracks =
             timeline?.tracks.filter(
               (t: any) => t.track_type?.toLowerCase() === 'effects',
-            ) || []
+            ) || [];
           const activeEffectsClip = effectsTracks
             .flatMap((t: any) => t.clips)
             .find(
               (clip: any) =>
                 playheadPosition >= clip.timeline_in &&
                 playheadPosition < clip.timeline_out,
-            )
-          const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0
+            );
+          const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
 
           // Render the frame immediately
           videoEngine.renderFrame(
@@ -197,11 +197,11 @@ export const PreviewPanel = () => {
             projectFps,
             activeProject.timeline_state.background,
             globalZoom,
-          )
-        })
+          );
+        });
 
       if (audioEngine) {
-        audioEngine.seekByTime(playheadPosition / projectFps)
+        audioEngine.seekByTime(playheadPosition / projectFps);
       }
     }
   }, [
@@ -213,9 +213,9 @@ export const PreviewPanel = () => {
     projectFps,
     activeProject,
     assets,
-  ])
+  ]);
 
-  if (!activeProject) return null
+  if (!activeProject) return null;
 
   return (
     <div className="flex h-full flex-col bg-black/40 p-4">
@@ -278,5 +278,5 @@ export const PreviewPanel = () => {
           )}
       </div>
     </div>
-  )
-}
+  );
+};

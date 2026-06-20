@@ -1,8 +1,8 @@
-import * as React from 'react'
-import { Checkbox as CheckboxPrimitive } from 'radix-ui'
+import * as React from 'react';
+import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 
-import { cn } from '@/lib/utils'
-import { CheckIcon } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils';
+import { CheckIcon } from '@phosphor-icons/react';
 
 function Checkbox({
   className,
@@ -24,7 +24,7 @@ function Checkbox({
         <CheckIcon />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-  )
+  );
 }
 
-export { Checkbox }
+export { Checkbox };

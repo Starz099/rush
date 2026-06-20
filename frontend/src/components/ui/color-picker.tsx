@@ -1,10 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useCallback, useMemo, useState, useEffect } from 'react'
-import { Popover, PopoverContent, PopoverTrigger } from './popover'
-import { EyedropperIcon, PlusIcon } from '@phosphor-icons/react'
-import { RgbaColorPicker } from 'react-colorful'
-import { Button } from './button'
-import { Input } from './input'
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { EyedropperIcon, PlusIcon } from '@phosphor-icons/react';
+import { RgbaColorPicker } from 'react-colorful';
+import { Button } from './button';
+import { Input } from './input';
 
 const DEFAULT_CHILDREN = (
   <div className="flex aspect-square h-fit w-fit items-center justify-center rounded-full bg-gradient-to-br from-pink-300/20 via-violet-300/20 to-indigo-300/20 p-[0.2rem] md:p-[0.2vw]">
@@ -12,47 +12,47 @@ const DEFAULT_CHILDREN = (
       <EyedropperIcon className="aspect-square w-[1rem] text-white md:w-[1vw]" />
     </div>
   </div>
-)
+);
 
 type TColorPicker = {
-  value: string
-  onChange: (value: string) => void
-  handleAdd?: (value: string) => void
-  children?: React.ReactNode
-}
+  value: string;
+  onChange: (value: string) => void;
+  handleAdd?: (value: string) => void;
+  children?: React.ReactNode;
+};
 
 function rgbaToHex(r: number, g: number, b: number, a: number = 1) {
   const toHex = (n: number) => {
-    let hex = n.toString(16)
-    return hex.length === 1 ? '0' + hex : hex
-  }
+    let hex = n.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
 
-  const alpha = isNaN(a) ? 255 : Math.round(a * 255)
+  const alpha = isNaN(a) ? 255 : Math.round(a * 255);
 
   return `#${toHex(r)}${toHex(g)}${toHex(b)}${
     alpha === 255 ? '' : toHex(alpha)
-  }`
+  }`;
 }
 
 function hexToRgba(hex: string) {
-  if (!hex) return null
-  hex = hex.replace(/^#/, '')
+  if (!hex) return null;
+  hex = hex.replace(/^#/, '');
 
   if (hex.length === 3) {
     hex = hex
       .split('')
       .map((char) => char + char)
-      .join('')
+      .join('');
   }
 
-  if (hex.length !== 6 && hex.length !== 8) return null
+  if (hex.length !== 6 && hex.length !== 8) return null;
 
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const a = hex.length === 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const a = hex.length === 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
 
-  return { r, g, b, a }
+  return { r, g, b, a };
 }
 
 const ColorPicker: React.FC<TColorPicker> = ({
@@ -64,57 +64,57 @@ const ColorPicker: React.FC<TColorPicker> = ({
   // Local state for the color picker to make the drag buttery-smooth
   const [localColor, setLocalColor] = useState(
     () => hexToRgba(value) || { r: 0, g: 0, b: 0, a: 1 },
-  )
+  );
 
   // Synchronize local color state with `value` prop if changed from outside
   useEffect(() => {
-    const rgba = hexToRgba(value)
+    const rgba = hexToRgba(value);
     if (rgba) {
       const currentLocalHex = rgbaToHex(
         localColor.r,
         localColor.g,
         localColor.b,
         localColor.a,
-      )
+      );
       if (currentLocalHex.toLowerCase() !== value.toLowerCase()) {
-        setLocalColor(rgba)
+        setLocalColor(rgba);
       }
     }
-  }, [value])
+  }, [value]);
 
   const color = useMemo(() => {
-    const rgba = hexToRgba(value)
-    return { hex: value, alpha: rgba ? rgba.a : 1 }
-  }, [value])
+    const rgba = hexToRgba(value);
+    return { hex: value, alpha: rgba ? rgba.a : 1 };
+  }, [value]);
 
   const handleChangeAlpha = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newAlpha = parseFloat(e.target.value)
-    const rgba = hexToRgba(color.hex)
+    const newAlpha = parseFloat(e.target.value);
+    const rgba = hexToRgba(color.hex);
     if (rgba) {
-      const newHex = rgbaToHex(rgba.r, rgba.g, rgba.b, newAlpha)
-      setLocalColor({ ...rgba, a: newAlpha })
-      onChange(newHex)
+      const newHex = rgbaToHex(rgba.r, rgba.g, rgba.b, newAlpha);
+      setLocalColor({ ...rgba, a: newAlpha });
+      onChange(newHex);
     }
-  }
+  };
 
   const handleChangeColor = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newColor: any = e.target.value
-    const rgba = hexToRgba(newColor)
+    const newColor: any = e.target.value;
+    const rgba = hexToRgba(newColor);
     if (rgba) {
-      setLocalColor(rgba)
+      setLocalColor(rgba);
     }
-    onChange(newColor)
-  }
+    onChange(newColor);
+  };
 
   const handleColorChange = useCallback(
     (newColor: { r: number; g: number; b: number; a: number }) => {
-      setLocalColor(newColor)
-      const { r, g, b, a } = newColor
-      const newHex = rgbaToHex(r, g, b, a)
-      onChange(newHex)
+      setLocalColor(newColor);
+      const { r, g, b, a } = newColor;
+      const newHex = rgbaToHex(r, g, b, a);
+      onChange(newHex);
     },
     [onChange],
-  )
+  );
 
   return (
     <Popover>
@@ -167,7 +167,7 @@ const ColorPicker: React.FC<TColorPicker> = ({
         </div>
       </PopoverContent>
     </Popover>
-  )
-}
+  );
+};
 
-export default ColorPicker
+export default ColorPicker;

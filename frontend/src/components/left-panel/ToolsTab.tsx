@@ -5,36 +5,36 @@ import {
   EyedropperIcon,
   SparkleIcon,
   TimerIcon,
-} from '@phosphor-icons/react'
-import { useWorkspaceStore } from '@/store/workspaceStore'
-import { useProjectStore } from '@/store/projectStore'
-import { useAppStore } from '@/store/timelineStore'
-import { BackgroundTool } from './tools/background/BackgroundTool'
+} from '@phosphor-icons/react';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useProjectStore } from '@/store/projectStore';
+import { useAppStore } from '@/store/timelineStore';
+import { BackgroundTool } from './tools/background/BackgroundTool';
 
 export const ToolsTab = () => {
-  const activeTool: any = useWorkspaceStore((state) => state.activeTool)
-  const setActiveTool = useWorkspaceStore((state) => state.setActiveTool)
+  const activeTool: any = useWorkspaceStore((state) => state.activeTool);
+  const setActiveTool = useWorkspaceStore((state) => state.setActiveTool);
 
-  const activeProject = useProjectStore((state) => state.activeProject)
-  const saveTimeline = useProjectStore((state) => state.saveTimeline)
-  const playheadPosition = useAppStore((state) => state.playhead_position)
+  const activeProject = useProjectStore((state) => state.activeProject);
+  const saveTimeline = useProjectStore((state) => state.saveTimeline);
+  const playheadPosition = useAppStore((state) => state.playhead_position);
 
   if (activeTool === 'bg') {
-    return <BackgroundTool />
+    return <BackgroundTool />;
   }
 
   const handleAddZoomEffect = async () => {
-    if (!activeProject) return
-    const timeline = activeProject.timeline_state
+    if (!activeProject) return;
+    const timeline = activeProject.timeline_state;
     const effectsTrack = timeline.tracks.find(
       (t: any) => t.track_type?.toLowerCase() === 'effects',
-    )
+    );
     if (!effectsTrack) {
-      alert('No effects track found on the timeline.')
-      return
+      alert('No effects track found on the timeline.');
+      return;
     }
 
-    const duration = 150 // default to 5 seconds (assuming 30fps)
+    const duration = 150; // default to 5 seconds (assuming 30fps)
     const newClip = {
       id: crypto.randomUUID(),
       asset_id: null,
@@ -43,32 +43,32 @@ export const ToolsTab = () => {
       source_in: 0,
       source_out: duration,
       transform: { x: 0, y: 0, scale: 1.2, z_index: 0 },
-    }
+    };
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       if (t.id === effectsTrack.id) {
-        return { ...t, clips: [...t.clips, newClip] }
+        return { ...t, clips: [...t.clips, newClip] };
       }
-      return t
-    })
+      return t;
+    });
 
     await saveTimeline(activeProject.id, {
       ...timeline,
       tracks: updatedTracks,
-    })
-  }
+    });
+  };
   const handleAddSpeedEffect = async () => {
-    if (!activeProject) return
-    const timeline = activeProject.timeline_state
+    if (!activeProject) return;
+    const timeline = activeProject.timeline_state;
     const effectsTrack = timeline.tracks.find(
       (t: any) => t.track_type?.toLowerCase() === 'effects',
-    )
+    );
     if (!effectsTrack) {
-      alert('No effects track found on the timeline.')
-      return
+      alert('No effects track found on the timeline.');
+      return;
     }
 
-    const duration = 150 // default to 5 seconds (assuming 30fps)
+    const duration = 150; // default to 5 seconds (assuming 30fps)
     const newClip = {
       id: crypto.randomUUID(),
       asset_id: null,
@@ -77,20 +77,20 @@ export const ToolsTab = () => {
       source_in: 0,
       source_out: duration,
       speed_factor: 2.0, // default to 2x speed
-    }
+    };
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       if (t.id === effectsTrack.id) {
-        return { ...t, clips: [...t.clips, newClip] }
+        return { ...t, clips: [...t.clips, newClip] };
       }
-      return t
-    })
+      return t;
+    });
 
     await saveTimeline(activeProject.id, {
       ...timeline,
       tracks: updatedTracks,
-    })
-  }
+    });
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -210,5 +210,5 @@ export const ToolsTab = () => {
         </button>
       </div>
     </div>
-  )
-}
+  );
+};

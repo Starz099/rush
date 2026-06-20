@@ -1,141 +1,141 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { useProjectStore } from '@/store/projectStore'
-import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useProjectStore } from '@/store/projectStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from '@/components/ui/resizable'
-import type { Project } from '@/types/project'
-import { projectApi } from '@/api/project'
-import { LeftPanel } from '@/components/left-panel'
-import { PreviewPanel } from '@/components/PreviewPanel'
-import { TimelinePanel } from '@/components/TimelinePanel'
-import { PropertiesSidebar } from '@/components/PropertiesSidebar'
-import { CaretLeftIcon } from '@phosphor-icons/react'
-import { Separator } from '@/components/ui/separator'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+} from '@/components/ui/resizable';
+import type { Project } from '@/types/project';
+import { projectApi } from '@/api/project';
+import { LeftPanel } from '@/components/left-panel';
+import { PreviewPanel } from '@/components/PreviewPanel';
+import { TimelinePanel } from '@/components/TimelinePanel';
+import { PropertiesSidebar } from '@/components/PropertiesSidebar';
+import { CaretLeftIcon } from '@phosphor-icons/react';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 const Workspace = () => {
-  const navigate = useNavigate()
-  const { projectId } = useParams<{ projectId: string }>()
-  const activeProject = useProjectStore((state) => state.activeProject)
-  const setActiveProject = useProjectStore((state) => state.setActiveProject)
-  const fetchAssets = useProjectStore((state) => state.fetchAssets)
-  const saveTimeline = useProjectStore((state) => state.saveTimeline)
-  const deleteClip = useProjectStore((state) => state.deleteClip)
-  const [project, setProject] = useState<Project | null>(activeProject)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRendering, setIsRendering] = useState(false)
-  const [renderProgress, setRenderProgress] = useState(0)
+  const navigate = useNavigate();
+  const { projectId } = useParams<{ projectId: string }>();
+  const activeProject = useProjectStore((state) => state.activeProject);
+  const setActiveProject = useProjectStore((state) => state.setActiveProject);
+  const fetchAssets = useProjectStore((state) => state.fetchAssets);
+  const saveTimeline = useProjectStore((state) => state.saveTimeline);
+  const deleteClip = useProjectStore((state) => state.deleteClip);
+  const [project, setProject] = useState<Project | null>(activeProject);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
+      const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
         target.isContentEditable
       ) {
-        return
+        return;
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const selClipId = useWorkspaceStore.getState().selectedClipId
-        const selTrackId = useWorkspaceStore.getState().selectedTrackId
+        const selClipId = useWorkspaceStore.getState().selectedClipId;
+        const selTrackId = useWorkspaceStore.getState().selectedTrackId;
         if (selClipId && selTrackId) {
-          deleteClip(selTrackId, selClipId)
-          useWorkspaceStore.getState().clearSelection()
+          deleteClip(selTrackId, selClipId);
+          useWorkspaceStore.getState().clearSelection();
         }
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [deleteClip])
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deleteClip]);
 
   const handleExport = async () => {
-    if (!project) return
+    if (!project) return;
 
     const outputPath = window.prompt(
       'Enter absolute output file path (e.g. C:/videos/output.mp4):',
       '',
-    )
-    if (!outputPath) return
+    );
+    if (!outputPath) return;
 
-    setIsRendering(true)
-    setRenderProgress(0)
+    setIsRendering(true);
+    setRenderProgress(0);
 
-    let unlisten: (() => void) | null = null
+    let unlisten: (() => void) | null = null;
 
     try {
-      const { listen } = await import('@tauri-apps/api/event')
+      const { listen } = await import('@tauri-apps/api/event');
       unlisten = await listen<{ progress: number }>(
         'render-progress',
         (event) => {
-          setRenderProgress(event.payload.progress)
+          setRenderProgress(event.payload.progress);
         },
-      )
+      );
 
-      await projectApi.export(project.id, outputPath)
-      alert('Project exported successfully!')
+      await projectApi.export(project.id, outputPath);
+      alert('Project exported successfully!');
     } catch (error) {
-      console.error('Export failed:', error)
-      alert('Export failed: ' + error)
+      console.error('Export failed:', error);
+      alert('Export failed: ' + error);
     } finally {
-      setIsRendering(false)
+      setIsRendering(false);
       if (unlisten) {
-        unlisten()
+        unlisten();
       }
     }
-  }
+  };
 
   useEffect(() => {
     if (!projectId) {
-      navigate('/')
-      return
+      navigate('/');
+      return;
     }
 
-    let isMounted = true
+    let isMounted = true;
 
     const loadData = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
 
       try {
-        const loadedProject = await projectApi.getById(projectId)
+        const loadedProject = await projectApi.getById(projectId);
 
-        if (!isMounted) return
+        if (!isMounted) return;
 
-        setProject(loadedProject)
-        setActiveProject(loadedProject)
-        await fetchAssets(projectId)
+        setProject(loadedProject);
+        setActiveProject(loadedProject);
+        await fetchAssets(projectId);
       } catch (error) {
-        if (!isMounted) return
+        if (!isMounted) return;
 
-        console.error('Failed to load project data:', error)
-        navigate('/')
+        console.error('Failed to load project data:', error);
+        navigate('/');
       } finally {
         if (isMounted) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
       }
-    }
+    };
 
-    loadData()
+    loadData();
 
     return () => {
-      isMounted = false
-    }
-  }, [navigate, projectId, setActiveProject])
+      isMounted = false;
+    };
+  }, [navigate, projectId, setActiveProject]);
 
   if (isLoading || !project) {
     return (
       <div className="bg-background text-foreground flex h-screen items-center justify-center">
         Loading workspace...
       </div>
-    )
+    );
   }
 
   return (
@@ -211,7 +211,7 @@ const Workspace = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
-  )
-}
+  );
+};
 
-export default Workspace
+export default Workspace;

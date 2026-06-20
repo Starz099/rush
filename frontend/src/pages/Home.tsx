@@ -1,105 +1,105 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DotsThreeVerticalIcon,
   PlayIcon,
   PlusIcon,
   TrashIcon,
   PencilSimpleIcon,
-} from '@phosphor-icons/react'
+} from '@phosphor-icons/react';
 
-import { Button } from '@/components/ui/button'
-import { BackgroundBeams } from '@/components/ui/background-beams'
-import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button';
+import { BackgroundBeams } from '@/components/ui/background-beams';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from '@/components/ui/select';
 
-import { useProjectStore } from '@/store/projectStore'
+import { useProjectStore } from '@/store/projectStore';
 import {
   RESOLUTIONS,
   FPS_OPTIONS,
   DEFAULT_PROJECT_CONFIG,
-} from '@/constants/project'
-import type { Project, ResolutionValue, FPSValue } from '@/types/project'
+} from '@/constants/project';
+import type { Project, ResolutionValue, FPSValue } from '@/types/project';
 
 const Home = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   // Store state and actions
-  const projects = useProjectStore((state) => state.projects)
-  const fetchProjects = useProjectStore((state) => state.fetchProjects)
-  const createProject = useProjectStore((state) => state.createProject)
-  const deleteProject = useProjectStore((state) => state.deleteProject)
-  const renameProject = useProjectStore((state) => state.renameProject)
-  const setActiveProject = useProjectStore((state) => state.setActiveProject)
+  const projects = useProjectStore((state) => state.projects);
+  const fetchProjects = useProjectStore((state) => state.fetchProjects);
+  const createProject = useProjectStore((state) => state.createProject);
+  const deleteProject = useProjectStore((state) => state.deleteProject);
+  const renameProject = useProjectStore((state) => state.renameProject);
+  const setActiveProject = useProjectStore((state) => state.setActiveProject);
 
-  const [isOpen, setIsOpen] = useState(false)
-  const [projectName, setProjectName] = useState('')
+  const [isOpen, setIsOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
   const [resolution, setResolution] = useState<ResolutionValue>(
     DEFAULT_PROJECT_CONFIG.RESOLUTION,
-  )
-  const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS)
+  );
+  const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS);
 
-  const [isRenameOpen, setIsRenameOpen] = useState(false)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
   const handleCreate = async () => {
     try {
-      await createProject(projectName, resolution, fps)
-      setIsOpen(false)
-      setProjectName('')
-      setResolution(DEFAULT_PROJECT_CONFIG.RESOLUTION)
-      setFps(DEFAULT_PROJECT_CONFIG.FPS)
+      await createProject(projectName, resolution, fps);
+      setIsOpen(false);
+      setProjectName('');
+      setResolution(DEFAULT_PROJECT_CONFIG.RESOLUTION);
+      setFps(DEFAULT_PROJECT_CONFIG.FPS);
     } catch (error) {
-      console.error('Failed to create project:', error)
+      console.error('Failed to create project:', error);
     }
-  }
+  };
 
   const handleRename = async () => {
-    if (!editingProject) return
+    if (!editingProject) return;
     try {
-      await renameProject(editingProject.id, newProjectName)
-      setIsRenameOpen(false)
+      await renameProject(editingProject.id, newProjectName);
+      setIsRenameOpen(false);
     } catch (error) {
-      console.error('Failed to rename project:', error)
+      console.error('Failed to rename project:', error);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!deletingProject) return
+    if (!deletingProject) return;
     try {
-      await deleteProject(deletingProject.id)
-      setIsDeleteOpen(false)
+      await deleteProject(deletingProject.id);
+      setIsDeleteOpen(false);
     } catch (error) {
-      console.error('Failed to delete project:', error)
+      console.error('Failed to delete project:', error);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchProjects()
-  }, [fetchProjects])
+    fetchProjects();
+  }, [fetchProjects]);
 
   return (
     <div className="bg-background text-foreground relative flex h-screen items-center justify-center overflow-hidden p-4">
@@ -227,8 +227,8 @@ const Home = () => {
                   size="icon-sm"
                   variant="ghost"
                   onClick={() => {
-                    setActiveProject(project)
-                    navigate(`/workspace/${project.id}`)
+                    setActiveProject(project);
+                    navigate(`/workspace/${project.id}`);
                   }}
                 >
                   <PlayIcon weight="regular" className="translate-x-[0.5px]" />
@@ -262,9 +262,9 @@ const Home = () => {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       onClick={() => {
-                        setEditingProject(project)
-                        setNewProjectName(project.name)
-                        setIsRenameOpen(true)
+                        setEditingProject(project);
+                        setNewProjectName(project.name);
+                        setIsRenameOpen(true);
                       }}
                     >
                       <PencilSimpleIcon data-icon="inline-start" />
@@ -273,8 +273,8 @@ const Home = () => {
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => {
-                        setDeletingProject(project)
-                        setIsDeleteOpen(true)
+                        setDeletingProject(project);
+                        setIsDeleteOpen(true);
                       }}
                     >
                       <TrashIcon data-icon="inline-start" />
@@ -288,7 +288,7 @@ const Home = () => {
         </CardContent>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;

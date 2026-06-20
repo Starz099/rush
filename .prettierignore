@@ -10,3 +10,5 @@ dist-ssr/
 .turbo/
 .cache/
 .vite/
+**/*.rs
+

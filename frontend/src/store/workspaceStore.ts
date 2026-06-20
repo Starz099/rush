@@ -1,20 +1,20 @@
-import { create } from 'zustand'
-import type { Asset, EditingTool } from '@/api/bindings'
+import { create } from 'zustand';
+import type { Asset, EditingTool } from '@/api/bindings';
 
 interface WorkspaceState {
-  selectedAsset: Asset | null
-  selectedClipId: string | null
-  selectedTrackId: string | null
-  isPlaying: boolean
-  activeTool: EditingTool
+  selectedAsset: Asset | null;
+  selectedClipId: string | null;
+  selectedTrackId: string | null;
+  isPlaying: boolean;
+  activeTool: EditingTool;
 
-  setSelectedAsset: (asset: Asset | null) => void
-  setClipSelection: (trackId: string | null, clipId: string | null) => void
-  clearSelection: () => void
+  setSelectedAsset: (asset: Asset | null) => void;
+  setClipSelection: (trackId: string | null, clipId: string | null) => void;
+  clearSelection: () => void;
 
-  setIsPlaying: (playing: boolean) => void
-  togglePlaying: () => void
-  setActiveTool: (tool: EditingTool) => void
+  setIsPlaying: (playing: boolean) => void;
+  togglePlaying: () => void;
+  setActiveTool: (tool: EditingTool) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -47,4 +47,4 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIsPlaying: (playing: boolean) => set({ isPlaying: playing }),
   togglePlaying: () => set((state) => ({ isPlaying: !state.isPlaying })),
   setActiveTool: (tool: EditingTool) => set({ activeTool: tool }),
-}))
+}));

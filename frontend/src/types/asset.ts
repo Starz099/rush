@@ -1,3 +1,3 @@
-import type { Asset as AssetBinding } from '@/api/bindings'
+import type { Asset as AssetBinding } from '@/api/bindings';
 
-export type Asset = AssetBinding
+export type Asset = AssetBinding;

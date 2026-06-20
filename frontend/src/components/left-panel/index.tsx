@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { AssetsTab } from './AssetsTab'
-import { ToolsTab } from './ToolsTab'
+import { useState } from 'react';
+import { AssetsTab } from './AssetsTab';
+import { ToolsTab } from './ToolsTab';
 
 interface LeftPanelProps {
-  projectId: string
+  projectId: string;
 }
 
 export const LeftPanel = ({ projectId }: LeftPanelProps) => {
-  const [activeTab, setActiveTab] = useState<'assets' | 'tools'>('assets')
+  const [activeTab, setActiveTab] = useState<'assets' | 'tools'>('assets');
 
   return (
     <div className="flex h-full flex-col">
@@ -41,5 +41,5 @@ export const LeftPanel = ({ projectId }: LeftPanelProps) => {
         <ToolsTab />
       )}
     </div>
-  )
-}
+  );
+};

@@ -1,19 +1,19 @@
-import { AudioPipeline } from '../decoders/AudioPipeline'
-import type { IAudioProvider } from './providers/types'
+import { AudioPipeline } from '../decoders/AudioPipeline';
+import type { IAudioProvider } from './providers/types';
 
 /**
  * AudioEngine acts as the master orchestrator for all audio tracks in the project.
  * It manages multiple AudioPipelines and ensures they are synchronized.
  */
 export class AudioEngine {
-  private audioCtx: AudioContext
-  private pipelines: Map<string, AudioPipeline> = new Map()
-  private playbackStartTime: number = 0
-  private playbackStartPlayheadTime: number = 0
-  private disposed: boolean = false
+  private audioCtx: AudioContext;
+  private pipelines: Map<string, AudioPipeline> = new Map();
+  private playbackStartTime: number = 0;
+  private playbackStartPlayheadTime: number = 0;
+  private disposed: boolean = false;
 
   constructor(context: AudioContext) {
-    this.audioCtx = context
+    this.audioCtx = context;
   }
 
   /**
@@ -29,35 +29,40 @@ export class AudioEngine {
     timelineEnd: number = Infinity,
     sourceEnd: number = Infinity,
   ) {
-    if (this.disposed) return
+    if (this.disposed) return;
 
     // Initialize the provider (demuxing/metadata)
-    await provider.initialize()
+    await provider.initialize();
 
     // Create a new pipeline for this track
-    const pipeline = new AudioPipeline(provider, this.audioCtx)
+    const pipeline = new AudioPipeline(provider, this.audioCtx);
 
     // Setup the spatial position immediately
-    pipeline.setClipPosition(timelineStart, sourceStart, timelineEnd, sourceEnd)
+    pipeline.setClipPosition(
+      timelineStart,
+      sourceStart,
+      timelineEnd,
+      sourceEnd,
+    );
 
     // Sync the master clock
     pipeline.setMasterSync(
       this.playbackStartTime,
       this.playbackStartPlayheadTime,
-    )
+    );
 
-    this.pipelines.set(trackId, pipeline)
-    return pipeline
+    this.pipelines.set(trackId, pipeline);
+    return pipeline;
   }
 
   /**
    * Removes and disposes of a track.
    */
   public removeTrack(trackId: string) {
-    const pipeline = this.pipelines.get(trackId)
+    const pipeline = this.pipelines.get(trackId);
     if (pipeline) {
-      pipeline.dispose()
-      this.pipelines.delete(trackId)
+      pipeline.dispose();
+      this.pipelines.delete(trackId);
     }
   }
 
@@ -66,8 +71,8 @@ export class AudioEngine {
    */
   public stop() {
     this.pipelines.forEach((pipeline) => {
-      pipeline.stop()
-    })
+      pipeline.stop();
+    });
   }
 
   /**
@@ -75,10 +80,10 @@ export class AudioEngine {
    * Called by the main playback loop.
    */
   public decodeNextBatch(count: number = 5) {
-    if (this.disposed) return
+    if (this.disposed) return;
     this.pipelines.forEach((pipeline) => {
-      pipeline.decodeNextBatch(count)
-    })
+      pipeline.decodeNextBatch(count);
+    });
   }
 
   /**
@@ -90,26 +95,26 @@ export class AudioEngine {
     startPlayheadFrame: number,
     framerate: number,
   ) {
-    this.playbackStartTime = startTime
-    this.playbackStartPlayheadTime = startPlayheadFrame / framerate
+    this.playbackStartTime = startTime;
+    this.playbackStartPlayheadTime = startPlayheadFrame / framerate;
 
     this.pipelines.forEach((pipeline) => {
       pipeline.setMasterSync(
         this.playbackStartTime,
         this.playbackStartPlayheadTime,
-      )
-    })
+      );
+    });
   }
 
   /**
    * Seeks all tracks to a specific time.
    */
   public seekByTime(timelinePlayheadInSeconds: number) {
-    if (this.disposed) return
+    if (this.disposed) return;
 
     // After seeking, we update the internal sync so Play continues correctly
-    this.playbackStartTime = this.audioCtx.currentTime
-    this.playbackStartPlayheadTime = timelinePlayheadInSeconds
+    this.playbackStartTime = this.audioCtx.currentTime;
+    this.playbackStartPlayheadTime = timelinePlayheadInSeconds;
 
     this.pipelines.forEach((pipeline) => {
       // Calculate the source playhead for this specific track
@@ -117,35 +122,38 @@ export class AudioEngine {
       const sourcePlayhead =
         timelinePlayheadInSeconds -
         pipeline.timelineStartInSeconds +
-        pipeline.sourceStartInSeconds
+        pipeline.sourceStartInSeconds;
 
       // Seek the pipeline to the calculated position (clamp to >= sourceStart)
-      const seekTarget = Math.max(pipeline.sourceStartInSeconds, sourcePlayhead)
-      pipeline.seek(seekTarget)
+      const seekTarget = Math.max(
+        pipeline.sourceStartInSeconds,
+        sourcePlayhead,
+      );
+      pipeline.seek(seekTarget);
 
       // Sync the master clock on the pipeline
       pipeline.setMasterSync(
         this.playbackStartTime,
         this.playbackStartPlayheadTime,
-      )
-    })
+      );
+    });
   }
 
   /**
    * Returns a specific track pipeline.
    */
   public getTrack(trackId: string): AudioPipeline | undefined {
-    return this.pipelines.get(trackId)
+    return this.pipelines.get(trackId);
   }
 
   /**
    * Shuts down the engine and all pipelines.
    */
   public dispose() {
-    this.disposed = true
+    this.disposed = true;
     this.pipelines.forEach((pipeline) => {
-      pipeline.dispose()
-    })
-    this.pipelines.clear()
+      pipeline.dispose();
+    });
+    this.pipelines.clear();
   }
 }

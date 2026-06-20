@@ -1,5 +1,5 @@
-import type { Asset } from '@/api/bindings'
-import { Button } from '@/components/ui/button'
+import type { Asset } from '@/api/bindings';
+import { Button } from '@/components/ui/button';
 import {
   FileVideoIcon,
   FileImageIcon,
@@ -8,15 +8,15 @@ import {
   TrashIcon,
   PencilSimpleIcon,
   PlusIcon,
-} from '@phosphor-icons/react'
+} from '@phosphor-icons/react';
 
 interface AssetCellProps {
-  asset: Asset
-  isSelected: boolean
-  onClick: () => void
-  onDelete: (e: React.MouseEvent) => void
-  onRename: (e: React.MouseEvent) => void
-  onAddToTimeline: (e: React.MouseEvent) => void
+  asset: Asset;
+  isSelected: boolean;
+  onClick: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+  onRename: (e: React.MouseEvent) => void;
+  onAddToTimeline: (e: React.MouseEvent) => void;
 }
 
 export const AssetCell = ({
@@ -82,5 +82,5 @@ export const AssetCell = ({
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};

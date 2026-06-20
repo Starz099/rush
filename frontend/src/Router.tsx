@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Home from './pages/Home'
-import Workspace from './pages/Workspace'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Workspace from './pages/Workspace';
 
 const Router = () => {
   return (
@@ -10,7 +10,7 @@ const Router = () => {
         <Route path="/workspace/:projectId" element={<Workspace />} />
       </Routes>
     </BrowserRouter>
-  )
-}
+  );
+};
 
-export default Router
+export default Router;

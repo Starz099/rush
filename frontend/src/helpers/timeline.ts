@@ -1,4 +1,4 @@
-import { type Clip } from '@/api/bindings'
+import { type Clip } from '@/api/bindings';
 
 /**
  * Calculates which source frame should be displayed for a given playhead position on the timeline.
@@ -12,11 +12,11 @@ export function getSourceFrameForPlayhead(
   clip: Clip,
 ): number | null {
   if (playhead < clip.timeline_in || playhead >= clip.timeline_out) {
-    return null
+    return null;
   }
 
-  const offsetFromStart = playhead - clip.timeline_in
-  const targetSourceFrame = clip.source_in + offsetFromStart
+  const offsetFromStart = playhead - clip.timeline_in;
+  const targetSourceFrame = clip.source_in + offsetFromStart;
 
-  return targetSourceFrame
+  return targetSourceFrame;
 }

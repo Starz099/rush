@@ -1,134 +1,134 @@
-import { useState, useEffect } from 'react'
-import { PlusIcon } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { AssetCell } from '@/components/AssetCell'
-import { assetApi } from '@/api/asset'
-import type { Asset } from '@/api/bindings'
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { fpsToNumeric } from '@/helpers/fps'
+import { useState, useEffect } from 'react';
+import { PlusIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AssetCell } from '@/components/AssetCell';
+import { assetApi } from '@/api/asset';
+import type { Asset } from '@/api/bindings';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { fpsToNumeric } from '@/helpers/fps';
 
-import { useWorkspaceStore } from '@/store/workspaceStore'
-import { useProjectStore } from '@/store/projectStore'
-import { useAppStore } from '@/store/timelineStore'
-import { isVideoTrack, isAudioTrack } from '@/constants/trackConfig'
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useProjectStore } from '@/store/projectStore';
+import { useAppStore } from '@/store/timelineStore';
+import { isVideoTrack, isAudioTrack } from '@/constants/trackConfig';
 
 interface AssetsTabProps {
-  projectId: string
+  projectId: string;
 }
 
 export const AssetsTab = ({ projectId }: AssetsTabProps) => {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true);
 
-  const selectedAsset = useWorkspaceStore((state) => state.selectedAsset)
-  const setSelectedAsset = useWorkspaceStore((state) => state.setSelectedAsset)
+  const selectedAsset = useWorkspaceStore((state) => state.selectedAsset);
+  const setSelectedAsset = useWorkspaceStore((state) => state.setSelectedAsset);
 
-  const activeProject = useProjectStore((state) => state.activeProject)
-  const assets = useProjectStore((state) => state.assets)
-  const fetchAssets = useProjectStore((state) => state.fetchAssets)
-  const addAsset = useProjectStore((state) => state.addAsset)
-  const removeAsset = useProjectStore((state) => state.removeAsset)
-  const renameAsset = useProjectStore((state) => state.renameAsset)
-  const saveTimeline = useProjectStore((state) => state.saveTimeline)
+  const activeProject = useProjectStore((state) => state.activeProject);
+  const assets = useProjectStore((state) => state.assets);
+  const fetchAssets = useProjectStore((state) => state.fetchAssets);
+  const addAsset = useProjectStore((state) => state.addAsset);
+  const removeAsset = useProjectStore((state) => state.removeAsset);
+  const renameAsset = useProjectStore((state) => state.renameAsset);
+  const saveTimeline = useProjectStore((state) => state.saveTimeline);
 
-  const prepareAsset = useAppStore((state) => state.prepareAsset)
+  const prepareAsset = useAppStore((state) => state.prepareAsset);
 
   useEffect(() => {
-    let isMounted = true
+    let isMounted = true;
     const loadAssets = async () => {
-      setIsLoading(true)
-      await fetchAssets(projectId)
-      if (isMounted) setIsLoading(false)
-    }
-    loadAssets()
+      setIsLoading(true);
+      await fetchAssets(projectId);
+      if (isMounted) setIsLoading(false);
+    };
+    loadAssets();
     return () => {
-      isMounted = false
-    }
-  }, [projectId, fetchAssets])
+      isMounted = false;
+    };
+  }, [projectId, fetchAssets]);
 
   const getMediaDuration = (filePath: string): Promise<number | null> => {
     return new Promise((resolve) => {
       // Use audio element for all probes as it's lighter and handles mp3 better
-      const media = document.createElement('audio')
-      media.preload = 'metadata'
+      const media = document.createElement('audio');
+      media.preload = 'metadata';
       media.onloadedmetadata = () => {
-        resolve(Math.round(media.duration * 1000))
-      }
+        resolve(Math.round(media.duration * 1000));
+      };
       media.onerror = () => {
-        resolve(null)
-      }
-      media.src = convertFileSrc(filePath)
-    })
-  }
+        resolve(null);
+      };
+      media.src = convertFileSrc(filePath);
+    });
+  };
 
   const handleAddAsset = async () => {
     const filePath = window.prompt(
       'Enter absolute file path to an image, video, or MP3:',
-    )
-    if (!filePath) return
+    );
+    if (!filePath) return;
 
     try {
-      const duration = await getMediaDuration(filePath)
-      const newAsset = await assetApi.register(projectId, filePath, duration)
-      addAsset(newAsset)
+      const duration = await getMediaDuration(filePath);
+      const newAsset = await assetApi.register(projectId, filePath, duration);
+      addAsset(newAsset);
     } catch (error) {
-      console.error('Failed to register asset:', error)
-      alert('Error registering asset: ' + error)
+      console.error('Failed to register asset:', error);
+      alert('Error registering asset: ' + error);
     }
-  }
+  };
 
   const handleDeleteAsset = async (assetId: string) => {
     try {
-      await assetApi.delete(assetId)
-      removeAsset(assetId)
-      if (selectedAsset?.id === assetId) setSelectedAsset(null)
+      await assetApi.delete(assetId);
+      removeAsset(assetId);
+      if (selectedAsset?.id === assetId) setSelectedAsset(null);
     } catch (error) {
-      console.error('Failed to delete asset:', error)
-      alert('Error deleting asset: ' + error)
+      console.error('Failed to delete asset:', error);
+      alert('Error deleting asset: ' + error);
     }
-  }
+  };
 
   const handleRenameAsset = async (asset: Asset) => {
-    const newName = window.prompt('Enter new name for asset:', asset.name)
-    if (!newName || newName === asset.name) return
+    const newName = window.prompt('Enter new name for asset:', asset.name);
+    if (!newName || newName === asset.name) return;
     try {
-      await renameAsset(asset.id, newName)
+      await renameAsset(asset.id, newName);
       if (selectedAsset?.id === asset.id) {
-        setSelectedAsset({ ...asset, name: newName })
+        setSelectedAsset({ ...asset, name: newName });
       }
     } catch (error) {
-      console.error('Failed to rename asset:', error)
-      alert('Error renaming asset: ' + error)
+      console.error('Failed to rename asset:', error);
+      alert('Error renaming asset: ' + error);
     }
-  }
+  };
 
   const handleAddToTimeline = async (asset: Asset) => {
-    if (!activeProject) return
+    if (!activeProject) return;
 
-    const timeline = activeProject.timeline_state
+    const timeline = activeProject.timeline_state;
 
     // Determine target tracks for this asset type
-    const isVideo = asset.media_type === 'video'
+    const isVideo = asset.media_type === 'video';
     const isAudio =
       asset.media_type === 'audio' ||
-      asset.file_path.toLowerCase().endsWith('.mp3')
-    const isImage = asset.media_type === 'image'
+      asset.file_path.toLowerCase().endsWith('.mp3');
+    const isImage = asset.media_type === 'image';
 
     // Duration calculation (Convert ms to project frames)
-    const framerate = fpsToNumeric(activeProject.framerate)
-    const durationMs = asset.duration_ms || 5000
-    const durationFrames = Math.round((durationMs / 1000) * framerate)
+    const framerate = fpsToNumeric(activeProject.framerate);
+    const durationMs = asset.duration_ms || 5000;
+    const durationFrames = Math.round((durationMs / 1000) * framerate);
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       const shouldAddToThisTrack =
         (isVideoTrack(t) && (isVideo || isImage)) ||
-        (isAudioTrack(t) && isAudio)
+        (isAudioTrack(t) && isAudio);
 
       if (shouldAddToThisTrack) {
         // Find the next available position on THIS specific track
-        const lastClip = t.clips[t.clips.length - 1]
-        const timelineIn = lastClip ? lastClip.timeline_out : 0
-        const timelineOut = timelineIn + durationFrames
+        const lastClip = t.clips[t.clips.length - 1];
+        const timelineIn = lastClip ? lastClip.timeline_out : 0;
+        const timelineOut = timelineIn + durationFrames;
 
         const newClip = {
           id: crypto.randomUUID(),
@@ -137,26 +137,31 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
           timeline_out: timelineOut,
           source_in: 0,
           source_out: durationFrames,
-        }
-        return { ...t, clips: [...t.clips, newClip] }
+        };
+        return { ...t, clips: [...t.clips, newClip] };
       }
 
-      return t
-    })
+      return t;
+    });
 
     // Verify if any tracks were actually updated
-    const tracksUpdated = updatedTracks.some((t, i) => t !== timeline.tracks[i])
+    const tracksUpdated = updatedTracks.some(
+      (t, i) => t !== timeline.tracks[i],
+    );
     if (!tracksUpdated) {
-      alert(`Could not find a suitable track for ${asset.media_type} asset.`)
-      return
+      alert(`Could not find a suitable track for ${asset.media_type} asset.`);
+      return;
     }
 
-    await saveTimeline(activeProject.id, { ...timeline, tracks: updatedTracks })
+    await saveTimeline(activeProject.id, {
+      ...timeline,
+      tracks: updatedTracks,
+    });
 
     if (isVideo) {
-      void prepareAsset(asset.id, asset.file_path)
+      void prepareAsset(asset.id, asset.file_path);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -165,7 +170,7 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
           Loading assets...
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -198,16 +203,16 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
                 isSelected={selectedAsset?.id === asset.id}
                 onClick={() => setSelectedAsset(asset)}
                 onDelete={(e) => {
-                  e.stopPropagation()
-                  handleDeleteAsset(asset.id)
+                  e.stopPropagation();
+                  handleDeleteAsset(asset.id);
                 }}
                 onRename={(e) => {
-                  e.stopPropagation()
-                  handleRenameAsset(asset)
+                  e.stopPropagation();
+                  handleRenameAsset(asset);
                 }}
                 onAddToTimeline={(e) => {
-                  e.stopPropagation()
-                  handleAddToTimeline(asset)
+                  e.stopPropagation();
+                  handleAddToTimeline(asset);
                 }}
               />
             ))
@@ -215,5 +220,5 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
         </div>
       </ScrollArea>
     </div>
-  )
-}
+  );
+};

@@ -6,7 +6,7 @@ export const unwrap = async <T>(
     { status: 'ok'; data: T } | { status: 'error'; error: string }
   >,
 ): Promise<T> => {
-  const result = await promise
-  if (result.status === 'ok') return result.data
-  throw new Error(result.error)
-}
+  const result = await promise;
+  if (result.status === 'ok') return result.data;
+  throw new Error(result.error);
+};

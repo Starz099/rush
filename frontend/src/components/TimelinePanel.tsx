@@ -1,43 +1,43 @@
-import { useProjectStore } from '@/store/projectStore'
-import { useAppStore } from '@/store/timelineStore'
-import { useWorkspaceStore } from '@/store/workspaceStore'
-import { PlayIcon, PauseIcon } from '@phosphor-icons/react'
-import { getTrackUIConfig } from '@/constants/trackConfig'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { useRef } from 'react'
-import { Button } from '@/components/ui/button'
-import { fpsToNumeric } from '@/helpers/fps'
-import { PIXELS_PER_SECOND, TICK_INTERVAL_SECONDS } from '@/constants/timeline'
-import { TimelineTrack } from './TimelineTrack'
+import { useProjectStore } from '@/store/projectStore';
+import { useAppStore } from '@/store/timelineStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { PlayIcon, PauseIcon } from '@phosphor-icons/react';
+import { getTrackUIConfig } from '@/constants/trackConfig';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { fpsToNumeric } from '@/helpers/fps';
+import { PIXELS_PER_SECOND, TICK_INTERVAL_SECONDS } from '@/constants/timeline';
+import { TimelineTrack } from './TimelineTrack';
 
 export const TimelinePanel = () => {
-  const activeProject = useProjectStore((state) => state.activeProject)
-  const saveTimeline = useProjectStore((state) => state.saveTimeline)
+  const activeProject = useProjectStore((state) => state.activeProject);
+  const saveTimeline = useProjectStore((state) => state.saveTimeline);
 
-  const isPlaying = useAppStore((state) => state.isPlaying)
-  const togglePlayback = useAppStore((state) => state.togglePlayback)
-  const playheadPosition = useAppStore((state) => state.playhead_position)
-  const setPlayhead = useAppStore((state) => state.setPlayhead)
-  const framerate = fpsToNumeric(activeProject?.framerate)
+  const isPlaying = useAppStore((state) => state.isPlaying);
+  const togglePlayback = useAppStore((state) => state.togglePlayback);
+  const playheadPosition = useAppStore((state) => state.playhead_position);
+  const setPlayhead = useAppStore((state) => state.setPlayhead);
+  const framerate = fpsToNumeric(activeProject?.framerate);
 
-  const { clearSelection } = useWorkspaceStore()
+  const { clearSelection } = useWorkspaceStore();
 
-  const timelineContentRef = useRef<HTMLDivElement>(null)
+  const timelineContentRef = useRef<HTMLDivElement>(null);
 
-  if (!activeProject) return null
+  if (!activeProject) return null;
 
-  const timeline = activeProject.timeline_state
+  const timeline = activeProject.timeline_state;
 
   // Calculate total duration in frames
-  const allClips = timeline.tracks.flatMap((t: any) => t.clips)
+  const allClips = timeline.tracks.flatMap((t: any) => t.clips);
   const maxFrames = allClips.reduce(
     (max: number, clip: any) => Math.max(max, clip.timeline_out),
     0,
-  )
+  );
 
-  const totalDurationSeconds = Math.max(maxFrames / framerate + 5, 30)
-  const timelineWidthPx = totalDurationSeconds * PIXELS_PER_SECOND
-  const numTicks = Math.ceil(totalDurationSeconds / TICK_INTERVAL_SECONDS) + 1
+  const totalDurationSeconds = Math.max(maxFrames / framerate + 5, 30);
+  const timelineWidthPx = totalDurationSeconds * PIXELS_PER_SECOND;
+  const numTicks = Math.ceil(totalDurationSeconds / TICK_INTERVAL_SECONDS) + 1;
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     // If clicking on empty timeline space, clear selection
@@ -45,39 +45,39 @@ export const TimelinePanel = () => {
       e.target === e.currentTarget ||
       (e.target as HTMLElement).classList.contains('bg-black/20')
     ) {
-      clearSelection()
+      clearSelection();
     }
 
-    if (!timelineContentRef.current) return
-    const rect = timelineContentRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    if (x < 0) return
+    if (!timelineContentRef.current) return;
+    const rect = timelineContentRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < 0) return;
 
     // Convert pixel X to time (seconds) then to frame
-    const timeInSeconds = x / PIXELS_PER_SECOND
-    const newFramePosition = Math.round(timeInSeconds * framerate)
+    const timeInSeconds = x / PIXELS_PER_SECOND;
+    const newFramePosition = Math.round(timeInSeconds * framerate);
 
-    setPlayhead(newFramePosition)
+    setPlayhead(newFramePosition);
 
     if (!isPlaying) {
       saveTimeline(activeProject.id, {
         ...timeline,
         playhead_position: newFramePosition,
-      })
+      });
     }
-  }
+  };
 
   // Format frames to HH:MM:SS:FF or MM:SS:FF
   const formatTime = (frame: number) => {
-    const totalSeconds = Math.floor(frame / framerate)
-    const f = frame % framerate
-    const s = totalSeconds % 60
-    const m = Math.floor(totalSeconds / 60) % 60
+    const totalSeconds = Math.floor(frame / framerate);
+    const f = frame % framerate;
+    const s = totalSeconds % 60;
+    const m = Math.floor(totalSeconds / 60) % 60;
 
     return `${m.toString().padStart(2, '0')}:${s
       .toString()
-      .padStart(2, '0')}:${f.toString().padStart(2, '0')}`
-  }
+      .padStart(2, '0')}:${f.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="flex h-full flex-col bg-[#111] select-none">
@@ -115,8 +115,8 @@ export const TimelinePanel = () => {
           <div className="h-6 border-b border-white/5 bg-white/[0.02]" />
 
           {timeline.tracks.map((track: any) => {
-            const config = getTrackUIConfig(track)
-            const Icon = config?.icon
+            const config = getTrackUIConfig(track);
+            const Icon = config?.icon;
             return (
               <div
                 key={track.id}
@@ -127,7 +127,7 @@ export const TimelinePanel = () => {
                   {track.name}
                 </span>
               </div>
-            )
+            );
           })}
         </div>
 
@@ -183,5 +183,5 @@ export const TimelinePanel = () => {
         </ScrollArea>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -1,96 +1,96 @@
-import type { Transform, BackgroundConfig } from '@/api/bindings'
+import type { Transform, BackgroundConfig } from '@/api/bindings';
 
 function hexToRgbaClearColor(hex: string) {
-  const rgba = hexToRgbaArray(hex)
-  return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] }
+  const rgba = hexToRgbaArray(hex);
+  return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
 }
 
 function hexToRgbaArray(hex: string): [number, number, number, number] {
-  if (!hex) return [0, 0, 0, 1]
-  let cleanHex = hex.replace(/^#/, '')
+  if (!hex) return [0, 0, 0, 1];
+  let cleanHex = hex.replace(/^#/, '');
 
   if (cleanHex.length === 3) {
     cleanHex = cleanHex
       .split('')
       .map((char) => char + char)
-      .join('')
+      .join('');
   }
 
   if (cleanHex.length !== 6 && cleanHex.length !== 8) {
-    return [0, 0, 0, 1]
+    return [0, 0, 0, 1];
   }
 
-  const r = parseInt(cleanHex.substring(0, 2), 16) / 255
-  const g = parseInt(cleanHex.substring(2, 4), 16) / 255
-  const b = parseInt(cleanHex.substring(4, 6), 16) / 255
+  const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+  const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+  const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
   const a =
-    cleanHex.length === 8 ? parseInt(cleanHex.substring(6, 8), 16) / 255 : 1
+    cleanHex.length === 8 ? parseInt(cleanHex.substring(6, 8), 16) / 255 : 1;
 
-  return [r, g, b, a]
+  return [r, g, b, a];
 }
 
 export class WebGPURenderer {
-  private canvas: HTMLCanvasElement
-  private device!: GPUDevice
-  private context!: GPUCanvasContext
-  private pipeline!: GPURenderPipeline
-  private bgGradientPipeline!: GPURenderPipeline
-  private bgUniformBuffer!: GPUBuffer
-  private format: GPUTextureFormat = 'bgra8unorm'
-  private disposed: boolean = false
-  private currentCommandEncoder: GPUCommandEncoder | null = null
-  private currentRenderPass: GPURenderPassEncoder | null = null
+  private canvas: HTMLCanvasElement;
+  private device!: GPUDevice;
+  private context!: GPUCanvasContext;
+  private pipeline!: GPURenderPipeline;
+  private bgGradientPipeline!: GPURenderPipeline;
+  private bgUniformBuffer!: GPUBuffer;
+  private format: GPUTextureFormat = 'bgra8unorm';
+  private disposed: boolean = false;
+  private currentCommandEncoder: GPUCommandEncoder | null = null;
+  private currentRenderPass: GPURenderPassEncoder | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas
+    this.canvas = canvas;
   }
 
   public async initialize() {
     if (!navigator.gpu) {
-      throw new Error('WebGPU is not supported on this browser.')
+      throw new Error('WebGPU is not supported on this browser.');
     }
 
-    const adapter = await navigator.gpu.requestAdapter()
-    if (!adapter) throw new Error('No GPU found.')
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('No GPU found.');
 
-    this.device = await adapter.requestDevice()
-    this.context = this.canvas.getContext('webgpu') as GPUCanvasContext
-    this.format = navigator.gpu.getPreferredCanvasFormat()
+    this.device = await adapter.requestDevice();
+    this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
+    this.format = navigator.gpu.getPreferredCanvasFormat();
 
     this.context.configure({
       device: this.device,
       format: this.format,
       alphaMode: 'premultiplied',
-    })
+    });
 
     // Reusable uniform buffer for background rendering parameters (272 bytes)
     this.bgUniformBuffer = this.device.createBuffer({
       size: 272,
       usage: 64 | 8, // GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    })
+    });
 
-    this.setupPipeline()
+    this.setupPipeline();
   }
 
   public beginFrame(background?: BackgroundConfig | null) {
-    if (this.disposed || !this.device || !this.context) return
-    this.currentCommandEncoder = this.device.createCommandEncoder()
+    if (this.disposed || !this.device || !this.context) return;
+    this.currentCommandEncoder = this.device.createCommandEncoder();
 
     // Determine clear value color from background configuration
-    let clearColor = { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }
-    let bgType = 0 // 0 = solid/clear, 1 = linear, 2 = radial, 3 = conic
+    let clearColor = { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
+    let bgType = 0; // 0 = solid/clear, 1 = linear, 2 = radial, 3 = conic
 
     if (background && background.source) {
-      const source = background.source
+      const source = background.source;
       if (source.type === 'solid') {
-        clearColor = hexToRgbaClearColor(source.params.color_hex)
+        clearColor = hexToRgbaClearColor(source.params.color_hex);
       } else if (source.type === 'gradient') {
-        const gType = source.params.gradient_type
-        bgType = gType === 'linear' ? 1 : gType === 'radial' ? 2 : 3
+        const gType = source.params.gradient_type;
+        bgType = gType === 'linear' ? 1 : gType === 'radial' ? 2 : 3;
       }
     }
 
-    const textureView = this.context.getCurrentTexture().createView()
+    const textureView = this.context.getCurrentTexture().createView();
     this.currentRenderPass = this.currentCommandEncoder.beginRenderPass({
       colorAttachments: [
         {
@@ -100,66 +100,68 @@ export class WebGPURenderer {
           storeOp: 'store',
         },
       ],
-    })
+    });
 
     // If gradient background is active, render it onto canvas
     if (bgType > 0 && background) {
-      const source = background.source
+      const source = background.source;
       const numColors =
-        source.type === 'gradient' ? source.params.colors?.length || 0 : 0
+        source.type === 'gradient' ? source.params.colors?.length || 0 : 0;
       const colors =
-        source.type === 'gradient' ? source.params.colors || [] : []
+        source.type === 'gradient' ? source.params.colors || [] : [];
       const angleDegrees =
-        source.type === 'gradient' ? (source.params.angle_degrees ?? 0) : 0
-      const blurValue = background.blur_value ?? 0
+        source.type === 'gradient' ? (source.params.angle_degrees ?? 0) : 0;
+      const blurValue = background.blur_value ?? 0;
 
       // Prepare Uniform Buffer Data (272 bytes)
-      const bufferData = new ArrayBuffer(272)
-      const view = new DataView(bufferData)
-      view.setUint32(0, bgType, true)
-      view.setUint32(4, numColors, true)
-      view.setFloat32(8, angleDegrees, true)
-      view.setFloat32(12, blurValue, true)
+      const bufferData = new ArrayBuffer(272);
+      const view = new DataView(bufferData);
+      view.setUint32(0, bgType, true);
+      view.setUint32(4, numColors, true);
+      view.setFloat32(8, angleDegrees, true);
+      view.setFloat32(12, blurValue, true);
 
       // Populate up to 16 colors
       for (let i = 0; i < 16; i++) {
-        const colorHex = colors[i]
+        const colorHex = colors[i];
         const colorRgba = colorHex
           ? hexToRgbaArray(colorHex)
-          : [0.0, 0.0, 0.0, 1.0]
-        view.setFloat32(16 + i * 16 + 0, colorRgba[0], true)
-        view.setFloat32(16 + i * 16 + 4, colorRgba[1], true)
-        view.setFloat32(16 + i * 16 + 8, colorRgba[2], true)
-        view.setFloat32(16 + i * 16 + 12, colorRgba[3], true)
+          : [0.0, 0.0, 0.0, 1.0];
+        view.setFloat32(16 + i * 16 + 0, colorRgba[0], true);
+        view.setFloat32(16 + i * 16 + 4, colorRgba[1], true);
+        view.setFloat32(16 + i * 16 + 8, colorRgba[2], true);
+        view.setFloat32(16 + i * 16 + 12, colorRgba[3], true);
       }
 
-      this.device.queue.writeBuffer(this.bgUniformBuffer, 0, bufferData)
+      this.device.queue.writeBuffer(this.bgUniformBuffer, 0, bufferData);
 
       if (bgType >= 1 && bgType <= 3) {
         // Gradient backgrounds (linear, radial, conic)
         const bindGroup = this.device.createBindGroup({
           layout: this.bgGradientPipeline.getBindGroupLayout(0),
           entries: [{ binding: 0, resource: { buffer: this.bgUniformBuffer } }],
-        })
+        });
 
-        this.currentRenderPass.setPipeline(this.bgGradientPipeline)
-        this.currentRenderPass.setBindGroup(0, bindGroup)
-        this.currentRenderPass.draw(6)
+        this.currentRenderPass.setPipeline(this.bgGradientPipeline);
+        this.currentRenderPass.setBindGroup(0, bindGroup);
+        this.currentRenderPass.draw(6);
       }
     }
 
     // Set the clip render pipeline back to default for rendering clips
-    this.currentRenderPass.setPipeline(this.pipeline)
+    this.currentRenderPass.setPipeline(this.pipeline);
   }
 
   public drawClip(frame: VideoFrame, transform: Transform | null) {
     if (!this.currentRenderPass || !this.device) {
-      return
+      return;
     }
 
     // prepare the texture from the VideoFrame
-    const externalTexture = this.device.importExternalTexture({ source: frame })
-    const sampler = this.device.createSampler()
+    const externalTexture = this.device.importExternalTexture({
+      source: frame,
+    });
+    const sampler = this.device.createSampler();
 
     // Prepare the Uniform Data (MUST match the Shader struct above)
     const uniformData = new Float32Array([
@@ -171,13 +173,13 @@ export class WebGPURenderer {
       transform?.y ?? 0, // position.y
       transform?.scale ?? 1, // scale
       0, // Padding (for 16-byte alignment)
-    ])
+    ]);
 
     const uniformBuffer = this.device.createBuffer({
       size: uniformData.byteLength,
       usage: 64 | 8, // GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    })
-    this.device.queue.writeBuffer(uniformBuffer, 0, uniformData)
+    });
+    this.device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     // Create the Bind Group for this specific clip
     const bindGroup = this.device.createBindGroup({
@@ -187,11 +189,11 @@ export class WebGPURenderer {
         { binding: 1, resource: externalTexture },
         { binding: 2, resource: { buffer: uniformBuffer } },
       ],
-    })
+    });
 
     // Record the draw command into the current pass
-    this.currentRenderPass.setBindGroup(0, bindGroup)
-    this.currentRenderPass.draw(6)
+    this.currentRenderPass.setBindGroup(0, bindGroup);
+    this.currentRenderPass.draw(6);
   }
 
   public setupPipeline() {
@@ -247,9 +249,9 @@ export class WebGPURenderer {
       fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
           return textureSampleBaseClampToEdge(myTexture, mySampler, uv);
       }
-    `
+    `;
 
-    const module = this.device.createShaderModule({ code: shaderCode })
+    const module = this.device.createShaderModule({ code: shaderCode });
     this.pipeline = this.device.createRenderPipeline({
       layout: 'auto',
       vertex: {
@@ -262,7 +264,7 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
-    })
+    });
 
     // 2. Background Gradient Pipeline setup
     const bgGradientShaderCode = `
@@ -357,10 +359,10 @@ export class WebGPURenderer {
           }
           return colorSum / totalWeight;
       }
-    `
+    `;
     const bgGradientModule = this.device.createShaderModule({
       code: bgGradientShaderCode,
-    })
+    });
     this.bgGradientPipeline = this.device.createRenderPipeline({
       layout: 'auto',
       vertex: {
@@ -373,20 +375,20 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
-    })
+    });
   }
 
   public endFrame() {
-    if (!this.currentCommandEncoder || !this.currentRenderPass) return
+    if (!this.currentCommandEncoder || !this.currentRenderPass) return;
 
-    this.currentRenderPass.end()
-    this.device.queue.submit([this.currentCommandEncoder.finish()])
+    this.currentRenderPass.end();
+    this.device.queue.submit([this.currentCommandEncoder.finish()]);
 
-    this.currentCommandEncoder = null
-    this.currentRenderPass = null
+    this.currentCommandEncoder = null;
+    this.currentRenderPass = null;
   }
 
   public dispose() {
-    this.disposed = true
+    this.disposed = true;
   }
 }

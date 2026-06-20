@@ -1,29 +1,29 @@
-import { useWorkspaceStore } from '@/store/workspaceStore'
-import { useProjectStore } from '@/store/projectStore'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Slider } from '@/components/ui/slider'
-import { Button } from '@/components/ui/button'
-import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react'
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useProjectStore } from '@/store/projectStore';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react';
 
 export const PropertiesSidebar = () => {
   const { selectedAsset, selectedClipId, selectedTrackId, clearSelection } =
-    useWorkspaceStore()
-  const { activeProject, updateClipProperties, deleteClip } = useProjectStore()
+    useWorkspaceStore();
+  const { activeProject, updateClipProperties, deleteClip } = useProjectStore();
 
   // Find the selected clip object if one exists
   const track = activeProject?.timeline_state.tracks.find(
     (t) => t.id === selectedTrackId,
-  )
-  const selectedClip = track?.clips.find((c) => c.id === selectedClipId)
+  );
+  const selectedClip = track?.clips.find((c) => c.id === selectedClipId);
 
   const handleClipUpdate = (props: any) => {
     if (selectedTrackId && selectedClipId) {
-      updateClipProperties(selectedTrackId, selectedClipId, props)
+      updateClipProperties(selectedTrackId, selectedClipId, props);
     }
-  }
+  };
 
   const handleTransformUpdate = (key: string, value: number) => {
     const currentTransform = selectedClip?.transform || {
@@ -31,24 +31,24 @@ export const PropertiesSidebar = () => {
       y: 0,
       scale: 1,
       z_index: 0,
-    }
+    };
     handleClipUpdate({
       transform: {
         ...currentTransform,
         [key]: value,
       },
-    })
-  }
+    });
+  };
 
   const handleZIndexUpdate = (delta: number) => {
     if (selectedClip) {
-      const currentZ = selectedClip.transform?.z_index || 0
-      handleTransformUpdate('z_index', currentZ + delta)
+      const currentZ = selectedClip.transform?.z_index || 0;
+      handleTransformUpdate('z_index', currentZ + delta);
     }
-  }
+  };
 
   const clamp = (val: number, min: number, max: number) =>
-    Math.min(Math.max(val, min), max)
+    Math.min(Math.max(val, min), max);
 
   return (
     <div className="flex h-full flex-col bg-[#0a0a0a]">
@@ -132,8 +132,8 @@ export const PropertiesSidebar = () => {
                               value={selectedClip.speed_factor ?? 1.0}
                               step={0.1}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 1.0
-                                handleClipUpdate({ speed_factor: val })
+                                const val = parseFloat(e.target.value) || 1.0;
+                                handleClipUpdate({ speed_factor: val });
                               }}
                             />
                           </div>
@@ -193,8 +193,8 @@ export const PropertiesSidebar = () => {
                               value={selectedClip.transform?.scale ?? 1.0}
                               step={0.05}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 1.0
-                                handleTransformUpdate('scale', val)
+                                const val = parseFloat(e.target.value) || 1.0;
+                                handleTransformUpdate('scale', val);
                               }}
                             />
                           </div>
@@ -437,8 +437,8 @@ export const PropertiesSidebar = () => {
                 className="mt-4 h-8 w-full text-[10px] font-semibold tracking-wider uppercase"
                 onClick={() => {
                   if (selectedTrackId && selectedClipId) {
-                    deleteClip(selectedTrackId, selectedClipId)
-                    clearSelection()
+                    deleteClip(selectedTrackId, selectedClipId);
+                    clearSelection();
                   }
                 }}
               >
@@ -504,5 +504,5 @@ export const PropertiesSidebar = () => {
         </div>
       </ScrollArea>
     </div>
-  )
-}
+  );
+};

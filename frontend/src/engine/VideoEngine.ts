@@ -1,15 +1,15 @@
-import type { WebGPURenderer } from './core/Renderer'
-import { LookAheadManager } from './buffering/LookAheadManager'
-import type { Project, Clip, Asset, BackgroundConfig } from '@/api/bindings'
+import type { WebGPURenderer } from './core/Renderer';
+import { LookAheadManager } from './buffering/LookAheadManager';
+import type { Project, Clip, Asset, BackgroundConfig } from '@/api/bindings';
 
 export class VideoEngine {
-  private renderer: WebGPURenderer
-  private lookAhead: LookAheadManager
-  private disposed = false
+  private renderer: WebGPURenderer;
+  private lookAhead: LookAheadManager;
+  private disposed = false;
 
   constructor(renderer: WebGPURenderer) {
-    this.renderer = renderer
-    this.lookAhead = new LookAheadManager()
+    this.renderer = renderer;
+    this.lookAhead = new LookAheadManager();
   }
 
   /**
@@ -20,8 +20,8 @@ export class VideoEngine {
     activeProject: Project,
     assets: Asset[],
   ) {
-    if (this.disposed) return
-    await this.lookAhead.tick(playheadFrame, activeProject, assets)
+    if (this.disposed) return;
+    await this.lookAhead.tick(playheadFrame, activeProject, assets);
   }
 
   /**
@@ -34,19 +34,19 @@ export class VideoEngine {
     background?: BackgroundConfig | null,
     globalZoom: number = 1.0,
   ) {
-    if (this.disposed) return
+    if (this.disposed) return;
 
     // 1. Start WebGPU frame recording
-    this.renderer.beginFrame(background)
+    this.renderer.beginFrame(background);
 
     // 2. Render each active clip
     for (const clip of activeClips) {
       // Pull the decoded frame from the LookAheadManager
-      const frame = this.lookAhead.getFrame(clip.id, playheadFrame, framerate)
+      const frame = this.lookAhead.getFrame(clip.id, playheadFrame, framerate);
 
       if (frame) {
         // Adjust the individual clip transform by the global zoom multiplier
-        const originalTransform = clip.transform
+        const originalTransform = clip.transform;
         const modifiedTransform = originalTransform
           ? {
               x: (originalTransform.x ?? 0) * globalZoom,
@@ -59,29 +59,29 @@ export class VideoEngine {
               y: 0,
               scale: globalZoom,
               z_index: 0,
-            }
+            };
 
         // Draw the frame onto the canvas using our WebGPU renderer
-        this.renderer.drawClip(frame, modifiedTransform)
+        this.renderer.drawClip(frame, modifiedTransform);
       }
     }
 
     // 3. Submit WebGPU commands to the GPU
-    this.renderer.endFrame()
+    this.renderer.endFrame();
   }
 
   /**
    * Resets all buffer sessions. Called when playhead jumps/scrubs.
    */
   public reset() {
-    this.lookAhead.reset()
+    this.lookAhead.reset();
   }
 
   /**
    * Clean up everything when disposing the editor
    */
   public dispose() {
-    this.disposed = true
-    this.lookAhead.dispose()
+    this.disposed = true;
+    this.lookAhead.dispose();
   }
 }

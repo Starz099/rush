@@ -2,8 +2,8 @@ import type {
   Project as ProjectBinding,
   ResolutionPreset,
   FpsPreset,
-} from '@/api/bindings'
+} from '@/api/bindings';
 
-export type Project = ProjectBinding
-export type ResolutionValue = ResolutionPreset
-export type FPSValue = FpsPreset
+export type Project = ProjectBinding;
+export type ResolutionValue = ResolutionPreset;
+export type FPSValue = FpsPreset;
