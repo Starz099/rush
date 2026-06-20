@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { PlusIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { AssetCell } from './AssetCell'
+import { AssetCell } from '@/components/AssetCell'
 import { assetApi } from '@/api/asset'
 import type { Asset } from '@/api/bindings'
 import { convertFileSrc } from '@tauri-apps/api/core'
@@ -10,14 +10,16 @@ import { fpsToNumeric } from '@/helpers/fps'
 
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
-import { useAppStore } from '../store/timelineStore'
+import { useAppStore } from '@/store/timelineStore'
+import { isVideoTrack, isAudioTrack } from '@/constants/trackConfig'
 
-interface AssetSidebarProps {
+interface AssetsTabProps {
   projectId: string
 }
 
-export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
+export const AssetsTab = ({ projectId }: AssetsTabProps) => {
   const [isLoading, setIsLoading] = useState(true)
+
   const selectedAsset = useWorkspaceStore((state) => state.selectedAsset)
   const setSelectedAsset = useWorkspaceStore((state) => state.setSelectedAsset)
 
@@ -119,8 +121,8 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       const shouldAddToThisTrack =
-        (t.track_type === 'video' && (isVideo || isImage)) ||
-        (t.track_type === 'audio' && (isVideo || isAudio))
+        (isVideoTrack(t) && (isVideo || isImage)) ||
+        (isAudioTrack(t) && isAudio)
 
       if (shouldAddToThisTrack) {
         // Find the next available position on THIS specific track
@@ -167,7 +169,7 @@ export const AssetSidebar = ({ projectId }: AssetSidebarProps) => {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b p-3">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           Assets

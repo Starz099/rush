@@ -9,6 +9,7 @@ import { VideoEngine } from '../engine/VideoEngine'
 import { AudioEngine } from '../engine/audio/AudioEngine'
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator'
 import { fpsToNumeric } from '@/helpers/fps'
+import { isVideoTrack } from '@/constants/trackConfig'
 
 export const PreviewPanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject)
@@ -30,8 +31,7 @@ export const PreviewPanel = () => {
   const demuxingAssets = useAppStore((state) => state.demuxingAssets)
 
   const timeline = activeProject?.timeline_state
-  const videoTracks =
-    timeline?.tracks.filter((t: any) => t.track_type === 'video') || []
+  const videoTracks = timeline?.tracks.filter(isVideoTrack) || []
 
   // Active clips for scrubbing and UI hints
   const activeClips = videoTracks.flatMap((track: any) =>
@@ -176,8 +176,28 @@ export const PreviewPanel = () => {
             (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
           )
 
+          // Find active global zoom multiplier
+          const effectsTracks =
+            timeline?.tracks.filter(
+              (t: any) => t.track_type?.toLowerCase() === 'effects',
+            ) || []
+          const activeEffectsClip = effectsTracks
+            .flatMap((t: any) => t.clips)
+            .find(
+              (clip: any) =>
+                playheadPosition >= clip.timeline_in &&
+                playheadPosition < clip.timeline_out,
+            )
+          const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0
+
           // Render the frame immediately
-          videoEngine.renderFrame(playheadPosition, sortedClips, projectFps)
+          videoEngine.renderFrame(
+            playheadPosition,
+            sortedClips,
+            projectFps,
+            activeProject.timeline_state.background,
+            globalZoom,
+          )
         })
 
       if (audioEngine) {
@@ -222,7 +242,7 @@ export const PreviewPanel = () => {
         <canvas
           ref={canvasRef}
           style={{
-            display: activeAsset?.media_type === 'video' ? 'block' : 'none',
+            display: activeAsset?.media_type === 'image' ? 'none' : 'block',
           }}
           className="h-full w-full bg-white/5 object-contain"
           width={previewWidth}

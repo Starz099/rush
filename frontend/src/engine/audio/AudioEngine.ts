@@ -26,6 +26,8 @@ export class AudioEngine {
     provider: IAudioProvider,
     timelineStart: number = 0,
     sourceStart: number = 0,
+    timelineEnd: number = Infinity,
+    sourceEnd: number = Infinity,
   ) {
     if (this.disposed) return
 
@@ -36,7 +38,7 @@ export class AudioEngine {
     const pipeline = new AudioPipeline(provider, this.audioCtx)
 
     // Setup the spatial position immediately
-    pipeline.setClipPosition(timelineStart, sourceStart)
+    pipeline.setClipPosition(timelineStart, sourceStart, timelineEnd, sourceEnd)
 
     // Sync the master clock
     pipeline.setMasterSync(

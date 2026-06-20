@@ -1,4 +1,5 @@
-use crate::db::models::project::Project as DbProject;
+use crate::db::models::clip::BackgroundConfig;
+use crate::db::models::{clip::EffectConfig, project::Project as DbProject};
 use crate::models::TrackType;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ pub struct RenderTimeline {
     pub framerate: i32,
     pub duration_seconds: f32,
     pub tracks: Vec<RenderTrack>,
+    pub background: Option<BackgroundConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,12 +27,15 @@ pub struct RenderClip {
     pub id: String,
     pub asset_id: String,
     pub file_path: String,
+    pub media_type: String,
     pub timeline_in: f64,
     pub timeline_out: f64,
     pub source_in: f64,
     pub source_out: f64,
     pub transform: Option<ClipTransform>,
     pub volume: f32,
+    pub speed_factor: f32,
+    pub effects: Vec<EffectConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,18 +64,26 @@ impl RenderTimeline {
                     max_duration_seconds = timeline_out;
                 }
 
-                let file_path: String = conn
-                    .query_row(
-                        "SELECT file_path FROM assets WHERE id = ?1",
-                        [&clip.asset_id],
-                        |row| row.get(0),
+                // If asset_id exists, fetch it from database. Otherwise, it is empty (e.g. text/overlays)
+                let (file_path, media_type) = if let Some(ref asset_id) = clip.asset_id {
+                    conn.query_row(
+                        "SELECT file_path, media_type FROM assets WHERE id = ?1",
+                        [asset_id],
+                        |row| {
+                            let path: String = row.get(0)?;
+                            let media: String = row.get(1)?;
+                            Ok((path, media))
+                        },
                     )
                     .map_err(|e| {
                         format!(
-                            "Failed to find file path for asset {}: {}",
-                            clip.asset_id, e
+                            "Failed to find file path and media type for asset {}: {}",
+                            asset_id, e
                         )
-                    })?;
+                    })?
+                } else {
+                    ("".to_string(), "".to_string())
+                };
 
                 let transform = clip.transform.as_ref().map(|t| ClipTransform {
                     width: (project.viewport_width as f32 * t.scale) as i32,
@@ -81,14 +94,17 @@ impl RenderTimeline {
 
                 render_clips.push(RenderClip {
                     id: clip.id.clone(),
-                    asset_id: clip.asset_id.clone(),
+                    asset_id: clip.asset_id.clone().unwrap_or_default(),
                     file_path,
+                    media_type,
                     timeline_in,
                     timeline_out,
                     source_in,
                     source_out,
                     transform,
                     volume: 1.0, //TODO: take actual input for volume from frontend
+                    speed_factor: clip.speed_factor,
+                    effects: clip.effects.clone(),
                 })
             }
 
@@ -106,6 +122,7 @@ impl RenderTimeline {
             framerate: project.framerate,
             duration_seconds: max_duration_seconds as f32,
             tracks: render_tracks,
+            background: project.timeline_state.background.clone(),
         })
     }
 }

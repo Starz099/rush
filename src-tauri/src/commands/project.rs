@@ -1,4 +1,4 @@
-use crate::db::models::clip::{TimelineState, Track};
+use crate::db::models::clip::{default_background, EditingTool, TimelineState, Track};
 use crate::db::models::project::Project;
 use crate::models::{FpsPreset, ResolutionPreset, TrackType};
 use crate::render::models::RenderTimeline;
@@ -30,14 +30,30 @@ pub fn create_project(
                 name: "Video 1".to_string(),
                 track_type: TrackType::Video,
                 clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
             },
             Track {
                 id: "audio-1".to_string(),
                 name: "Audio 1".to_string(),
                 track_type: TrackType::Audio,
                 clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
+            },
+            Track {
+                id: "effects-1".to_string(),
+                name: "Effects 1".to_string(),
+                track_type: TrackType::Effects,
+                clips: vec![],
+                transitions: vec![],
+                is_muted: false,
+                is_locked: false,
             },
         ],
+        background: Some(default_background()),
     };
     let timeline_json = serde_json::to_string(&initial_timeline).map_err(|e| e.to_string())?;
 
@@ -161,25 +177,30 @@ pub fn export_project(
     project_id: String,
     output_path: String,
 ) -> Result<(), String> {
-    // 1. Get database connection
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    // 2. Fetch the project by ID
-    let project = db
+    // Fetch project and compile timeline data (holding db lock only during this scope)
+    let render_timeline = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let project = db
             .query_row(
                 "SELECT id, name, viewport_width, viewport_height, framerate, timeline_state, created_at, updated_at
-             FROM projects WHERE id = ?1",
+              FROM projects WHERE id = ?1",
                 [&project_id],
                 Project::from_row,
             )
             .map_err(|e| e.to_string())?;
 
-    // 3. Compile timeline data from project
-    let render_timeline = RenderTimeline::from_project(&project, &db)?;
+        RenderTimeline::from_project(&project, &db)?
+    };
 
-    // 4. Instantiate RenderEngine and run it
+    // Instantiate RenderEngine and run it (database is now unlocked and fully accessible)
     let engine = RenderEngine::new(render_timeline);
     engine.start_render(&app_handle, &output_path)?;
 
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn dummy_tool_types() -> Vec<EditingTool> {
+    vec![]
 }

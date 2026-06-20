@@ -1,12 +1,8 @@
 import { useProjectStore } from '@/store/projectStore'
 import { useAppStore } from '@/store/timelineStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
-import {
-  FilmStripIcon,
-  SpeakerHighIcon,
-  PlayIcon,
-  PauseIcon,
-} from '@phosphor-icons/react'
+import { PlayIcon, PauseIcon } from '@phosphor-icons/react'
+import { getTrackUIConfig } from '@/constants/trackConfig'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
@@ -118,24 +114,24 @@ export const TimelinePanel = () => {
           {/* Header Spacer for Timebar */}
           <div className="h-6 border-b border-white/5 bg-white/[0.02]" />
 
-          {timeline.tracks.map((track: any) => (
-            <div
-              key={track.id}
-              className="flex h-16 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-3"
-            >
-              {track.track_type === 'video' ? (
-                <FilmStripIcon className="size-4 text-blue-400" />
-              ) : (
-                <SpeakerHighIcon className="size-4 text-green-400" />
-              )}
-              <span className="truncate text-[11px] font-medium">
-                {track.name}
-              </span>
-            </div>
-          ))}
+          {timeline.tracks.map((track: any) => {
+            const config = getTrackUIConfig(track)
+            const Icon = config?.icon
+            return (
+              <div
+                key={track.id}
+                className="flex h-16 items-center gap-2 border-b border-white/5 bg-white/[0.02] px-3"
+              >
+                {Icon && <Icon className={`size-4 ${config.iconColor}`} />}
+                <span className="truncate text-[11px] font-medium">
+                  {track.name}
+                </span>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Scrollable Tracks Content */}
+        {/* Scrollable Tracks s Content */}
         <ScrollArea className="flex-1 overflow-hidden" dir="ltr">
           <div
             className="relative flex min-h-full flex-col"

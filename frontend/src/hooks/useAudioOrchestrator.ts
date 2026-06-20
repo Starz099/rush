@@ -34,14 +34,15 @@ export function useAudioOrchestrator(
     const preloadBufferFrames = framerate * 5
     const trailingBufferFrames = framerate * 1
 
-    const audioTracks = timeline.tracks.filter(
-      (t: any) => t.track_type === 'audio',
-    )
-    const clipsToMount = audioTracks.flatMap((track: any) =>
+    const clipsToMount = timeline.tracks.flatMap((track: any) =>
       track.clips.filter((clip: any) => {
         const asset = assets.find((a) => a.id === clip.asset_id)
+        const hasAudio =
+          asset &&
+          (asset.media_type === 'audio' || asset.media_type === 'video')
         const isAssetReady = asset ? !!readyAssets[asset.id] : false
         return (
+          hasAudio &&
           isAssetReady &&
           playhead < clip.timeline_out + trailingBufferFrames &&
           playhead > clip.timeline_in - preloadBufferFrames &&
@@ -121,18 +122,27 @@ export function useAudioOrchestrator(
             `[Orchestrator] Preloading track: ${clip.id} (mode: ${isMp3 ? 'Standalone/MP3' : 'MP4'}) using path: ${audioPathToUse}`,
           )
 
+          const timelineEnd = clip.timeline_out / framerate
+          const sourceEnd = clip.source_out / framerate
+
           await audioEngine.addTrack(
             clip.id,
             provider,
             clip.timeline_in / framerate,
             clip.source_in / framerate,
+            timelineEnd,
+            sourceEnd,
           )
 
           const pipeline = audioEngine.getTrack(clip.id)
           if (pipeline) {
             const sourceTime =
               (playhead - clip.timeline_in + clip.source_in) / framerate
-            pipeline.seek(sourceTime)
+            const clampedSourceTime = Math.max(
+              clip.source_in / framerate,
+              sourceTime,
+            )
+            pipeline.seek(clampedSourceTime)
           }
 
           mountedClipIds.current.add(clip.id)
