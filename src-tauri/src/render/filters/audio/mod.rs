@@ -1,3 +1,4 @@
 pub mod delay;
-pub mod volume;
+pub mod tempo;
 pub mod trim;
+pub mod volume;

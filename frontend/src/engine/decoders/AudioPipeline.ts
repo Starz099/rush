@@ -3,6 +3,8 @@ import type {
   AudioSample,
   IAudioProvider,
 } from '../audio/providers/types'
+import { useProjectStore } from '../../store/projectStore'
+import { fpsToNumeric } from '../../helpers/fps'
 
 export class AudioPipeline {
   private provider: IAudioProvider
@@ -42,9 +44,28 @@ export class AudioPipeline {
         const timelinePos =
           this.timelineStartInSeconds +
           (audioTimeInSource - this.sourceStartInSeconds)
+
+        const activeProject = useProjectStore.getState().activeProject
+        const framerate = activeProject?.framerate
+          ? fpsToNumeric(activeProject.framerate)
+          : 30
+        const speedClips =
+          activeProject?.timeline_state.tracks
+            .filter((t: any) => t.track_type?.toLowerCase() === 'effects')
+            .flatMap((t: any) => t.clips)
+            .filter(
+              (c: any) =>
+                c.speed_factor !== undefined && c.speed_factor !== null,
+            ) || []
+
         const playtime =
           this.playbackStartTime +
-          (timelinePos - this.playbackStartPlayheadTime)
+          getRealTimeDuration(
+            this.playbackStartPlayheadTime,
+            timelinePos,
+            speedClips,
+            framerate,
+          )
 
         // If the last scheduled sample is more than 0.5s in the future, chill.
         if (playtime > this.audioCtx.currentTime + 0.5) {
@@ -155,20 +176,51 @@ export class AudioPipeline {
       return
     }
 
+    const activeProject = useProjectStore.getState().activeProject
+    const framerate = activeProject?.framerate
+      ? fpsToNumeric(activeProject.framerate)
+      : 30
+    const speedClips =
+      activeProject?.timeline_state.tracks
+        .filter((t: any) => t.track_type?.toLowerCase() === 'effects')
+        .flatMap((t: any) => t.clips)
+        .filter(
+          (c: any) => c.speed_factor !== undefined && c.speed_factor !== null,
+        ) || []
+
     // 3. When should this play on the hardware clock?
-    // PlayTime = MasterStartTime + (TimelinePos - MasterStartPlayhead)
     const playtime =
-      this.playbackStartTime + (timelinePos - this.playbackStartPlayheadTime)
+      this.playbackStartTime +
+      getRealTimeDuration(
+        this.playbackStartPlayheadTime,
+        timelinePos,
+        speedClips,
+        framerate,
+      )
 
     const clipEndTimeline = this.timelineEndInSeconds
     const clipEndPlaytime =
       this.playbackStartTime +
-      (clipEndTimeline - this.playbackStartPlayheadTime)
+      getRealTimeDuration(
+        this.playbackStartPlayheadTime,
+        clipEndTimeline,
+        speedClips,
+        framerate,
+      )
 
     if (playtime >= clipEndPlaytime) {
       data.close()
       return
     }
+
+    // Set dynamic speed factor based on active speed clip at timelinePos
+    const activeSpeedClip = speedClips.find(
+      (c: any) =>
+        timelinePos >= c.timeline_in / framerate &&
+        timelinePos < c.timeline_out / framerate,
+    )
+    const speed = activeSpeedClip?.speed_factor ?? 1.0
+    source.playbackRate.value = speed
 
     // Track source so we can stop it if the user pauses
     this.activeSources.push(source)
@@ -186,7 +238,9 @@ export class AudioPipeline {
       // Increased tolerance for lag
       // If it's slightly in the past, start with an offset
       const offset = currentTime - playtime
-      source.start(currentTime, offset)
+      // Scale offset to source buffer seconds (since buffer is raw and plays at `speed` rate)
+      const rawOffset = offset * speed
+      source.start(currentTime, rawOffset)
       source.stop(clipEndPlaytime)
     }
 
@@ -270,4 +324,43 @@ export class AudioPipeline {
       this.decoder.close()
     }
   }
+}
+
+function getRealTimeDuration(
+  startPlayheadTime: number,
+  targetTime: number,
+  speedClips: any[],
+  framerate: number,
+) {
+  if (targetTime <= startPlayheadTime) return 0
+
+  const boundaries = new Set<number>()
+  boundaries.add(startPlayheadTime)
+  boundaries.add(targetTime)
+
+  for (const clip of speedClips) {
+    const tIn = clip.timeline_in / framerate
+    const tOut = clip.timeline_out / framerate
+    if (tIn > startPlayheadTime && tIn < targetTime) boundaries.add(tIn)
+    if (tOut > startPlayheadTime && tOut < targetTime) boundaries.add(tOut)
+  }
+
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b)
+
+  let totalRealTime = 0
+  for (let i = 0; i < sortedBoundaries.length - 1; i++) {
+    const t1 = sortedBoundaries[i]
+    const t2 = sortedBoundaries[i + 1]
+    const mid = (t1 + t2) / 2
+
+    const clip = speedClips.find(
+      (c) =>
+        mid >= c.timeline_in / framerate && mid < c.timeline_out / framerate,
+    )
+    const speed = clip?.speed_factor ?? 1.0
+
+    totalRealTime += (t2 - t1) / speed
+  }
+
+  return totalRealTime
 }

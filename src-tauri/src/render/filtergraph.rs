@@ -164,10 +164,14 @@ impl TimelineCompiler {
             }
         }
 
-        // Apply global zoom effects from the effects tracks to the final composite video stream
+        // Apply global zoom and speed effects from the effects tracks to the final composite video stream
         let mut effect_clip_idx = 0;
+        let mut speed_clip_idx = 0;
+        let mut cumulative_offset: f64 = 0.0;
+
         for track in &self.timeline.tracks {
             if track.track_type == TrackType::Effects {
+                // Apply zoom effects first (they do not alter timestamps)
                 for clip in &track.clips {
                     let scale = clip
                         .transform
@@ -200,7 +204,45 @@ impl TimelineCompiler {
             }
         }
 
-        if !audio_streams.is_empty() {
+        // Apply Speed Effects chronologically
+        let mut speed_clips: Vec<&crate::render::models::RenderClip> = Vec::new();
+        for track in &self.timeline.tracks {
+            if track.track_type == TrackType::Effects {
+                for clip in &track.clips {
+                    if (clip.speed_factor - 1.0).abs() > 0.001 {
+                        speed_clips.push(clip);
+                    }
+                }
+            }
+        }
+        speed_clips.sort_by(|a, b| a.timeline_in.partial_cmp(&b.timeline_in).unwrap());
+
+        for clip in &speed_clips {
+            let next_video_stream = format!("v_speed_{}", speed_clip_idx);
+            speed_clip_idx += 1;
+
+            let t_in = clip.timeline_in - cumulative_offset;
+            let t_out = clip.timeline_out - cumulative_offset;
+
+            let speed_filter = video::speed::SpeedFilter {
+                t_in,
+                t_out,
+                speed_factor: clip.speed_factor as f64,
+            };
+
+            filter_steps.push(format!(
+                "[{}]{}[{}]",
+                current_video_stream,
+                speed_filter.compile(),
+                next_video_stream
+            ));
+
+            current_video_stream = next_video_stream;
+            cumulative_offset +=
+                (clip.timeline_out - clip.timeline_in) * (1.0 - 1.0 / clip.speed_factor as f64);
+        }
+
+        let mut final_audio_label = if !audio_streams.is_empty() {
             let audio_inputs = audio_streams
                 .iter()
                 .map(|tag| format!("[{}]", tag))
@@ -212,19 +254,80 @@ impl TimelineCompiler {
                 audio_inputs,
                 audio_streams.len()
             ));
-        }
-
-        let compiled_filtergraph = filter_steps.join("; ");
-        let audio_label = if !audio_streams.is_empty() {
             Some("a_mixed".to_string())
         } else {
             None
         };
+
+        if let Some(ref audio_in) = final_audio_label {
+            if !speed_clips.is_empty() {
+                // Construct audio segments
+                let mut current_time = 0.0;
+                let mut segments = Vec::new();
+
+                for clip in &speed_clips {
+                    if clip.timeline_in > current_time {
+                        segments.push((current_time, Some(clip.timeline_in), 1.0));
+                    }
+                    segments.push((
+                        clip.timeline_in,
+                        Some(clip.timeline_out),
+                        clip.speed_factor as f64,
+                    ));
+                    current_time = clip.timeline_out;
+                }
+
+                // Add final segment to end of video
+                segments.push((current_time, None, 1.0));
+
+                // Compile each segment
+                let mut segment_labels = Vec::new();
+                for (idx, (start, end, speed)) in segments.iter().enumerate() {
+                    let label = format!("a_seg_{}", idx);
+
+                    let mut trim_str = format!("atrim=start={:.3}", start);
+                    if let Some(e) = end {
+                        trim_str.push_str(&format!(":end={:.3}", e));
+                    }
+                    trim_str.push_str(",asetpts=PTS-STARTPTS");
+
+                    let tempo_filter = audio::tempo::TempoFilter { speed: *speed };
+                    let tempo_str = tempo_filter.compile();
+                    let filter_str = if !tempo_str.is_empty() {
+                        format!("{},{}", trim_str, tempo_str)
+                    } else {
+                        trim_str
+                    };
+
+                    filter_steps.push(format!("[{}]{}[{}]", audio_in, filter_str, label));
+                    segment_labels.push(label);
+                }
+
+                // Concat segments
+                let concat_inputs = segment_labels
+                    .iter()
+                    .map(|l| format!("[{}]", l))
+                    .collect::<Vec<String>>()
+                    .join("");
+
+                let speed_audio_out = "a_speed_mixed".to_string();
+                filter_steps.push(format!(
+                    "{}concat=n={}:v=0:a=1[{}]",
+                    concat_inputs,
+                    segment_labels.len(),
+                    speed_audio_out
+                ));
+
+                final_audio_label = Some(speed_audio_out);
+            }
+        }
+
+        let compiled_filtergraph = filter_steps.join("; ");
         Ok((
             input_paths,
             compiled_filtergraph,
             current_video_stream,
-            audio_label,
+            final_audio_label,
         ))
     }
 }

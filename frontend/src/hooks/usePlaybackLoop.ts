@@ -29,20 +29,39 @@ export function usePlaybackLoop(
   const playbackStartPlayhead = useRef<number>(0)
   const playheadFloatRef = useRef<number>(0)
   const lastTickTime = useRef<number>(0)
+  const lastAudioTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     const tick = (now: number) => {
       if (!isPlaying) return
 
+      const timeline = activeProject?.timeline_state
+      const effectsTracks =
+        timeline?.tracks.filter(
+          (t: any) => t.track_type?.toLowerCase() === 'effects',
+        ) || []
+      const activeSpeedClip = effectsTracks
+        .flatMap((t: any) => t.clips)
+        .find(
+          (clip: any) =>
+            clip.speed_factor !== undefined &&
+            clip.speed_factor !== null &&
+            playheadFloatRef.current >= clip.timeline_in &&
+            playheadFloatRef.current < clip.timeline_out,
+        )
+      const currentSpeed = activeSpeedClip?.speed_factor ?? 1.0
+
       if (audioCtx) {
-        // Master clock derived from hardware audio context
-        const elapsedSeconds = audioCtx.currentTime - playbackStartTime.current
-        playheadFloatRef.current =
-          playbackStartPlayhead.current + elapsedSeconds * framerate
+        // Master clock derived from hardware audio context deltas
+        const nowAudioTime = audioCtx.currentTime
+        const deltaSeconds =
+          nowAudioTime - (lastAudioTimeRef.current ?? nowAudioTime)
+        lastAudioTimeRef.current = nowAudioTime
+        playheadFloatRef.current += deltaSeconds * framerate * currentSpeed
       } else {
         // Fallback to high-precision performance clock
         const delta = (now - lastTickTime.current) / 1000
-        playheadFloatRef.current += delta * framerate
+        playheadFloatRef.current += delta * framerate * currentSpeed
       }
 
       lastTickTime.current = now
@@ -55,7 +74,6 @@ export function usePlaybackLoop(
       }
 
       // 2. UPDATE VIDEO (High-precision every tick)
-      const timeline = activeProject?.timeline_state
       const videoTracks = timeline?.tracks.filter(isVideoTrack) || []
 
       if (videoEngine) {
@@ -82,14 +100,12 @@ export function usePlaybackLoop(
         )
 
         // Find active global zoom multiplier
-        const effectsTracks =
-          timeline?.tracks.filter(
-            (t: any) => t.track_type?.toLowerCase() === 'effects',
-          ) || []
         const activeEffectsClip = effectsTracks
           .flatMap((t: any) => t.clips)
           .find(
             (clip: any) =>
+              clip.transform?.scale !== undefined &&
+              clip.transform?.scale !== null &&
               playheadFloatRef.current >= clip.timeline_in &&
               playheadFloatRef.current < clip.timeline_out,
           )
@@ -121,6 +137,7 @@ export function usePlaybackLoop(
       if (audioCtx) {
         playbackStartTime.current = audioCtx.currentTime
         playbackStartPlayhead.current = currentPos
+        lastAudioTimeRef.current = audioCtx.currentTime
 
         if (audioEngine) {
           // Sync all tracks to the new start point

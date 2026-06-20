@@ -4,6 +4,7 @@ import {
   CropIcon,
   EyedropperIcon,
   SparkleIcon,
+  TimerIcon,
 } from '@phosphor-icons/react'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useProjectStore } from '@/store/projectStore'
@@ -42,6 +43,40 @@ export const ToolsTab = () => {
       source_in: 0,
       source_out: duration,
       transform: { x: 0, y: 0, scale: 1.2, z_index: 0 },
+    }
+
+    const updatedTracks = timeline.tracks.map((t: any) => {
+      if (t.id === effectsTrack.id) {
+        return { ...t, clips: [...t.clips, newClip] }
+      }
+      return t
+    })
+
+    await saveTimeline(activeProject.id, {
+      ...timeline,
+      tracks: updatedTracks,
+    })
+  }
+  const handleAddSpeedEffect = async () => {
+    if (!activeProject) return
+    const timeline = activeProject.timeline_state
+    const effectsTrack = timeline.tracks.find(
+      (t: any) => t.track_type?.toLowerCase() === 'effects',
+    )
+    if (!effectsTrack) {
+      alert('No effects track found on the timeline.')
+      return
+    }
+
+    const duration = 150 // default to 5 seconds (assuming 30fps)
+    const newClip = {
+      id: crypto.randomUUID(),
+      asset_id: null,
+      timeline_in: playheadPosition,
+      timeline_out: playheadPosition + duration,
+      source_in: 0,
+      source_out: duration,
+      speed_factor: 2.0, // default to 2x speed
     }
 
     const updatedTracks = timeline.tracks.map((t: any) => {
@@ -152,6 +187,23 @@ export const ToolsTab = () => {
             </div>
             <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
               Adds a global composition zoom clip on the effects track at the
+              current playhead position.
+            </div>
+          </div>
+        </button>
+
+        {/* Speed Effect Button */}
+        <button
+          onClick={handleAddSpeedEffect}
+          className="flex items-start gap-3 rounded-lg border border-white/5 bg-white/[0.01] p-3 text-left text-white/60 transition-all hover:border-white/10 hover:bg-white/[0.02]"
+        >
+          <TimerIcon className="mt-0.5 size-4 shrink-0 text-amber-400" />
+          <div>
+            <div className="text-xs font-medium text-white">
+              Add Speed Effect
+            </div>
+            <div className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+              Adds a global speed change block on the effects track at the
               current playhead position.
             </div>
           </div>

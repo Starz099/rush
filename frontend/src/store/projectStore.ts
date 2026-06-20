@@ -43,6 +43,7 @@ interface ProjectState {
     edge: 'left' | 'right',
     newFrameValue: number,
   ) => Promise<void>
+  deleteClip: (trackId: string, clipId: string) => Promise<void>
   updateBackground: (
     background: BackgroundConfig,
     persist?: boolean,
@@ -392,6 +393,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ),
       }
     }
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    })
+
+    await get().saveTimeline(project.id, updatedTimeline)
+  },
+
+  deleteClip: async (trackId: string, clipId: string) => {
+    const project = get().activeProject
+    if (!project) return
+
+    const timeline = project.timeline_state
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      if (track.id !== trackId) return track
+      return {
+        ...track,
+        clips: track.clips.filter((clip: Clip) => clip.id !== clipId),
+      }
+    })
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks }
 
     set({
       activeProject: {

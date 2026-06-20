@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button'
 import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react'
 
 export const PropertiesSidebar = () => {
-  const { selectedAsset, selectedClipId, selectedTrackId } = useWorkspaceStore()
-  const { activeProject, updateClipProperties } = useProjectStore()
+  const { selectedAsset, selectedClipId, selectedTrackId, clearSelection } =
+    useWorkspaceStore()
+  const { activeProject, updateClipProperties, deleteClip } = useProjectStore()
 
   // Find the selected clip object if one exists
   const track = activeProject?.timeline_state.tracks.find(
@@ -108,44 +109,110 @@ export const PropertiesSidebar = () => {
 
               {track?.track_type?.toLowerCase() === 'effects' ? (
                 <>
-                  {/* Zoom Multiplier Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-purple-500" />
-                      <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
-                        Zoom Effect Properties
-                      </h3>
-                    </div>
+                  {selectedClip.speed_factor !== undefined &&
+                  selectedClip.speed_factor !== null ? (
+                    <>
+                      {/* Speed Multiplier Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-1 rounded-full bg-amber-500" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-amber-400/80 uppercase">
+                            Speed Effect Properties
+                          </h3>
+                        </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                          Zoom Multiplier
-                        </Label>
-                        <Input
-                          type="number"
-                          className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                          value={selectedClip.transform?.scale ?? 1.0}
-                          step={0.05}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 1.0
-                            handleTransformUpdate('scale', val)
-                          }}
-                        />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                              Speed Multiplier
+                            </Label>
+                            <Input
+                              type="number"
+                              className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                              value={selectedClip.speed_factor ?? 1.0}
+                              step={0.1}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 1.0
+                                handleClipUpdate({ speed_factor: val })
+                              }}
+                            />
+                          </div>
+                          <Slider
+                            value={[selectedClip.speed_factor ?? 1.0]}
+                            min={0.25}
+                            max={4.0}
+                            step={0.1}
+                            onValueChange={([val]) =>
+                              handleClipUpdate({ speed_factor: val })
+                            }
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          {[0.5, 1.0, 2.0, 4.0].map((preset) => (
+                            <Button
+                              key={preset}
+                              variant="outline"
+                              size="sm"
+                              className={`h-7 flex-1 border-white/5 text-[10px] ${
+                                selectedClip.speed_factor === preset
+                                  ? 'border-amber-500/30 bg-amber-500/20 text-amber-400'
+                                  : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
+                              }`}
+                              onClick={() =>
+                                handleClipUpdate({ speed_factor: preset })
+                              }
+                            >
+                              {preset}x
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                      <Slider
-                        value={[selectedClip.transform?.scale ?? 1.0]}
-                        min={0.5}
-                        max={5.0}
-                        step={0.05}
-                        onValueChange={([val]) =>
-                          handleTransformUpdate('scale', val)
-                        }
-                      />
-                    </div>
-                  </div>
 
-                  <Separator className="bg-white/5" />
+                      <Separator className="bg-white/5" />
+                    </>
+                  ) : (
+                    <>
+                      {/* Zoom Multiplier Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-1 rounded-full bg-purple-500" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
+                            Zoom Effect Properties
+                          </h3>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                              Zoom Multiplier
+                            </Label>
+                            <Input
+                              type="number"
+                              className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                              value={selectedClip.transform?.scale ?? 1.0}
+                              step={0.05}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 1.0
+                                handleTransformUpdate('scale', val)
+                              }}
+                            />
+                          </div>
+                          <Slider
+                            value={[selectedClip.transform?.scale ?? 1.0]}
+                            min={0.5}
+                            max={5.0}
+                            step={0.05}
+                            onValueChange={([val]) =>
+                              handleTransformUpdate('scale', val)
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <Separator className="bg-white/5" />
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -363,6 +430,20 @@ export const PropertiesSidebar = () => {
                   {selectedClip.id}
                 </p>
               </div>
+
+              <Button
+                variant="destructive"
+                size="sm"
+                className="mt-4 h-8 w-full text-[10px] font-semibold tracking-wider uppercase"
+                onClick={() => {
+                  if (selectedTrackId && selectedClipId) {
+                    deleteClip(selectedTrackId, selectedClipId)
+                    clearSelection()
+                  }
+                }}
+              >
+                Delete Clip
+              </Button>
             </div>
           ) : selectedAsset ? (
             <div className="space-y-5">

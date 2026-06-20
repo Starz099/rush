@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProjectStore } from '@/store/projectStore'
+import { useWorkspaceStore } from '@/store/workspaceStore'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -24,10 +25,36 @@ const Workspace = () => {
   const setActiveProject = useProjectStore((state) => state.setActiveProject)
   const fetchAssets = useProjectStore((state) => state.fetchAssets)
   const saveTimeline = useProjectStore((state) => state.saveTimeline)
+  const deleteClip = useProjectStore((state) => state.deleteClip)
   const [project, setProject] = useState<Project | null>(activeProject)
   const [isLoading, setIsLoading] = useState(true)
   const [isRendering, setIsRendering] = useState(false)
   const [renderProgress, setRenderProgress] = useState(0)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selClipId = useWorkspaceStore.getState().selectedClipId
+        const selTrackId = useWorkspaceStore.getState().selectedTrackId
+        if (selClipId && selTrackId) {
+          deleteClip(selTrackId, selClipId)
+          useWorkspaceStore.getState().clearSelection()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [deleteClip])
 
   const handleExport = async () => {
     if (!project) return
