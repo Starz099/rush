@@ -1,5 +1,7 @@
 import type { Transform, BackgroundConfig } from '@/api/bindings';
 
+const MSAA_SAMPLE_COUNT = 4;
+
 function hexToRgbaClearColor(hex: string) {
   const rgba = hexToRgbaArray(hex);
   return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
@@ -45,6 +47,8 @@ export class WebGPURenderer {
   private width: number = 0;
   private height: number = 0;
   private offscreenTexture: GPUTexture | null = null;
+  private multisampledTexture: GPUTexture | null = null;
+  private sampler!: GPUSampler;
 
   constructor(target: HTMLCanvasElement | { width: number; height: number }) {
     if (target instanceof HTMLCanvasElement) {
@@ -88,6 +92,20 @@ export class WebGPURenderer {
       });
     }
 
+    // Allocate multisampled texture for MSAA (4x MSAA)
+    this.multisampledTexture = this.device.createTexture({
+      size: [this.width, this.height],
+      sampleCount: MSAA_SAMPLE_COUNT,
+      format: this.format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    // Create the reusable bilinear sampler
+    this.sampler = this.device.createSampler({
+      minFilter: 'linear',
+      magFilter: 'linear',
+    });
+
     // Reusable uniform buffer for background rendering parameters (272 bytes)
     this.bgUniformBuffer = this.device.createBuffer({
       size: 272,
@@ -104,6 +122,35 @@ export class WebGPURenderer {
       (!this.context && !this.offscreenTexture)
     )
       return;
+
+    // Dynamically resize preview canvas WebGPU context and MSAA texture if dimensions change
+    if (this.canvas) {
+      const currentWidth = this.canvas.width;
+      const currentHeight = this.canvas.height;
+
+      if (currentWidth !== this.width || currentHeight !== this.height) {
+        this.width = currentWidth;
+        this.height = currentHeight;
+
+        this.context!.configure({
+          device: this.device,
+          format: this.format,
+          alphaMode: 'premultiplied',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+
+        if (this.multisampledTexture) {
+          this.multisampledTexture.destroy();
+        }
+        this.multisampledTexture = this.device.createTexture({
+          size: [this.width, this.height],
+          sampleCount: MSAA_SAMPLE_COUNT,
+          format: this.format,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+      }
+    }
+
     this.currentCommandEncoder = this.device.createCommandEncoder();
 
     // Determine clear value color from background configuration
@@ -120,17 +167,20 @@ export class WebGPURenderer {
       }
     }
 
-    const textureView = this.offscreenTexture
+    const resolveTargetView = this.offscreenTexture
       ? this.offscreenTexture.createView()
       : this.context!.getCurrentTexture().createView();
+
+    const msaaView = this.multisampledTexture!.createView();
 
     this.currentRenderPass = this.currentCommandEncoder.beginRenderPass({
       colorAttachments: [
         {
-          view: textureView,
+          view: msaaView,
+          resolveTarget: resolveTargetView,
           clearValue: clearColor,
           loadOp: 'clear',
-          storeOp: 'store',
+          storeOp: 'discard', // Discard multisampled texture after resolving to resolveTarget
         },
       ],
     });
@@ -194,10 +244,6 @@ export class WebGPURenderer {
     const externalTexture = this.device.importExternalTexture({
       source: frame,
     });
-    const sampler = this.device.createSampler({
-      minFilter: 'linear',
-      magFilter: 'linear',
-    });
 
     // Prepare the Uniform Data (MUST match the Shader struct above)
     const uniformData = new Float32Array([
@@ -221,7 +267,7 @@ export class WebGPURenderer {
     const bindGroup = this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: sampler },
+        { binding: 0, resource: this.sampler },
         { binding: 1, resource: externalTexture },
         { binding: 2, resource: { buffer: uniformBuffer } },
       ],
@@ -300,6 +346,9 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
+      multisample: {
+        count: MSAA_SAMPLE_COUNT,
+      },
     });
 
     // 2. Background Gradient Pipeline setup
@@ -411,6 +460,9 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
+      multisample: {
+        count: MSAA_SAMPLE_COUNT,
+      },
     });
   }
 
@@ -426,5 +478,13 @@ export class WebGPURenderer {
 
   public dispose() {
     this.disposed = true;
+    if (this.multisampledTexture) {
+      this.multisampledTexture.destroy();
+      this.multisampledTexture = null;
+    }
+    if (this.offscreenTexture) {
+      this.offscreenTexture.destroy();
+      this.offscreenTexture = null;
+    }
   }
 }

@@ -220,38 +220,42 @@ export const PreviewPanel = () => {
     if (!isPlaying && videoEngine && activeProject) {
       videoEngine.reset(); // Clear all buffers and decoders
 
+      const targetPlayhead = playheadPosition;
       // Fetch and decode the frame at the new playhead position
-      void videoEngine
-        .tick(playheadPosition, activeProject, assets)
-        .then(() => {
-          // Sort by z_index so overlays are rendered correctly
-          const sortedClips = [...activeClips].sort(
-            (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-          );
+      void videoEngine.tick(targetPlayhead, activeProject, assets).then(() => {
+        // Abort if the playhead has moved since this seek was scheduled
+        if (useAppStore.getState().playhead_position !== targetPlayhead) {
+          return;
+        }
 
-          // Find active global zoom multiplier
-          const effectsTracks =
-            timeline?.tracks.filter(
-              (t: any) => t.track_type?.toLowerCase() === 'effects',
-            ) || [];
-          const activeEffectsClip = effectsTracks
-            .flatMap((t: any) => t.clips)
-            .find(
-              (clip: any) =>
-                playheadPosition >= clip.timeline_in &&
-                playheadPosition < clip.timeline_out,
-            );
-          const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+        // Sort by z_index so overlays are rendered correctly
+        const sortedClips = [...activeClips].sort(
+          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
+        );
 
-          // Render the frame immediately
-          videoEngine.renderFrame(
-            playheadPosition,
-            sortedClips,
-            projectFps,
-            activeProject.timeline_state.background,
-            globalZoom,
+        // Find active global zoom multiplier
+        const effectsTracks =
+          timeline?.tracks.filter(
+            (t: any) => t.track_type?.toLowerCase() === 'effects',
+          ) || [];
+        const activeEffectsClip = effectsTracks
+          .flatMap((t: any) => t.clips)
+          .find(
+            (clip: any) =>
+              targetPlayhead >= clip.timeline_in &&
+              targetPlayhead < clip.timeline_out,
           );
-        });
+        const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+
+        // Render the frame immediately
+        videoEngine.renderFrame(
+          targetPlayhead,
+          sortedClips,
+          projectFps,
+          activeProject.timeline_state.background,
+          globalZoom,
+        );
+      });
 
       if (audioEngine) {
         audioEngine.seekByTime(playheadPosition / projectFps);

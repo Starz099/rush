@@ -64,8 +64,8 @@ pub fn save_test_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(
                     "-i",
                     "-", // Tells FFmpeg to read from standard input pipe instead of a file
                     "-vframes",
-                    "1",               // Stop processing after exactly one frame
-                    "test_output.png", // Output target file name saved to the root folder
+                    "1",                  // Stop processing after exactly one frame
+                    "../test_output.png", // Output target file name saved to the root folder
                 ])
                 .stdin(Stdio::piped()) // Capture the stdin file descriptor handle explicitly
                 .stdout(Stdio::null()) // Suppress regular stdout noise
