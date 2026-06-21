@@ -109,8 +109,8 @@ export const PropertiesSidebar = () => {
 
               {track?.track_type?.toLowerCase() === 'effects' ? (
                 <>
-                  {selectedClip.speed_factor !== undefined &&
-                  selectedClip.speed_factor !== null ? (
+                  {selectedClip.transform === undefined ||
+                  selectedClip.transform === null ? (
                     <>
                       {/* Speed Multiplier Section */}
                       <div className="space-y-4">

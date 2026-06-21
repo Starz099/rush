@@ -26,6 +26,7 @@ export const commands = {
     typedError<null, string>(
       __TAURI_INVOKE('export_project', { projectId, outputPath }),
     ),
+  dummyToolTypes: () => __TAURI_INVOKE<EditingTool[]>('dummy_tool_types'),
   registerAsset: (
     projectId: string,
     filePath: string,
@@ -54,7 +55,6 @@ export const commands = {
     typedError<RangeResult, string>(
       __TAURI_INVOKE('read_moov_box', { filePath }),
     ),
-  dummyToolTypes: () => __TAURI_INVOKE<EditingTool[]>('dummy_tool_types'),
 };
 
 /* Types */

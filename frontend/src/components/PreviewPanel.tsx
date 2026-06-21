@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { WebGPURenderer } from '../engine/core/Renderer';
 import { VideoEngine } from '../engine/VideoEngine';
 import { AudioEngine } from '../engine/audio/AudioEngine';
+import { ExportEngine } from '../engine/export/ExportEngine';
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
 import { fpsToNumeric } from '@/helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
@@ -117,6 +118,58 @@ export const PreviewPanel = () => {
 
   // Attach Orchestrators to manage tracks/clips
   useAudioOrchestrator(audioEngine, audioCtx);
+
+  // Temporary listener to test the offscreen rendering & capture pipeline
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ctrl + Shift + E to trigger the offscreen export test
+      if (e.key === 'E' && e.ctrlKey && e.shiftKey && activeProject) {
+        e.preventDefault();
+        console.log(
+          `[Test Export] Triggered offscreen render export test at playhead: ${playheadPosition}`,
+        );
+        try {
+          // We use 1920x1080 to test both the offscreen logic AND non-256-aligned width padding rules!
+          const exportWidth = activeProject.viewport_width;
+          const exportHeight = activeProject.viewport_height;
+          const exporter = new ExportEngine(exportWidth, exportHeight);
+          await exporter.initialize();
+
+          const pixels = await exporter.testExportSingleFrame(
+            playheadPosition,
+            activeProject,
+            assets,
+          );
+
+          console.log(
+            `%c[Test Export SUCCESS] Captured Frame at Resolution: ${exportWidth}x${exportHeight}`,
+            'color: #00ff00; font-weight: bold;',
+          );
+          console.log(
+            `[Test Export SUCCESS] Total Bytes Extracted: ${pixels.byteLength}`,
+          );
+          console.log(
+            `[Test Export SUCCESS] Expected clean byte size: ${exportWidth * exportHeight * 4}`,
+          );
+          console.log(
+            `[Test Export SUCCESS] First 16 bytes:`,
+            Array.from(pixels.slice(0, 16)),
+          );
+
+          exporter.dispose();
+        } catch (err) {
+          console.error(
+            `%c[Test Export ERROR]`,
+            'color: #ff0000; font-weight: bold;',
+            err,
+          );
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playheadPosition, activeProject, assets]);
 
   const isActiveAssetLoading = activeAsset
     ? activeAsset.media_type === 'video' &&

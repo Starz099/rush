@@ -30,9 +30,9 @@ function hexToRgbaArray(hex: string): [number, number, number, number] {
 }
 
 export class WebGPURenderer {
-  private canvas: HTMLCanvasElement;
+  private canvas: HTMLCanvasElement | null = null;
   private device!: GPUDevice;
-  private context!: GPUCanvasContext;
+  private context: GPUCanvasContext | null = null;
   private pipeline!: GPURenderPipeline;
   private bgGradientPipeline!: GPURenderPipeline;
   private bgUniformBuffer!: GPUBuffer;
@@ -41,8 +41,20 @@ export class WebGPURenderer {
   private currentCommandEncoder: GPUCommandEncoder | null = null;
   private currentRenderPass: GPURenderPassEncoder | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
+  // Track rendering dimensions
+  private width: number = 0;
+  private height: number = 0;
+  private offscreenTexture: GPUTexture | null = null;
+
+  constructor(target: HTMLCanvasElement | { width: number; height: number }) {
+    if (target instanceof HTMLCanvasElement) {
+      this.canvas = target;
+      this.width = target.width;
+      this.height = target.height;
+    } else {
+      this.width = target.width;
+      this.height = target.height;
+    }
   }
 
   public async initialize() {
@@ -54,14 +66,27 @@ export class WebGPURenderer {
     if (!adapter) throw new Error('No GPU found.');
 
     this.device = await adapter.requestDevice();
-    this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
     this.format = navigator.gpu.getPreferredCanvasFormat();
 
-    this.context.configure({
-      device: this.device,
-      format: this.format,
-      alphaMode: 'premultiplied',
-    });
+    if (this.canvas) {
+      this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
+      this.context.configure({
+        device: this.device,
+        format: this.format,
+        alphaMode: 'premultiplied',
+        // COPY_SRC is useful if we ever want to read from preview canvas
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+    } else {
+      // Force RGBA format for offscreen exporting (standard format avoiding driver channels swap)
+      this.format = 'rgba8unorm';
+      // Initialize custom offscreen texture with COPY_SRC enabled for extraction
+      this.offscreenTexture = this.device.createTexture({
+        size: [this.width, this.height],
+        format: this.format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+    }
 
     // Reusable uniform buffer for background rendering parameters (272 bytes)
     this.bgUniformBuffer = this.device.createBuffer({
@@ -73,7 +98,12 @@ export class WebGPURenderer {
   }
 
   public beginFrame(background?: BackgroundConfig | null) {
-    if (this.disposed || !this.device || !this.context) return;
+    if (
+      this.disposed ||
+      !this.device ||
+      (!this.context && !this.offscreenTexture)
+    )
+      return;
     this.currentCommandEncoder = this.device.createCommandEncoder();
 
     // Determine clear value color from background configuration
@@ -90,7 +120,10 @@ export class WebGPURenderer {
       }
     }
 
-    const textureView = this.context.getCurrentTexture().createView();
+    const textureView = this.offscreenTexture
+      ? this.offscreenTexture.createView()
+      : this.context!.getCurrentTexture().createView();
+
     this.currentRenderPass = this.currentCommandEncoder.beginRenderPass({
       colorAttachments: [
         {
@@ -161,12 +194,15 @@ export class WebGPURenderer {
     const externalTexture = this.device.importExternalTexture({
       source: frame,
     });
-    const sampler = this.device.createSampler();
+    const sampler = this.device.createSampler({
+      minFilter: 'linear',
+      magFilter: 'linear',
+    });
 
     // Prepare the Uniform Data (MUST match the Shader struct above)
     const uniformData = new Float32Array([
-      this.canvas.width, // canvasResolution.x
-      this.canvas.height, // canvasResolution.y
+      this.width, // canvasResolution.x
+      this.height, // canvasResolution.y
       frame.displayWidth, // frameResolution.x
       frame.displayHeight, // frameResolution.y
       transform?.x ?? 0, // position.x
