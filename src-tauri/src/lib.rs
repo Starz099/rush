@@ -66,8 +66,8 @@ pub fn run() {
         })
         .invoke_handler(run_with_commands![
             generate_handler,
-            commands::temp::stream_temp,
-            commands::temp::save_test_frame
+            commands::temp::save_test_frame,
+            commands::temp::stream_export_frame
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

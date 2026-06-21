@@ -3,19 +3,6 @@ use std::process::{Command, Stdio};
 use tauri::ipc::{InvokeBody, Request};
 
 #[tauri::command]
-pub fn stream_temp(_app: tauri::AppHandle, req: Request<'_>) -> Result<(), String> {
-    match req.body() {
-        InvokeBody::Raw(bytes) => {
-            println!("[IPC Success] Captured raw memory allocation block!");
-            println!("Byte length received: {}", bytes.len());
-            println!("Data contents: {:?}", bytes);
-            Ok(())
-        }
-        _ => Err("Invalid payload type. Expected a raw binary array.".to_string()),
-    }
-}
-
-#[tauri::command]
 pub fn save_test_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(), String> {
     match request.body() {
         InvokeBody::Raw(bytes) => {
@@ -104,5 +91,54 @@ pub fn save_test_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(
             }
         }
         _ => Err("Invalid payload type. Expected a raw uncompressed binary array.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn stream_export_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(), String> {
+    match request.body() {
+        InvokeBody::Raw(bytes) => {
+            // Extract frame metadata from headers
+            let frame_index = request
+                .headers()
+                .get("x-frame-index")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0);
+
+            let timestamp_micros = request
+                .headers()
+                .get("x-timestamp-micros")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
+
+            let width = request
+                .headers()
+                .get("x-width")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1920);
+
+            let height = request
+                .headers()
+                .get("x-height")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1080);
+
+            let timestamp_secs = (timestamp_micros as f64) / 1_000_000.0;
+            let size_mb = (bytes.len() as f64) / (1024.0 * 1024.0);
+
+            // Log details of the frame
+            println!(
+                "Received frame #{}, timestamp {:.3}s, size {}x{}, bytes: {:.2}MB",
+                frame_index, timestamp_secs, width, height, size_mb
+            );
+
+            // Memory of `bytes` is immediately dropped here as it goes out of scope
+            Ok(())
+        }
+        _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),
     }
 }

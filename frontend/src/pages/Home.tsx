@@ -41,7 +41,6 @@ import {
   DEFAULT_PROJECT_CONFIG,
 } from '@/constants/project';
 import type { Project, ResolutionValue, FPSValue } from '@/types/project';
-import { invoke } from '@tauri-apps/api/core';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -288,28 +287,6 @@ const Home = () => {
           </div>
         </CardContent>
       </Card>
-      <Button
-        className="relative z-10"
-        onClick={() => {
-          const fn = async () => {
-            try {
-              const testBytes = new Uint8Array([1, 22, 3, 4, 5]);
-
-              console.log('Streaming raw bytes across IPC boundary...');
-
-              //@ts-ignore
-              const res = await invoke('stream_temp', testBytes);
-
-              console.log('IPC Execution successfully verified.');
-            } catch (error) {
-              console.error('Failed to invoke stream_temp:', error);
-            }
-          };
-          fn();
-        }}
-      >
-        Test DATA transfer
-      </Button>
     </div>
   );
 };
