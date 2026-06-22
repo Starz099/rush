@@ -2,10 +2,11 @@ import { WebGPURenderer } from '../core/Renderer';
 import { LookAheadManager } from '../buffering/LookAheadManager';
 import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../../helpers/fps';
-import { audioBufferToWav } from '../../helpers/audioWav';
 import { isVideoTrack } from '@/constants/trackConfig';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useAppStore } from '../../store/timelineStore';
+
+const AUDIO_CHUNK_SIZE_SECONDS = 120;
 
 export class ExportEngine {
   private renderer: WebGPURenderer;
@@ -385,13 +386,36 @@ export class ExportEngine {
         }
       }
 
-      // 7. RUN THE AUDIO RENDER (Outside the video loop!)
-      console.log('[Export] Rendering audio timeline...');
-      const wavBytes = await this.exportAudio(activeProject, assets);
+      console.log('[Export] Rendering audio timeline in chunks...');
+      const durationSeconds = totalFrames / framerate;
+      const chunkSizeSeconds = AUDIO_CHUNK_SIZE_SECONDS;
 
-      // 8. UPLOAD WAV FILE TO BACKEND
-      console.log('[Export] Uploading temp audio to backend...');
-      await invoke('write_audio_file', wavBytes);
+      for (
+        let startSec = 0;
+        startSec < durationSeconds;
+        startSec += chunkSizeSeconds
+      ) {
+        if (this.disposed) break;
+
+        const chunkDuration = Math.min(
+          chunkSizeSeconds,
+          durationSeconds - startSec,
+        );
+        console.log(
+          `[Export] Rendering audio chunk: ${startSec}s to ${startSec + chunkDuration}s`,
+        );
+
+        // Render chunk
+        const pcmBytes = await this.exportAudioChunk(
+          activeProject,
+          assets,
+          startSec,
+          chunkDuration,
+        );
+
+        // Stream raw PCM bytes to Tauri (will append to temp file)
+        await invoke('write_audio_chunk', pcmBytes);
+      }
     } catch (err) {
       console.error('[ExportEngine] Export failed inside try block:', err);
       throw err;
@@ -406,57 +430,57 @@ export class ExportEngine {
   /**
    * To compile and save the audio for the final export
    */
-  private async exportAudio(
-    activeProject: Project,
-    assets: Asset[],
-  ): Promise<Uint8Array> {
-    const timeline = activeProject.timeline_state;
-    const framerate = fpsToNumeric(activeProject.framerate);
+  // private async exportAudio(
+  //   activeProject: Project,
+  //   assets: Asset[],
+  // ): Promise<Uint8Array> {
+  //   const timeline = activeProject.timeline_state;
+  //   const framerate = fpsToNumeric(activeProject.framerate);
 
-    // Calculate total duration of the timeline in seconds
-    const allClips = timeline.tracks.flatMap((track: any) => track.clips);
-    const totalFrames = allClips.reduce(
-      (max: number, clip: any) => Math.max(max, clip.timeline_out),
-      0,
-    );
-    const durationSeconds = totalFrames / framerate;
+  //   // Calculate total duration of the timeline in seconds
+  //   const allClips = timeline.tracks.flatMap((track: any) => track.clips);
+  //   const totalFrames = allClips.reduce(
+  //     (max: number, clip: any) => Math.max(max, clip.timeline_out),
+  //     0,
+  //   );
+  //   const durationSeconds = totalFrames / framerate;
 
-    // create an offline mixing board
-    const sampleRate = 48000;
-    const offlineCtx = new OfflineAudioContext(
-      2, // number of channels (stereo)
-      sampleRate * durationSeconds, // length in samples
-      sampleRate,
-    );
+  //   // create an offline mixing board
+  //   const sampleRate = 48000;
+  //   const offlineCtx = new OfflineAudioContext(
+  //     2, // number of channels (stereo)
+  //     sampleRate * durationSeconds, // length in samples
+  //     sampleRate,
+  //   );
 
-    for (const track of timeline.tracks) {
-      for (const clip of track.clips) {
-        const audioBuffer = await this.loadAudioBufferForClip(
-          clip,
-          assets,
-          offlineCtx,
-        );
-        if (!audioBuffer) continue;
+  //   for (const track of timeline.tracks) {
+  //     for (const clip of track.clips) {
+  //       const audioBuffer = await this.loadAudioBufferForClip(
+  //         clip,
+  //         assets,
+  //         offlineCtx,
+  //       );
+  //       if (!audioBuffer) continue;
 
-        // Create a virtual player node
-        const source = offlineCtx.createBufferSource();
-        source.buffer = audioBuffer;
+  //       // Create a virtual player node
+  //       const source = offlineCtx.createBufferSource();
+  //       source.buffer = audioBuffer;
 
-        // Connect to the master volume/mix
-        source.connect(offlineCtx.destination);
+  //       // Connect to the master volume/mix
+  //       source.connect(offlineCtx.destination);
 
-        // Schedule the clip to play at the right timeline markers
-        source.start(
-          clip.timeline_in / framerate, // When to play on the timeline (seconds)
-          clip.source_in / framerate, // Where to start inside the source file (seconds)
-          (clip.timeline_out - clip.timeline_in) / framerate, // Clip duration (seconds)
-        );
-      }
-    }
+  //       // Schedule the clip to play at the right timeline markers
+  //       source.start(
+  //         clip.timeline_in / framerate, // When to play on the timeline (seconds)
+  //         clip.source_in / framerate, // Where to start inside the source file (seconds)
+  //         (clip.timeline_out - clip.timeline_in) / framerate, // Clip duration (seconds)
+  //       );
+  //     }
+  //   }
 
-    const renderedBuffer = await offlineCtx.startRendering();
-    return audioBufferToWav(renderedBuffer);
-  }
+  //   const renderedBuffer = await offlineCtx.startRendering();
+  //   return audioBufferToWav(renderedBuffer);
+  // }
 
   /**
    * Helper to fetch and decode audio bytes for a clip using the OfflineAudioContext
@@ -479,5 +503,98 @@ export class ExportEngine {
     const arrayBuffer = await response.arrayBuffer();
 
     return await offlineCtx.decodeAudioData(arrayBuffer);
+  }
+
+  private audioBufferToPCM16(buffer: AudioBuffer): Uint8Array {
+    const numChannels = buffer.numberOfChannels;
+    const numSamples = buffer.length;
+
+    const arrayBuffer = new ArrayBuffer(numSamples * numChannels * 2); // 2 bytes per sample (16-bit)
+    const view = new DataView(arrayBuffer);
+
+    const channels = [];
+    for (let c = 0; c < numChannels; c++) {
+      channels.push(buffer.getChannelData(c));
+    }
+
+    let offset = 0;
+    for (let i = 0; i < numSamples; i++) {
+      for (let c = 0; c < numChannels; c++) {
+        let sample = channels[c][i];
+
+        // Clamp floats to prevent noise distortion
+        sample = Math.max(-1.0, Math.min(1.0, sample));
+
+        // Map Float [-1.0, 1.0] to Int16 [-32768, 32767]
+        const pcmSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        view.setInt16(offset, pcmSample, true);
+        offset += 2;
+      }
+    }
+
+    return new Uint8Array(arrayBuffer);
+  }
+
+  /**
+   * To compile and save the audio in chunks for the final export
+   */
+  private async exportAudioChunk(
+    activeProject: Project,
+    assets: Asset[],
+    startTimeSeconds: number,
+    durationSeconds: number,
+  ): Promise<Uint8Array> {
+    const timeline = activeProject.timeline_state;
+    const framerate = fpsToNumeric(activeProject.framerate);
+    const sampleRate = 48000;
+
+    const offlineCtx = new OfflineAudioContext(
+      2,
+      sampleRate * durationSeconds,
+      sampleRate,
+    );
+
+    const endTimeSeconds = startTimeSeconds + durationSeconds;
+
+    for (const track of timeline.tracks) {
+      for (const clip of track.clips) {
+        const clipInSec = clip.timeline_in / framerate;
+        const clipOutSec = clip.timeline_out / framerate;
+
+        // Check if clip falls within this chunk window
+        const overlaps =
+          clipInSec < endTimeSeconds && clipOutSec > startTimeSeconds;
+        if (!overlaps) continue;
+
+        const audioBuffer = await this.loadAudioBufferForClip(
+          clip,
+          assets,
+          offlineCtx,
+        );
+        if (!audioBuffer) continue;
+
+        const source = offlineCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(offlineCtx.destination);
+
+        // 1. Where in the chunk context to start playing (0-based relative to startTimeSeconds)
+        const scheduleTime = Math.max(0, clipInSec - startTimeSeconds);
+
+        // 2. Where inside the source audio asset we start playing
+        const elapsedClipTime = Math.max(0, startTimeSeconds - clipInSec);
+        const sourceOffset = clip.source_in / framerate + elapsedClipTime;
+
+        // 3. How long to play this clip in the current chunk window
+        const playDuration = Math.min(
+          clipOutSec - startTimeSeconds - scheduleTime,
+          durationSeconds - scheduleTime,
+        );
+
+        source.start(scheduleTime, sourceOffset, playDuration);
+      }
+    }
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    return this.audioBufferToPCM16(renderedBuffer);
   }
 }

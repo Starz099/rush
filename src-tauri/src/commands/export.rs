@@ -1,3 +1,4 @@
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -289,6 +290,12 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
                         "-y",
                         "-i",
                         temp_video_path_str,
+                        "-f",
+                        "s16le", // Raw 16-bit Little-Endian PCM format
+                        "-ar",
+                        "48000", // Sample rate: 48kHz
+                        "-ac",
+                        "2", // Stereo channels
                         "-i",
                         temp_audio_path_str,
                         "-c:v",
@@ -350,6 +357,40 @@ pub fn write_audio_file(state: State<'_, ExportState>, request: Request<'_>) -> 
                 Ok(())
             } else {
                 Err("No active export session found. Call start_export first.".to_string())
+            }
+        }
+        _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn write_audio_chunk(
+    state: State<'_, ExportState>,
+    request: Request<'_>,
+) -> Result<(), String> {
+    match request.body() {
+        InvokeBody::Raw(bytes) => {
+            let lock = state.0.lock().map_err(|e| e.to_string())?;
+
+            if let Some(session) = lock.as_ref() {
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .append(true)
+                    .open(&session.temp_audio_path)
+                    .map_err(|e| format!("Failed to open temp audio file: {}", e))?;
+
+                file.write_all(bytes)
+                    .map_err(|e| format!("Failed to write audio chunk bytes: {}", e))?;
+
+                println!(
+                    "[Backend] Appended audio chunk: {:.2} MB",
+                    (bytes.len() as f64) / (1024.0 * 1024.0)
+                );
+
+                Ok(())
+            } else {
+                Err("No active export session found.".to_string())
             }
         }
         _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),

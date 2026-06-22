@@ -72,6 +72,7 @@ pub fn run() {
             commands::export::start_export,
             commands::export::write_export_frame,
             commands::export::write_audio_file,
+            commands::export::write_audio_chunk,
             commands::export::finish_export
         ])
         .run(tauri::generate_context!())
