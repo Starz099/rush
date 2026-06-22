@@ -14,13 +14,73 @@ export class ExportEngine {
   private width: number;
   private height: number;
   public disposed = false;
+  private encoder!: VideoEncoder;
+  private pendingChunks: Promise<any>[] = [];
 
   constructor(width: number, height: number) {
     this.width = width;
     this.height = height;
-    // Instantiate a separate renderer in Offscreen/Headless mode
-    this.renderer = new WebGPURenderer({ width, height });
+    // Instantiate an OffscreenCanvas to render WebGPU directly into it
+    const canvas = new OffscreenCanvas(width, height);
+    this.renderer = new WebGPURenderer(canvas);
     this.lookAhead = new LookAheadManager();
+  }
+
+  private async initVideoEncoder(framerate: number) {
+    this.pendingChunks = [];
+
+    // H.264 Level 4.2/4.0 profiles are required for 1080p 60fps limits.
+    const codecs = ['avc1.64002a', 'avc1.4d002a', 'avc1.42002a', 'avc1.42001e'];
+    let selectedCodec = 'avc1.42001e';
+
+    for (const codec of codecs) {
+      try {
+        const config = {
+          codec,
+          width: this.width % 2 === 0 ? this.width : this.width - 1,
+          height: this.height % 2 === 0 ? this.height : this.height - 1,
+          bitrate: 8_000_000,
+          framerate,
+        };
+        const support = await VideoEncoder.isConfigSupported(config);
+        if (support.supported) {
+          selectedCodec = codec;
+          console.log(`[VideoEncoder] Selected supported codec: ${codec}`);
+          break;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+
+    this.encoder = new VideoEncoder({
+      output: (chunk, metadata) => {
+        const chunkData = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(chunkData);
+
+        const annexBBuffer = this.avcToAnnexB(
+          chunkData,
+          chunk.type === 'key',
+          metadata,
+        );
+
+        // Stream compressed H.264 raw packet directly to Tauri backend
+        const p = invoke('write_video_chunk', annexBBuffer);
+        this.pendingChunks.push(p);
+      },
+      error: (error) => {
+        console.error('[VideoEncoder] Encoding error:', error);
+      },
+    });
+
+    this.encoder.configure({
+      codec: selectedCodec,
+      width: this.width % 2 === 0 ? this.width : this.width - 1,
+      height: this.height % 2 === 0 ? this.height : this.height - 1,
+      bitrate: 8_000_000, // 8 Mbps (high quality 1080p)
+      framerate: framerate,
+      hardwareAcceleration: 'no-preference', // Automatically use GPU but fallback gracefully to software if needed
+    });
   }
 
   public async initialize() {
@@ -87,10 +147,15 @@ export class ExportEngine {
    */
   public async captureFrameData(): Promise<Uint8Array> {
     const device = (this.renderer as any).device as GPUDevice;
+    const context = (this.renderer as any).context as GPUCanvasContext;
     const offscreenTexture = (this.renderer as any)
       .offscreenTexture as GPUTexture;
 
-    if (!device || !offscreenTexture) {
+    const sourceTexture = context
+      ? context.getCurrentTexture()
+      : offscreenTexture;
+
+    if (!device || !sourceTexture) {
       throw new Error('ExportEngine is not initialized properly.');
     }
 
@@ -109,7 +174,7 @@ export class ExportEngine {
     // 2. Command GPU to copy texture to buffer
     const commandEncoder = device.createCommandEncoder();
     commandEncoder.copyTextureToBuffer(
-      { texture: offscreenTexture },
+      { texture: sourceTexture },
       { buffer: stagingBuffer, bytesPerRow: paddedBytesPerRow },
       { width: this.width, height: this.height, depthOrArrayLayers: 1 },
     );
@@ -257,6 +322,9 @@ export class ExportEngine {
     this.disposed = true;
     this.renderer.dispose();
     this.lookAhead.dispose();
+    if (this.encoder && this.encoder.state !== 'closed') {
+      this.encoder.close();
+    }
   }
 
   /**
@@ -289,13 +357,16 @@ export class ExportEngine {
       `[ExportEngine] Starting export to: ${outputPath}. Total frames: ${totalFrames}`,
     );
 
-    // Initialize the backend FFmpeg session
+    // Initialize the backend WebCodecs export session
     await invoke('start_export', {
       width: this.width,
       height: this.height,
       fps: framerate,
       outputPath,
     });
+
+    // Initialize the frontend video encoder
+    await this.initVideoEncoder(framerate);
 
     try {
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
@@ -349,7 +420,7 @@ export class ExportEngine {
           );
         const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
-        // 3. Render offscreen
+        // 3. Render offscreen directly into canvas
         this.renderer.beginFrame(background);
         for (const clip of activeClipsToRender) {
           const frame = this.lookAhead.getFrame(clip.id, frameIndex, framerate);
@@ -374,17 +445,37 @@ export class ExportEngine {
         }
         this.renderer.endFrame();
 
-        // 4. Extract resolved pixel bytes using GPU mapping (handles 256-byte alignment rules)
-        const frameData = await this.captureFrameData();
+        // 4. Create a VideoFrame directly from the OffscreenCanvas (no GPU-CPU backread!)
+        const offscreenCanvas = (this.renderer as any).canvas;
+        if (!offscreenCanvas) {
+          throw new Error(
+            'WebGPURenderer is not configured with an offscreen canvas',
+          );
+        }
 
-        // 5. Stream raw frame bytes to Tauri (Option A, raw body, no serialization)
-        await invoke('write_export_frame', frameData);
+        const timestampMicros = Math.round(
+          (frameIndex * 1_000_000) / framerate,
+        );
+        const videoFrame: VideoFrame = new VideoFrame(offscreenCanvas, {
+          timestamp: timestampMicros,
+          duration: Math.round(1_000_000 / framerate),
+        });
+
+        // 5. Feed the frame to the hardware encoder
+        this.encoder.encode(videoFrame);
+        videoFrame.close();
 
         // 6. Update progress indicator
         if (onProgress) {
           onProgress((frameIndex + 1) / totalFrames);
         }
       }
+
+      // Flush remaining video frames from the encoder buffer
+      console.log('[ExportEngine] Flushing video encoder...');
+      await this.encoder.flush();
+      await Promise.all(this.pendingChunks);
+      console.log('[ExportEngine] All video frames written to backend.');
 
       console.log('[Export] Rendering audio timeline in chunks...');
       const durationSeconds = totalFrames / framerate;
@@ -489,6 +580,7 @@ export class ExportEngine {
     clip: Clip,
     assets: Asset[],
     offlineCtx: OfflineAudioContext,
+    framerate: number,
   ): Promise<AudioBuffer | null> {
     const asset = assets.find((a) => a.id === clip.asset_id);
     if (!asset) return null;
@@ -497,8 +589,23 @@ export class ExportEngine {
     const extractedAudioPath = useAppStore.getState().extractedAudios[asset.id];
     const audioPathToUse = extractedAudioPath || asset.file_path;
 
-    // Fetch the file bytes over Tauri's custom asset protocol to avoid V8 JSON memory spikes
-    const url = convertFileSrc(audioPathToUse);
+    // Calculate source slice range
+    const sourceInSeconds = clip.source_in / framerate;
+    const clipDuration = (clip.timeline_out - clip.timeline_in) / framerate;
+
+    console.log(
+      `[ExportEngine] Slicing audio asset on backend: ${asset.name} at start=${sourceInSeconds.toFixed(2)}s, duration=${clipDuration.toFixed(2)}s`,
+    );
+
+    // Request the backend to slice the audio file using FFmpeg to avoid decoding full assets
+    const slicedAudioPath = await invoke<string>('slice_audio_asset', {
+      filePath: audioPathToUse,
+      startSec: sourceInSeconds,
+      durationSec: clipDuration,
+    });
+
+    // Fetch the sliced file bytes over Tauri's custom asset protocol
+    const url = convertFileSrc(slicedAudioPath);
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
 
@@ -570,6 +677,7 @@ export class ExportEngine {
           clip,
           assets,
           offlineCtx,
+          framerate,
         );
         if (!audioBuffer) continue;
 
@@ -580,9 +688,12 @@ export class ExportEngine {
         // 1. Where in the chunk context to start playing (0-based relative to startTimeSeconds)
         const scheduleTime = Math.max(0, clipInSec - startTimeSeconds);
 
-        // 2. Where inside the source audio asset we start playing
-        const elapsedClipTime = Math.max(0, startTimeSeconds - clipInSec);
-        const sourceOffset = clip.source_in / framerate + elapsedClipTime;
+        // 2. Where inside the source buffer we start playing.
+        // Since our source buffer is ALREADY sliced to match the clip's timeline window [clipInSec, clipOutSec],
+        // the beginning of this buffer corresponds to clipInSec.
+        // If the clip started before our chunk (clipInSec < startTimeSeconds), we need to skip the portion
+        // of the buffer that has already played: (startTimeSeconds - clipInSec) seconds.
+        const bufferOffset = Math.max(0, startTimeSeconds - clipInSec);
 
         // 3. How long to play this clip in the current chunk window
         const playDuration = Math.min(
@@ -590,11 +701,121 @@ export class ExportEngine {
           durationSeconds - scheduleTime,
         );
 
-        source.start(scheduleTime, sourceOffset, playDuration);
+        source.start(scheduleTime, bufferOffset, playDuration);
       }
     }
 
     const renderedBuffer = await offlineCtx.startRendering();
     return this.audioBufferToPCM16(renderedBuffer);
+  }
+
+  /**
+   * Converts a size-prefixed AVC/H.264 NAL unit sequence (mp4 format)
+   * into Annex B start-code-prefixed format, prepending SPS/PPS headers on keyframes.
+   */
+  private avcToAnnexB(
+    chunkData: Uint8Array,
+    isKeyframe: boolean,
+    metadata?: EncodedVideoChunkMetadata,
+  ): Uint8Array {
+    let description = metadata?.decoderConfig?.description;
+    let header: Uint8Array | null = null;
+
+    if (isKeyframe && description) {
+      const descView = new DataView(description as ArrayBuffer);
+      if (descView.byteLength >= 7) {
+        let pos = 5;
+        const numSps = descView.getUint8(pos) & 0x1f;
+        pos += 1;
+
+        const spsList: Uint8Array[] = [];
+        for (let i = 0; i < numSps; i++) {
+          const spsLen = descView.getUint16(pos);
+          pos += 2;
+          const sps = new Uint8Array(description as ArrayBuffer, pos, spsLen);
+          spsList.push(sps);
+          pos += spsLen;
+        }
+
+        const numPps = descView.getUint8(pos);
+        pos += 1;
+
+        const ppsList: Uint8Array[] = [];
+        for (let i = 0; i < numPps; i++) {
+          const ppsLen = descView.getUint16(pos);
+          pos += 2;
+          const pps = new Uint8Array(description as ArrayBuffer, pos, ppsLen);
+          ppsList.push(pps);
+          pos += ppsLen;
+        }
+
+        // Combine SPS and PPS into Annex B headers
+        let totalSize = 0;
+        for (const sps of spsList) totalSize += 4 + sps.length;
+        for (const pps of ppsList) totalSize += 4 + pps.length;
+
+        header = new Uint8Array(totalSize);
+        let headerPos = 0;
+        const startCode = new Uint8Array([0, 0, 0, 1]);
+
+        for (const sps of spsList) {
+          header.set(startCode, headerPos);
+          headerPos += 4;
+          header.set(sps, headerPos);
+          headerPos += sps.length;
+        }
+        for (const pps of ppsList) {
+          header.set(startCode, headerPos);
+          headerPos += 4;
+          header.set(pps, headerPos);
+          headerPos += pps.length;
+        }
+      }
+    }
+
+    // Loop through NAL units and swap 4-byte length prefix for 4-byte start codes [0,0,0,1]
+    let pos = 0;
+    const segments: Uint8Array[] = [];
+    if (header) {
+      segments.push(header);
+    }
+
+    while (pos < chunkData.length) {
+      if (pos + 4 > chunkData.length) {
+        break; // Guard against malformed trailing bytes
+      }
+
+      const length =
+        (chunkData[pos] << 24) |
+        (chunkData[pos + 1] << 16) |
+        (chunkData[pos + 2] << 8) |
+        chunkData[pos + 3];
+
+      if (pos + 4 + length > chunkData.length) {
+        break;
+      }
+
+      const nalu = new Uint8Array(4 + length);
+      nalu.set([0, 0, 0, 1], 0);
+      nalu.set(chunkData.subarray(pos + 4, pos + 4 + length), 4);
+      segments.push(nalu);
+
+      pos += 4 + length;
+    }
+
+    // Combine SPS, PPS, and all key/delta frame segments into one contiguous Annex B buffer
+    let totalLen = 0;
+    for (const seg of segments) {
+      totalLen += seg.length;
+    }
+
+    const output = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const seg of segments) {
+      output.set(seg, offset);
+      offset += seg.length;
+    }
+
+    return output;
   }
 }

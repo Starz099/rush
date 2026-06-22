@@ -28,7 +28,8 @@ macro_rules! run_with_commands {
             commands::asset::read_asset_bytes,
             commands::asset::extract_audio,
             commands::asset::read_asset_range,
-            commands::asset::read_moov_box
+            commands::asset::read_moov_box,
+            commands::asset::slice_audio_asset
             $(, $extra)*
         ]
     };
@@ -70,7 +71,7 @@ pub fn run() {
             commands::export::save_test_frame,
             commands::export::stream_export_frame,
             commands::export::start_export,
-            commands::export::write_export_frame,
+            commands::export::write_video_chunk,
             commands::export::write_audio_file,
             commands::export::write_audio_chunk,
             commands::export::finish_export

@@ -50,9 +50,14 @@ export class WebGPURenderer {
   private multisampledTexture: GPUTexture | null = null;
   private sampler!: GPUSampler;
 
-  constructor(target: HTMLCanvasElement | { width: number; height: number }) {
-    if (target instanceof HTMLCanvasElement) {
-      this.canvas = target;
+  constructor(
+    target:
+      | HTMLCanvasElement
+      | OffscreenCanvas
+      | { width: number; height: number },
+  ) {
+    if (target && 'getContext' in target) {
+      this.canvas = target as any;
       this.width = target.width;
       this.height = target.height;
     } else {

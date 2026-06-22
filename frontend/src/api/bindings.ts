@@ -55,6 +55,14 @@ export const commands = {
     typedError<RangeResult, string>(
       __TAURI_INVOKE('read_moov_box', { filePath }),
     ),
+  sliceAudioAsset: (
+    filePath: string,
+    startSec: number | null,
+    durationSec: number | null,
+  ) =>
+    typedError<string, string>(
+      __TAURI_INVOKE('slice_audio_asset', { filePath, startSec, durationSec }),
+    ),
 };
 
 /* Types */
