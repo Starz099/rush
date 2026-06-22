@@ -61,17 +61,18 @@ pub fn run() {
             app.manage(AppState {
                 db: std::sync::Mutex::new(connection),
             });
-            app.manage(commands::temp::ExportState(std::sync::Mutex::new(None)));
+            app.manage(commands::export::ExportState(std::sync::Mutex::new(None)));
 
             Ok(())
         })
         .invoke_handler(run_with_commands![
             generate_handler,
-            commands::temp::save_test_frame,
-            commands::temp::stream_export_frame,
-            commands::temp::start_export,
-            commands::temp::write_export_frame,
-            commands::temp::finish_export
+            commands::export::save_test_frame,
+            commands::export::stream_export_frame,
+            commands::export::start_export,
+            commands::export::write_export_frame,
+            commands::export::write_audio_file,
+            commands::export::finish_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

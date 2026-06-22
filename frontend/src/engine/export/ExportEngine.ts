@@ -2,8 +2,10 @@ import { WebGPURenderer } from '../core/Renderer';
 import { LookAheadManager } from '../buffering/LookAheadManager';
 import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../../helpers/fps';
+import { audioBufferToWav } from '../../helpers/audioWav';
 import { isVideoTrack } from '@/constants/trackConfig';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { useAppStore } from '../../store/timelineStore';
 
 export class ExportEngine {
   private renderer: WebGPURenderer;
@@ -382,11 +384,100 @@ export class ExportEngine {
           onProgress((frameIndex + 1) / totalFrames);
         }
       }
+
+      // 7. RUN THE AUDIO RENDER (Outside the video loop!)
+      console.log('[Export] Rendering audio timeline...');
+      const wavBytes = await this.exportAudio(activeProject, assets);
+
+      // 8. UPLOAD WAV FILE TO BACKEND
+      console.log('[Export] Uploading temp audio to backend...');
+      await invoke('write_audio_file', wavBytes);
+    } catch (err) {
+      console.error('[ExportEngine] Export failed inside try block:', err);
+      throw err;
     } finally {
-      // 7. Finish encoding and close the stream
+      // 9. Finish encoding and close the stream
       await invoke('finish_export');
     }
 
     console.log('[ExportEngine] Export loop finished.');
+  }
+
+  /**
+   * To compile and save the audio for the final export
+   */
+  private async exportAudio(
+    activeProject: Project,
+    assets: Asset[],
+  ): Promise<Uint8Array> {
+    const timeline = activeProject.timeline_state;
+    const framerate = fpsToNumeric(activeProject.framerate);
+
+    // Calculate total duration of the timeline in seconds
+    const allClips = timeline.tracks.flatMap((track: any) => track.clips);
+    const totalFrames = allClips.reduce(
+      (max: number, clip: any) => Math.max(max, clip.timeline_out),
+      0,
+    );
+    const durationSeconds = totalFrames / framerate;
+
+    // create an offline mixing board
+    const sampleRate = 48000;
+    const offlineCtx = new OfflineAudioContext(
+      2, // number of channels (stereo)
+      sampleRate * durationSeconds, // length in samples
+      sampleRate,
+    );
+
+    for (const track of timeline.tracks) {
+      for (const clip of track.clips) {
+        const audioBuffer = await this.loadAudioBufferForClip(
+          clip,
+          assets,
+          offlineCtx,
+        );
+        if (!audioBuffer) continue;
+
+        // Create a virtual player node
+        const source = offlineCtx.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // Connect to the master volume/mix
+        source.connect(offlineCtx.destination);
+
+        // Schedule the clip to play at the right timeline markers
+        source.start(
+          clip.timeline_in / framerate, // When to play on the timeline (seconds)
+          clip.source_in / framerate, // Where to start inside the source file (seconds)
+          (clip.timeline_out - clip.timeline_in) / framerate, // Clip duration (seconds)
+        );
+      }
+    }
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    return audioBufferToWav(renderedBuffer);
+  }
+
+  /**
+   * Helper to fetch and decode audio bytes for a clip using the OfflineAudioContext
+   */
+  private async loadAudioBufferForClip(
+    clip: Clip,
+    assets: Asset[],
+    offlineCtx: OfflineAudioContext,
+  ): Promise<AudioBuffer | null> {
+    const asset = assets.find((a) => a.id === clip.asset_id);
+    if (!asset) return null;
+
+    // Use the lightweight cached MP3 audio file if available, otherwise fall back to original path
+    const extractedAudioPath = useAppStore.getState().extractedAudios[asset.id];
+    const audioPathToUse = extractedAudioPath || asset.file_path;
+
+    // Fetch the file bytes over Tauri's custom asset protocol to avoid V8 JSON memory spikes
+    const url = convertFileSrc(audioPathToUse);
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+
+    return await offlineCtx.decodeAudioData(arrayBuffer);
   }
 }

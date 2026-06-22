@@ -3,10 +3,14 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
+use uuid::Uuid;
 
 pub struct ExportSession {
     pub child: std::process::Child,
     pub stdin: std::process::ChildStdin,
+    pub temp_video_path: std::path::PathBuf,
+    pub temp_audio_path: std::path::PathBuf,
+    pub final_output_path: String,
 }
 
 pub struct ExportState(pub Mutex<Option<ExportSession>>);
@@ -160,10 +164,24 @@ pub fn start_export(
     fps: u32,
     output_path: String,
 ) -> Result<(), String> {
+    let random_uuid = Uuid::new_v4();
+    let temp_dir = std::env::temp_dir();
+    let temp_video_path = temp_dir.join(format!("temp_video_{}.mp4", random_uuid));
+    let temp_audio_path = temp_dir.join(format!("temp_audio_{}.wav", random_uuid));
+
     println!(
-        "[Backend] Starting export session: {}x{} @ {}fps, output: {}",
-        width, height, fps, output_path
+        "[Backend] Starting export session: {}x{} @ {}fps",
+        width, height, fps
     );
+    println!(
+        "[Backend] Temp video path: {}\n[Backend] Temp audio path: {}",
+        temp_video_path.to_string_lossy(),
+        temp_audio_path.to_string_lossy()
+    );
+
+    let resolution_str = format!("{}x{}", width, height);
+    let fps_str = fps.to_string();
+    let temp_video_path_str = temp_video_path.to_string_lossy();
 
     let mut child = Command::new("ffmpeg")
         .args([
@@ -173,9 +191,9 @@ pub fn start_export(
             "-pix_fmt",
             "rgba",
             "-s",
-            &format!("{}x{}", width, height),
+            &resolution_str,
             "-r",
-            &fps.to_string(),
+            &fps_str,
             "-i",
             "-",
             "-c:v",
@@ -186,7 +204,7 @@ pub fn start_export(
             "veryfast",
             "-pix_fmt",
             "yuv420p",
-            &output_path,
+            &temp_video_path_str,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -200,7 +218,14 @@ pub fn start_export(
         .ok_or_else(|| "Failed to open stdin stream for FFmpeg".to_string())?;
 
     let mut lock = state.0.lock().map_err(|e| e.to_string())?;
-    *lock = Some(ExportSession { child, stdin });
+
+    *lock = Some(ExportSession {
+        child,
+        stdin,
+        temp_video_path,
+        temp_audio_path,
+        final_output_path: output_path,
+    });
 
     Ok(())
 }
@@ -246,12 +271,87 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
             .map_err(|e| format!("FFmpeg failed during compile step: {}", e))?;
 
         if status.success() {
-            println!("[Backend Success] Video file exported and closed successfully.");
-            Ok(())
+            let temp_video_path_str = session
+                .temp_video_path
+                .to_str()
+                .ok_or_else(|| "Invalid temporary video file path.".to_string())?;
+
+            if session.temp_audio_path.exists() {
+                println!("[Backend] Temporary audio file found. Muxing video and audio...");
+                let temp_audio_path_str = session
+                    .temp_audio_path
+                    .to_str()
+                    .ok_or_else(|| "Invalid temporary audio file path.".to_string())?;
+
+                // Mux silent video with generated audio
+                let mux_status = Command::new("ffmpeg")
+                    .args([
+                        "-y",
+                        "-i",
+                        temp_video_path_str,
+                        "-i",
+                        temp_audio_path_str,
+                        "-c:v",
+                        "copy", // Copy video stream directly without transcoding
+                        "-c:a",
+                        "aac", // Compress audio to AAC format
+                        &session.final_output_path,
+                    ])
+                    .status()
+                    .map_err(|e| format!("Failed to spawn FFmpeg muxing process: {}", e))?;
+
+                // Clean up temporary files on disk
+                let _ = std::fs::remove_file(&session.temp_video_path);
+                let _ = std::fs::remove_file(&session.temp_audio_path);
+
+                if mux_status.success() {
+                    println!("[Backend Success] Video file exported and muxed successfully.");
+                    Ok(())
+                } else {
+                    Err(format!("FFmpeg muxing failed with status: {}", mux_status))
+                }
+            } else {
+                println!(
+                    "[Backend] No temporary audio file found. Copying silent video directly..."
+                );
+                std::fs::copy(&session.temp_video_path, &session.final_output_path)
+                    .map_err(|e| format!("Failed to copy output video file: {}", e))?;
+
+                // Clean up temporary video file on disk
+                let _ = std::fs::remove_file(&session.temp_video_path);
+
+                println!("[Backend Success] Video file exported (silent) successfully.");
+                Ok(())
+            }
         } else {
-            Err(format!("FFmpeg failed with exit code: {}", status))
+            Err(format!("FFmpeg silent video compile failed: {}", status))
         }
     } else {
         Err("No active export session to finish.".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn write_audio_file(state: State<'_, ExportState>, request: Request<'_>) -> Result<(), String> {
+    match request.body() {
+        InvokeBody::Raw(bytes) => {
+            let lock = state.0.lock().map_err(|e| e.to_string())?;
+            if let Some(session) = lock.as_ref() {
+                let mut file = std::fs::File::create(&session.temp_audio_path)
+                    .map_err(|e| format!("Failed to create temp audio file: {}", e))?;
+                file.write_all(bytes)
+                    .map_err(|e| format!("Failed to write audio bytes: {}", e))?;
+                file.flush()
+                    .map_err(|e| format!("Failed to flush audio file: {}", e))?;
+                println!(
+                    "[Backend] Successfully saved temp audio file ({:.2}MB)",
+                    (bytes.len() as f64) / (1024.0 * 1024.0)
+                );
+                Ok(())
+            } else {
+                Err("No active export session found. Call start_export first.".to_string())
+            }
+        }
+        _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),
     }
 }
