@@ -96,6 +96,12 @@ const Workspace = () => {
   const handleExport2 = async () => {
     if (!project) return;
 
+    const outputPath = window.prompt(
+      'Enter absolute output file path (e.g. C:/videos/output.mp4):',
+      '',
+    );
+    if (!outputPath) return;
+
     setIsRendering(true);
     setRenderProgress(0);
 
@@ -106,9 +112,14 @@ const Workspace = () => {
 
     try {
       await exportEngine.initialize();
-      await exportEngine.exportTimeline(project, assets, (progress) => {
-        setRenderProgress(progress * 100);
-      });
+      await exportEngine.exportTimeline(
+        project,
+        assets,
+        outputPath,
+        (progress) => {
+          setRenderProgress(progress * 100);
+        },
+      );
       alert('Export-2 stream finished successfully!');
     } catch (error) {
       console.error('Export-2 failed:', error);

@@ -1,6 +1,15 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use tauri::ipc::{InvokeBody, Request};
+use tauri::State;
+
+pub struct ExportSession {
+    pub child: std::process::Child,
+    pub stdin: std::process::ChildStdin,
+}
+
+pub struct ExportState(pub Mutex<Option<ExportSession>>);
 
 #[tauri::command]
 pub fn save_test_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(), String> {
@@ -140,5 +149,109 @@ pub fn stream_export_frame(_app: tauri::AppHandle, request: Request<'_>) -> Resu
             Ok(())
         }
         _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn start_export(
+    state: State<'_, ExportState>,
+    width: u32,
+    height: u32,
+    fps: u32,
+    output_path: String,
+) -> Result<(), String> {
+    println!(
+        "[Backend] Starting export session: {}x{} @ {}fps, output: {}",
+        width, height, fps, output_path
+    );
+
+    let mut child = Command::new("ffmpeg")
+        .args([
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-s",
+            &format!("{}x{}", width, height),
+            "-r",
+            &fps.to_string(),
+            "-i",
+            "-",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "18",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            &output_path,
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit()) // Forward logs to console
+        .spawn()
+        .map_err(|e| format!("Failed to spawn FFmpeg process: {}", e))?;
+
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "Failed to open stdin stream for FFmpeg".to_string())?;
+
+    let mut lock = state.0.lock().map_err(|e| e.to_string())?;
+    *lock = Some(ExportSession { child, stdin });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn write_export_frame(
+    state: State<'_, ExportState>,
+    request: Request<'_>,
+) -> Result<(), String> {
+    match request.body() {
+        InvokeBody::Raw(bytes) => {
+            let mut lock = state.0.lock().map_err(|e| e.to_string())?;
+            if let Some(session) = lock.as_mut() {
+                session
+                    .stdin
+                    .write_all(bytes)
+                    .map_err(|e| format!("Failed to write frame bytes to FFmpeg: {}", e))?;
+                session
+                    .stdin
+                    .flush()
+                    .map_err(|e| format!("Failed to flush FFmpeg stdin pipe: {}", e))?;
+                Ok(())
+            } else {
+                Err("No active export session found. Did you call start_export?".to_string())
+            }
+        }
+        _ => Err("Invalid payload type. Expected raw binary bytes.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
+    println!("[Backend] Finishing export session.");
+
+    let mut lock = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(mut session) = lock.take() {
+        // Dropping stdin sends EOF to FFmpeg
+        drop(session.stdin);
+
+        let status = session
+            .child
+            .wait()
+            .map_err(|e| format!("FFmpeg failed during compile step: {}", e))?;
+
+        if status.success() {
+            println!("[Backend Success] Video file exported and closed successfully.");
+            Ok(())
+        } else {
+            Err(format!("FFmpeg failed with exit code: {}", status))
+        }
+    } else {
+        Err("No active export session to finish.".to_string())
     }
 }

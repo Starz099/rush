@@ -263,23 +263,17 @@ export class ExportEngine {
   public async exportTimeline(
     activeProject: Project,
     assets: Asset[],
+    outputPath: string,
     onProgress?: (progress: number) => void,
   ): Promise<void> {
     const timeline = activeProject.timeline_state;
     const framerate = fpsToNumeric(activeProject.framerate);
     const background = timeline.background;
 
-    // 1. Resolve global zoom scale factor from the timeline effects track
+    // 1. Filter effects tracks once before starting the loop
     const effectsTracks = timeline.tracks.filter(
       (t: any) => t.track_type?.toLowerCase() === 'effects',
     );
-    const activeZoomClip = effectsTracks
-      .flatMap((t: any) => t.clips)
-      .find(
-        (clip: any) =>
-          clip.transform?.scale !== undefined && clip.transform?.scale !== null,
-      );
-    const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
     // 2. Find total duration in frames
     const allClips = timeline.tracks.flatMap((track: any) => track.clips);
@@ -289,92 +283,108 @@ export class ExportEngine {
     );
 
     console.log(
-      `[ExportEngine] Starting export. Total frames to render: ${totalFrames}`,
+      `[ExportEngine] Starting export to: ${outputPath}. Total frames: ${totalFrames}`,
     );
 
-    for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-      if (this.disposed) {
-        console.log(
-          '[ExportEngine] Export loop terminated because engine was disposed.',
+    // Initialize the backend FFmpeg session
+    await invoke('start_export', {
+      width: this.width,
+      height: this.height,
+      fps: framerate,
+      outputPath,
+    });
+
+    try {
+      for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+        if (this.disposed) {
+          console.log(
+            '[ExportEngine] Export loop terminated because engine was disposed.',
+          );
+          break;
+        }
+
+        // Pre-decodes upcoming frames (tick lookahead manager)
+        await this.lookAhead.tick(frameIndex, activeProject, assets);
+
+        // Identify active video clips at this frame
+        const videoTracks = timeline.tracks.filter(isVideoTrack);
+        const activeClipsToRender: Clip[] = [];
+
+        videoTracks.forEach((track: any) => {
+          const activeClips = track.clips.filter(
+            (clip: any) =>
+              frameIndex >= clip.timeline_in && frameIndex < clip.timeline_out,
+          );
+          activeClipsToRender.push(...activeClips);
+        });
+
+        // Sort by z-index
+        activeClipsToRender.sort(
+          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
         );
-        break;
-      }
 
-      const timestampMicros = Math.round((frameIndex / framerate) * 1e6);
+        // Synchronously block until all active frames are decoded into the session queues
+        for (const clip of activeClipsToRender) {
+          await this.awaitFrameDecoded(
+            clip,
+            frameIndex,
+            framerate,
+            activeProject,
+            assets,
+          );
+        }
 
-      // Pre-decodes upcoming frames (tick lookahead manager)
-      await this.lookAhead.tick(frameIndex, activeProject, assets);
+        // Resolve zoom scale factor active at this specific frameIndex
+        const activeZoomClip = effectsTracks
+          .flatMap((t: any) => t.clips)
+          .find(
+            (clip: any) =>
+              clip.transform?.scale !== undefined &&
+              clip.transform?.scale !== null &&
+              frameIndex >= clip.timeline_in &&
+              frameIndex < clip.timeline_out,
+          );
+        const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
-      // Identify active video clips at this frame
-      const videoTracks = timeline.tracks.filter(isVideoTrack);
-      const activeClipsToRender: Clip[] = [];
+        // 3. Render offscreen
+        this.renderer.beginFrame(background);
+        for (const clip of activeClipsToRender) {
+          const frame = this.lookAhead.getFrame(clip.id, frameIndex, framerate);
+          if (frame) {
+            const originalTransform = clip.transform;
+            const modifiedTransform = originalTransform
+              ? {
+                  x: (originalTransform.x ?? 0) * resolvedZoom,
+                  y: (originalTransform.y ?? 0) * resolvedZoom,
+                  scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
+                  z_index: originalTransform.z_index,
+                }
+              : {
+                  x: 0,
+                  y: 0,
+                  scale: resolvedZoom,
+                  z_index: 0,
+                };
 
-      videoTracks.forEach((track: any) => {
-        const activeClips = track.clips.filter(
-          (clip: any) =>
-            frameIndex >= clip.timeline_in && frameIndex < clip.timeline_out,
-        );
-        activeClipsToRender.push(...activeClips);
-      });
+            this.renderer.drawClip(frame, modifiedTransform);
+          }
+        }
+        this.renderer.endFrame();
 
-      // Sort by z-index
-      activeClipsToRender.sort(
-        (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-      );
+        // 4. Extract resolved pixel bytes using GPU mapping (handles 256-byte alignment rules)
+        const frameData = await this.captureFrameData();
 
-      // Synchronously block until all active frames are decoded into the session queues
-      for (const clip of activeClipsToRender) {
-        await this.awaitFrameDecoded(
-          clip,
-          frameIndex,
-          framerate,
-          activeProject,
-          assets,
-        );
-      }
+        // 5. Stream raw frame bytes to Tauri (Option A, raw body, no serialization)
+        await invoke('write_export_frame', frameData);
 
-      // 3. Render offscreen
-      this.renderer.beginFrame(background);
-      for (const clip of activeClipsToRender) {
-        const frame = this.lookAhead.getFrame(clip.id, frameIndex, framerate);
-        if (frame) {
-          const originalTransform = clip.transform;
-          const modifiedTransform = originalTransform
-            ? {
-                x: (originalTransform.x ?? 0) * resolvedZoom,
-                y: (originalTransform.y ?? 0) * resolvedZoom,
-                scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                z_index: originalTransform.z_index,
-              }
-            : {
-                x: 0,
-                y: 0,
-                scale: resolvedZoom,
-                z_index: 0,
-              };
-
-          this.renderer.drawClip(frame, modifiedTransform);
+        // 6. Update progress indicator
+        if (onProgress) {
+          onProgress((frameIndex + 1) / totalFrames);
         }
       }
-      this.renderer.endFrame();
-
-      // 4. Extract resolved pixel bytes using GPU mapping (handles 256-byte alignment rules)
-      const frameData = await this.captureFrameData();
-
-      // 5. Stream frame bytes and metadata via headers to Tauri
-      await invoke('stream_export_frame', frameData, {
-        headers: {
-          'x-frame-index': frameIndex.toString(),
-          'x-timestamp-micros': timestampMicros.toString(),
-          'x-width': this.width.toString(),
-          'x-height': this.height.toString(),
-        },
-      });
-
-      // 6. Update progress indicator
-      if (onProgress) {
-        onProgress((frameIndex + 1) / totalFrames);
-      }
+    } finally {
+      // 7. Finish encoding and close the stream
+      await invoke('finish_export');
     }
 
     console.log('[ExportEngine] Export loop finished.');
