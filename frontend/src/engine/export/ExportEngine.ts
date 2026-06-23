@@ -346,6 +346,13 @@ export class ExportEngine {
       (t: any) => t.track_type?.toLowerCase() === 'effects',
     );
 
+    const speedClips = effectsTracks
+      .flatMap((t: any) => t.clips)
+      .filter(
+        (clip: any) =>
+          clip.speed_factor !== undefined && clip.speed_factor !== null,
+      );
+
     // 2. Find total duration in frames
     const allClips = timeline.tracks.flatMap((track: any) => track.clips);
     const totalFrames = allClips.reduce(
@@ -357,19 +364,30 @@ export class ExportEngine {
       `[ExportEngine] Starting export to: ${outputPath}. Total frames: ${totalFrames}`,
     );
 
+    // Collect speed blocks to send to the backend
+    const speedBlocks = speedClips.map((clip: any) => ({
+      start_frame: clip.timeline_in,
+      end_frame: clip.timeline_out,
+      factor: clip.speed_factor,
+    }));
+
     // Initialize the backend WebCodecs export session
     await invoke('start_export', {
       width: this.width,
       height: this.height,
       fps: framerate,
       outputPath,
+      speedBlocks,
     });
 
     // Initialize the frontend video encoder
     await this.initVideoEncoder(framerate);
 
     try {
-      for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+      let timelinePlayhead = 0;
+      let outputFrameIndex = 0;
+
+      while (timelinePlayhead < totalFrames) {
         if (this.disposed) {
           console.log(
             '[ExportEngine] Export loop terminated because engine was disposed.',
@@ -377,8 +395,10 @@ export class ExportEngine {
           break;
         }
 
+        const currentTimelineFrame = Math.floor(timelinePlayhead);
+
         // Pre-decodes upcoming frames (tick lookahead manager)
-        await this.lookAhead.tick(frameIndex, activeProject, assets);
+        await this.lookAhead.tick(currentTimelineFrame, activeProject, assets);
 
         // Identify active video clips at this frame
         const videoTracks = timeline.tracks.filter(isVideoTrack);
@@ -387,7 +407,8 @@ export class ExportEngine {
         videoTracks.forEach((track: any) => {
           const activeClips = track.clips.filter(
             (clip: any) =>
-              frameIndex >= clip.timeline_in && frameIndex < clip.timeline_out,
+              currentTimelineFrame >= clip.timeline_in &&
+              currentTimelineFrame < clip.timeline_out,
           );
           activeClipsToRender.push(...activeClips);
         });
@@ -401,7 +422,7 @@ export class ExportEngine {
         for (const clip of activeClipsToRender) {
           await this.awaitFrameDecoded(
             clip,
-            frameIndex,
+            currentTimelineFrame,
             framerate,
             activeProject,
             assets,
@@ -415,15 +436,19 @@ export class ExportEngine {
             (clip: any) =>
               clip.transform?.scale !== undefined &&
               clip.transform?.scale !== null &&
-              frameIndex >= clip.timeline_in &&
-              frameIndex < clip.timeline_out,
+              currentTimelineFrame >= clip.timeline_in &&
+              currentTimelineFrame < clip.timeline_out,
           );
         const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
         // 3. Render offscreen directly into canvas
         this.renderer.beginFrame(background);
         for (const clip of activeClipsToRender) {
-          const frame = this.lookAhead.getFrame(clip.id, frameIndex, framerate);
+          const frame = this.lookAhead.getFrame(
+            clip.id,
+            currentTimelineFrame,
+            framerate,
+          );
           if (frame) {
             const originalTransform = clip.transform;
             const modifiedTransform = originalTransform
@@ -454,7 +479,7 @@ export class ExportEngine {
         }
 
         const timestampMicros = Math.round(
-          (frameIndex * 1_000_000) / framerate,
+          (outputFrameIndex * 1_000_000) / framerate,
         );
         const videoFrame: VideoFrame = new VideoFrame(offscreenCanvas, {
           timestamp: timestampMicros,
@@ -465,9 +490,21 @@ export class ExportEngine {
         this.encoder.encode(videoFrame);
         videoFrame.close();
 
+        // Resolve the active speed factor at the current timeline frame position
+        const activeSpeedClip = speedClips.find(
+          (clip: any) =>
+            currentTimelineFrame >= clip.timeline_in &&
+            currentTimelineFrame < clip.timeline_out,
+        );
+        const activeSpeedFactor = activeSpeedClip?.speed_factor ?? 1.0;
+
+        // Warp the playhead step
+        timelinePlayhead += activeSpeedFactor;
+        outputFrameIndex++;
+
         // 6. Update progress indicator
         if (onProgress) {
-          onProgress((frameIndex + 1) / totalFrames);
+          onProgress(Math.min(1.0, timelinePlayhead / totalFrames));
         }
       }
 

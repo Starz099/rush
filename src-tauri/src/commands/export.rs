@@ -6,10 +6,19 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
 use uuid::Uuid;
 
+#[derive(serde::Serialize, serde::Deserialize, specta::Type, Clone, Debug)]
+pub struct SpeedBlock {
+    pub start_frame: u32,
+    pub end_frame: u32,
+    pub factor: f64,
+}
+
 pub struct ExportSession {
     pub temp_video_path: std::path::PathBuf,
     pub temp_audio_path: std::path::PathBuf,
     pub final_output_path: String,
+    pub speed_blocks: Vec<SpeedBlock>,
+    pub fps: u32,
 }
 
 pub struct ExportState(pub Mutex<Option<ExportSession>>);
@@ -162,6 +171,7 @@ pub fn start_export(
     height: u32,
     fps: u32,
     output_path: String,
+    speed_blocks: Vec<SpeedBlock>,
 ) -> Result<(), String> {
     let random_uuid = Uuid::new_v4();
     let temp_dir = std::env::temp_dir();
@@ -169,8 +179,11 @@ pub fn start_export(
     let temp_audio_path = temp_dir.join(format!("temp_audio_{}.raw", random_uuid));
 
     println!(
-        "[Backend] Starting WebCodecs export session: {}x{} @ {}fps",
-        width, height, fps
+        "[Backend] Starting WebCodecs export session: {}x{} @ {}fps. Speed blocks: {}",
+        width,
+        height,
+        fps,
+        speed_blocks.len()
     );
     println!(
         "[Backend] Temp video path: {}\n[Backend] Temp audio path: {}",
@@ -190,6 +203,8 @@ pub fn start_export(
         temp_video_path,
         temp_audio_path,
         final_output_path: output_path,
+        speed_blocks,
+        fps,
     });
 
     Ok(())
@@ -223,6 +238,75 @@ pub fn write_video_chunk(
     }
 }
 
+fn build_audio_speed_filter(
+    speed_blocks: &[SpeedBlock],
+    fps: u32,
+    total_duration_secs: f64,
+) -> String {
+    if speed_blocks.is_empty() {
+        return String::new();
+    }
+
+    let mut sorted_blocks = speed_blocks.to_vec();
+    sorted_blocks.sort_by_key(|b| b.start_frame);
+
+    let mut continuous_blocks = Vec::new();
+    let mut current_frame = 0;
+
+    for block in sorted_blocks {
+        if block.start_frame > current_frame {
+            continuous_blocks.push(SpeedBlock {
+                start_frame: current_frame,
+                end_frame: block.start_frame,
+                factor: 1.0,
+            });
+        }
+        continuous_blocks.push(block.clone());
+        current_frame = block.end_frame;
+    }
+
+    let total_frames = (total_duration_secs * fps as f64).round() as u32;
+    if current_frame < total_frames {
+        continuous_blocks.push(SpeedBlock {
+            start_frame: current_frame,
+            end_frame: total_frames,
+            factor: 1.0,
+        });
+    }
+
+    let mut filter_parts = Vec::new();
+    let mut concat_inputs = String::new();
+
+    for (idx, block) in continuous_blocks.iter().enumerate() {
+        let start_sec = block.start_frame as f64 / fps as f64;
+        let end_sec = block.end_frame as f64 / fps as f64;
+
+        let mut factor = block.factor;
+        if factor < 0.5 {
+            factor = 0.5;
+        } else if factor > 100.0 {
+            factor = 100.0;
+        }
+
+        filter_parts.push(format!(
+            "[1:a]atrim=start={:.3}:end={:.3},asetpts=PTS-STARTPTS,atempo={:.3}[a{}]",
+            start_sec, end_sec, factor, idx
+        ));
+        concat_inputs.push_str(&format!("[a{}]", idx));
+    }
+
+    if filter_parts.is_empty() {
+        return String::new();
+    }
+
+    format!(
+        "{}; {}concat=n={}:v=0:a=1[aout]",
+        filter_parts.join("; "),
+        concat_inputs,
+        filter_parts.len()
+    )
+}
+
 #[tauri::command]
 pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
     println!("[Backend] Finishing export session.");
@@ -240,34 +324,76 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
             .ok_or_else(|| "Invalid temporary audio file path.".to_string())?;
 
         if session.temp_audio_path.exists() {
-            println!("[Backend] Temporary audio file found. Muxing video and audio...");
+            let file_metadata = std::fs::metadata(&session.temp_audio_path)
+                .map_err(|e| format!("Failed to read raw audio metadata: {}", e))?;
+            let file_size = file_metadata.len();
+            let total_duration_secs = (file_size as f64) / 192000.0;
 
-            // Mux H.264 raw video stream with raw PCM audio
-            let mux_status = Command::new("ffmpeg")
-                .args([
-                    "-y",
-                    "-f",
-                    "h264", // Specify input is raw H.264 stream
-                    "-i",
-                    temp_video_path_str,
-                    "-f",
-                    "s16le", // Raw 16-bit PCM format
-                    "-ar",
-                    "48000",
-                    "-ac",
-                    "2",
-                    "-i",
-                    temp_audio_path_str,
-                    "-c:v",
-                    "copy", // Copy video track directly without transcoding
-                    "-c:a",
-                    "aac", // Compress raw PCM to AAC format
-                    &session.final_output_path,
-                ])
-                .status()
-                .map_err(|e| format!("Failed to spawn FFmpeg muxing process: {}", e))?;
+            let filter_complex_str =
+                build_audio_speed_filter(&session.speed_blocks, session.fps, total_duration_secs);
 
-            // Clean up temporary files on disk
+            let mux_status = if !filter_complex_str.is_empty() {
+                println!(
+                    "[Backend] Muxing H.264 video with speed-warped and pitch-corrected audio..."
+                );
+                println!("[Backend] Generated filter: {}", filter_complex_str);
+
+                Command::new("ffmpeg")
+                    .args([
+                        "-y",
+                        "-f",
+                        "h264",
+                        "-i",
+                        temp_video_path_str,
+                        "-f",
+                        "s16le",
+                        "-ar",
+                        "48000",
+                        "-ac",
+                        "2",
+                        "-i",
+                        temp_audio_path_str,
+                        "-filter_complex",
+                        &filter_complex_str,
+                        "-map",
+                        "0:v",
+                        "-map",
+                        "[aout]",
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "aac",
+                        &session.final_output_path,
+                    ])
+                    .status()
+                    .map_err(|e| format!("Failed to spawn FFmpeg muxing process: {}", e))?
+            } else {
+                println!("[Backend] Muxing H.264 video with 1x audio...");
+                Command::new("ffmpeg")
+                    .args([
+                        "-y",
+                        "-f",
+                        "h264",
+                        "-i",
+                        temp_video_path_str,
+                        "-f",
+                        "s16le",
+                        "-ar",
+                        "48000",
+                        "-ac",
+                        "2",
+                        "-i",
+                        temp_audio_path_str,
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "aac",
+                        &session.final_output_path,
+                    ])
+                    .status()
+                    .map_err(|e| format!("Failed to spawn FFmpeg muxing process: {}", e))?
+            };
+
             let _ = std::fs::remove_file(&session.temp_video_path);
             let _ = std::fs::remove_file(&session.temp_audio_path);
 
@@ -294,7 +420,6 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
                 .status()
                 .map_err(|e| format!("Failed to copy output video file: {}", e))?;
 
-            // Clean up temporary video file on disk
             let _ = std::fs::remove_file(&session.temp_video_path);
 
             if mux_status.success() {
