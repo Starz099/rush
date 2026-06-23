@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { WebGPURenderer } from '../engine/core/Renderer';
 import { VideoEngine } from '../engine/VideoEngine';
 import { AudioEngine } from '../engine/audio/AudioEngine';
+import { ExportEngine } from '../engine/export/ExportEngine';
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
 import { fpsToNumeric } from '@/helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
@@ -118,6 +119,58 @@ export const PreviewPanel = () => {
   // Attach Orchestrators to manage tracks/clips
   useAudioOrchestrator(audioEngine, audioCtx);
 
+  // Temporary listener to test the offscreen rendering & capture pipeline
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Ctrl + Shift + E to trigger the offscreen export test
+      if (e.key === 'E' && e.ctrlKey && e.shiftKey && activeProject) {
+        e.preventDefault();
+        console.log(
+          `[Test Export] Triggered offscreen render export test at playhead: ${playheadPosition}`,
+        );
+        try {
+          // We use 1920x1080 to test both the offscreen logic AND non-256-aligned width padding rules!
+          const exportWidth = activeProject.viewport_width;
+          const exportHeight = activeProject.viewport_height;
+          const exporter = new ExportEngine(exportWidth, exportHeight);
+          await exporter.initialize();
+
+          const pixels = await exporter.testExportSingleFrame(
+            playheadPosition,
+            activeProject,
+            assets,
+          );
+
+          console.log(
+            `%c[Test Export SUCCESS] Captured Frame at Resolution: ${exportWidth}x${exportHeight}`,
+            'color: #00ff00; font-weight: bold;',
+          );
+          console.log(
+            `[Test Export SUCCESS] Total Bytes Extracted: ${pixels.byteLength}`,
+          );
+          console.log(
+            `[Test Export SUCCESS] Expected clean byte size: ${exportWidth * exportHeight * 4}`,
+          );
+          console.log(
+            `[Test Export SUCCESS] First 16 bytes:`,
+            Array.from(pixels.slice(0, 16)),
+          );
+
+          exporter.dispose();
+        } catch (err) {
+          console.error(
+            `%c[Test Export ERROR]`,
+            'color: #ff0000; font-weight: bold;',
+            err,
+          );
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playheadPosition, activeProject, assets]);
+
   const isActiveAssetLoading = activeAsset
     ? activeAsset.media_type === 'video' &&
       (!readyAssets[activeAsset.id] || demuxingAssets[activeAsset.id])
@@ -167,38 +220,42 @@ export const PreviewPanel = () => {
     if (!isPlaying && videoEngine && activeProject) {
       videoEngine.reset(); // Clear all buffers and decoders
 
+      const targetPlayhead = playheadPosition;
       // Fetch and decode the frame at the new playhead position
-      void videoEngine
-        .tick(playheadPosition, activeProject, assets)
-        .then(() => {
-          // Sort by z_index so overlays are rendered correctly
-          const sortedClips = [...activeClips].sort(
-            (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-          );
+      void videoEngine.tick(targetPlayhead, activeProject, assets).then(() => {
+        // Abort if the playhead has moved since this seek was scheduled
+        if (useAppStore.getState().playhead_position !== targetPlayhead) {
+          return;
+        }
 
-          // Find active global zoom multiplier
-          const effectsTracks =
-            timeline?.tracks.filter(
-              (t: any) => t.track_type?.toLowerCase() === 'effects',
-            ) || [];
-          const activeEffectsClip = effectsTracks
-            .flatMap((t: any) => t.clips)
-            .find(
-              (clip: any) =>
-                playheadPosition >= clip.timeline_in &&
-                playheadPosition < clip.timeline_out,
-            );
-          const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+        // Sort by z_index so overlays are rendered correctly
+        const sortedClips = [...activeClips].sort(
+          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
+        );
 
-          // Render the frame immediately
-          videoEngine.renderFrame(
-            playheadPosition,
-            sortedClips,
-            projectFps,
-            activeProject.timeline_state.background,
-            globalZoom,
+        // Find active global zoom multiplier
+        const effectsTracks =
+          timeline?.tracks.filter(
+            (t: any) => t.track_type?.toLowerCase() === 'effects',
+          ) || [];
+        const activeEffectsClip = effectsTracks
+          .flatMap((t: any) => t.clips)
+          .find(
+            (clip: any) =>
+              targetPlayhead >= clip.timeline_in &&
+              targetPlayhead < clip.timeline_out,
           );
-        });
+        const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+
+        // Render the frame immediately
+        videoEngine.renderFrame(
+          targetPlayhead,
+          sortedClips,
+          projectFps,
+          activeProject.timeline_state.background,
+          globalZoom,
+        );
+      });
 
       if (audioEngine) {
         audioEngine.seekByTime(playheadPosition / projectFps);

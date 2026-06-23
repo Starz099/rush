@@ -17,6 +17,7 @@ import { CaretLeftIcon } from '@phosphor-icons/react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ExportEngine } from '@/engine/export/ExportEngine';
 
 const Workspace = () => {
   const navigate = useNavigate();
@@ -24,8 +25,8 @@ const Workspace = () => {
   const activeProject = useProjectStore((state) => state.activeProject);
   const setActiveProject = useProjectStore((state) => state.setActiveProject);
   const fetchAssets = useProjectStore((state) => state.fetchAssets);
-  const saveTimeline = useProjectStore((state) => state.saveTimeline);
   const deleteClip = useProjectStore((state) => state.deleteClip);
+  const assets = useProjectStore((state) => state.assets);
   const [project, setProject] = useState<Project | null>(activeProject);
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
@@ -89,6 +90,43 @@ const Workspace = () => {
       if (unlisten) {
         unlisten();
       }
+    }
+  };
+
+  const handleExport2 = async () => {
+    if (!project) return;
+
+    const outputPath = window.prompt(
+      'Enter absolute output file path (e.g. C:/videos/output.mp4):',
+      '',
+    );
+    if (!outputPath) return;
+
+    setIsRendering(true);
+    setRenderProgress(0);
+
+    const exportEngine = new ExportEngine(
+      project.viewport_width,
+      project.viewport_height,
+    );
+
+    try {
+      await exportEngine.initialize();
+      await exportEngine.exportTimeline(
+        project,
+        assets,
+        outputPath,
+        (progress) => {
+          setRenderProgress(progress * 100);
+        },
+      );
+      alert('Export-2 stream finished successfully!');
+    } catch (error) {
+      console.error('Export-2 failed:', error);
+      alert('Export-2 failed: ' + error);
+    } finally {
+      exportEngine.dispose();
+      setIsRendering(false);
     }
   };
 
@@ -172,11 +210,13 @@ const Workspace = () => {
           </Button>
           <Button
             size="sm"
-            onClick={() =>
-              project && saveTimeline(project.id, project.timeline_state)
-            }
+            variant="outline"
+            disabled={isRendering}
+            onClick={handleExport2}
           >
-            Save
+            {isRendering
+              ? `Streaming (${Math.round(renderProgress)}%)`
+              : 'Export-2'}
           </Button>
         </div>
       </header>

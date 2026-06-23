@@ -44,6 +44,7 @@ export function usePlaybackLoop(
         .flatMap((t: any) => t.clips)
         .find(
           (clip: any) =>
+            (clip.transform === undefined || clip.transform === null) &&
             clip.speed_factor !== undefined &&
             clip.speed_factor !== null &&
             playheadFloatRef.current >= clip.timeline_in &&

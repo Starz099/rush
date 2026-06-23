@@ -193,10 +193,9 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
 
               <span className="truncate">
                 {config?.type === 'effects'
-                  ? clip.speed_factor !== undefined &&
-                    clip.speed_factor !== null
-                    ? `Speed Effect (${clip.speed_factor}x)`
-                    : 'Zoom Effect'
+                  ? clip.transform !== undefined && clip.transform !== null
+                    ? 'Zoom Effect'
+                    : `Speed Effect (${clip.speed_factor ?? 1.0}x)`
                   : clip.id.slice(0, 8)}
               </span>
 

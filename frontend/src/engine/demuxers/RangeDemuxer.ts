@@ -245,18 +245,20 @@ export class RangeDemuxer {
       keyframeIdx--;
     }
 
-    // Calculate the byte range of the entire GOP (from Keyframe to target frame)
+    // Calculate the byte range of the entire GOP (from Keyframe to target frame + 8 extra lookahead frames for B-frame decoding support)
+    const endIdx = Math.min(targetIdx + 8, this.samples.length - 1);
     const keyframe = this.samples[keyframeIdx];
+    const endFrame = this.samples[endIdx];
     const targetFrame = this.samples[targetIdx];
     const startByte = keyframe.offset;
-    const endByte = targetFrame.offset + targetFrame.size - 1;
+    const endByte = endFrame.offset + endFrame.size - 1;
 
     // Fetch only this GOP slice from disk
     const gopBuffer = await this.fetchRange(startByte, endByte);
 
     // Slice the GOP buffer into individual frames and wrap them as EncodedVideoChunks
     const chunks = [];
-    for (let i = keyframeIdx; i <= targetIdx; i++) {
+    for (let i = keyframeIdx; i <= endIdx; i++) {
       const frameInfo = this.samples[i];
       const relativeOffset = frameInfo.offset - startByte;
 

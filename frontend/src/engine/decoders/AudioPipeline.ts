@@ -55,7 +55,9 @@ export class AudioPipeline {
             .flatMap((t: any) => t.clips)
             .filter(
               (c: any) =>
-                c.speed_factor !== undefined && c.speed_factor !== null,
+                (c.transform === undefined || c.transform === null) &&
+                c.speed_factor !== undefined &&
+                c.speed_factor !== null,
             ) || [];
 
         const playtime =
@@ -185,7 +187,10 @@ export class AudioPipeline {
         .filter((t: any) => t.track_type?.toLowerCase() === 'effects')
         .flatMap((t: any) => t.clips)
         .filter(
-          (c: any) => c.speed_factor !== undefined && c.speed_factor !== null,
+          (c: any) =>
+            (c.transform === undefined || c.transform === null) &&
+            c.speed_factor !== undefined &&
+            c.speed_factor !== null,
         ) || [];
 
     // 3. When should this play on the hardware clock?

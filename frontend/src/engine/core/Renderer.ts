@@ -1,5 +1,7 @@
 import type { Transform, BackgroundConfig } from '@/api/bindings';
 
+const MSAA_SAMPLE_COUNT = 4;
+
 function hexToRgbaClearColor(hex: string) {
   const rgba = hexToRgbaArray(hex);
   return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
@@ -30,9 +32,9 @@ function hexToRgbaArray(hex: string): [number, number, number, number] {
 }
 
 export class WebGPURenderer {
-  private canvas: HTMLCanvasElement;
+  private canvas: HTMLCanvasElement | null = null;
   private device!: GPUDevice;
-  private context!: GPUCanvasContext;
+  private context: GPUCanvasContext | null = null;
   private pipeline!: GPURenderPipeline;
   private bgGradientPipeline!: GPURenderPipeline;
   private bgUniformBuffer!: GPUBuffer;
@@ -41,8 +43,27 @@ export class WebGPURenderer {
   private currentCommandEncoder: GPUCommandEncoder | null = null;
   private currentRenderPass: GPURenderPassEncoder | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
+  // Track rendering dimensions
+  private width: number = 0;
+  private height: number = 0;
+  private offscreenTexture: GPUTexture | null = null;
+  private multisampledTexture: GPUTexture | null = null;
+  private sampler!: GPUSampler;
+
+  constructor(
+    target:
+      | HTMLCanvasElement
+      | OffscreenCanvas
+      | { width: number; height: number },
+  ) {
+    if (target && 'getContext' in target) {
+      this.canvas = target as any;
+      this.width = target.width;
+      this.height = target.height;
+    } else {
+      this.width = target.width;
+      this.height = target.height;
+    }
   }
 
   public async initialize() {
@@ -54,13 +75,40 @@ export class WebGPURenderer {
     if (!adapter) throw new Error('No GPU found.');
 
     this.device = await adapter.requestDevice();
-    this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
     this.format = navigator.gpu.getPreferredCanvasFormat();
 
-    this.context.configure({
-      device: this.device,
+    if (this.canvas) {
+      this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
+      this.context.configure({
+        device: this.device,
+        format: this.format,
+        alphaMode: 'premultiplied',
+        // COPY_SRC is useful if we ever want to read from preview canvas
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+    } else {
+      // Force RGBA format for offscreen exporting (standard format avoiding driver channels swap)
+      this.format = 'rgba8unorm';
+      // Initialize custom offscreen texture with COPY_SRC enabled for extraction
+      this.offscreenTexture = this.device.createTexture({
+        size: [this.width, this.height],
+        format: this.format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+    }
+
+    // Allocate multisampled texture for MSAA (4x MSAA)
+    this.multisampledTexture = this.device.createTexture({
+      size: [this.width, this.height],
+      sampleCount: MSAA_SAMPLE_COUNT,
       format: this.format,
-      alphaMode: 'premultiplied',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    // Create the reusable bilinear sampler
+    this.sampler = this.device.createSampler({
+      minFilter: 'linear',
+      magFilter: 'linear',
     });
 
     // Reusable uniform buffer for background rendering parameters (272 bytes)
@@ -73,7 +121,41 @@ export class WebGPURenderer {
   }
 
   public beginFrame(background?: BackgroundConfig | null) {
-    if (this.disposed || !this.device || !this.context) return;
+    if (
+      this.disposed ||
+      !this.device ||
+      (!this.context && !this.offscreenTexture)
+    )
+      return;
+
+    // Dynamically resize preview canvas WebGPU context and MSAA texture if dimensions change
+    if (this.canvas) {
+      const currentWidth = this.canvas.width;
+      const currentHeight = this.canvas.height;
+
+      if (currentWidth !== this.width || currentHeight !== this.height) {
+        this.width = currentWidth;
+        this.height = currentHeight;
+
+        this.context!.configure({
+          device: this.device,
+          format: this.format,
+          alphaMode: 'premultiplied',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+
+        if (this.multisampledTexture) {
+          this.multisampledTexture.destroy();
+        }
+        this.multisampledTexture = this.device.createTexture({
+          size: [this.width, this.height],
+          sampleCount: MSAA_SAMPLE_COUNT,
+          format: this.format,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+      }
+    }
+
     this.currentCommandEncoder = this.device.createCommandEncoder();
 
     // Determine clear value color from background configuration
@@ -90,14 +172,20 @@ export class WebGPURenderer {
       }
     }
 
-    const textureView = this.context.getCurrentTexture().createView();
+    const resolveTargetView = this.offscreenTexture
+      ? this.offscreenTexture.createView()
+      : this.context!.getCurrentTexture().createView();
+
+    const msaaView = this.multisampledTexture!.createView();
+
     this.currentRenderPass = this.currentCommandEncoder.beginRenderPass({
       colorAttachments: [
         {
-          view: textureView,
+          view: msaaView,
+          resolveTarget: resolveTargetView,
           clearValue: clearColor,
           loadOp: 'clear',
-          storeOp: 'store',
+          storeOp: 'discard', // Discard multisampled texture after resolving to resolveTarget
         },
       ],
     });
@@ -161,12 +249,11 @@ export class WebGPURenderer {
     const externalTexture = this.device.importExternalTexture({
       source: frame,
     });
-    const sampler = this.device.createSampler();
 
     // Prepare the Uniform Data (MUST match the Shader struct above)
     const uniformData = new Float32Array([
-      this.canvas.width, // canvasResolution.x
-      this.canvas.height, // canvasResolution.y
+      this.width, // canvasResolution.x
+      this.height, // canvasResolution.y
       frame.displayWidth, // frameResolution.x
       frame.displayHeight, // frameResolution.y
       transform?.x ?? 0, // position.x
@@ -185,7 +272,7 @@ export class WebGPURenderer {
     const bindGroup = this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: sampler },
+        { binding: 0, resource: this.sampler },
         { binding: 1, resource: externalTexture },
         { binding: 2, resource: { buffer: uniformBuffer } },
       ],
@@ -264,6 +351,9 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
+      multisample: {
+        count: MSAA_SAMPLE_COUNT,
+      },
     });
 
     // 2. Background Gradient Pipeline setup
@@ -375,6 +465,9 @@ export class WebGPURenderer {
         targets: [{ format: this.format }],
       },
       primitive: { topology: 'triangle-list' },
+      multisample: {
+        count: MSAA_SAMPLE_COUNT,
+      },
     });
   }
 
@@ -390,5 +483,13 @@ export class WebGPURenderer {
 
   public dispose() {
     this.disposed = true;
+    if (this.multisampledTexture) {
+      this.multisampledTexture.destroy();
+      this.multisampledTexture = null;
+    }
+    if (this.offscreenTexture) {
+      this.offscreenTexture.destroy();
+      this.offscreenTexture = null;
+    }
   }
 }

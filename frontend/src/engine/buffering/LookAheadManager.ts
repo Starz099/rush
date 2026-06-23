@@ -19,9 +19,10 @@ interface ActiveClipSession {
 export class LookAheadManager {
   private sessions: Map<string, ActiveClipSession> = new Map();
   private demuxerCache: Map<string, RangeDemuxer> = new Map(); // Shared demuxers per Asset ID
-  private mountingClipIds: Set<string> = new Set(); // Guard set to prevent concurrent duplicate mounts
+  private mountingClips: Map<string, Promise<void>> = new Map();
   private disposed = false;
-  private isTicking = false;
+  private globalSeekId = 0;
+  private activeTickSeekId: number | null = null;
 
   /**
    * Refreshes the active look-ahead window, mounts new clips, and unmounts old ones.
@@ -31,8 +32,13 @@ export class LookAheadManager {
     activeProject: Project,
     assets: Asset[],
   ) {
-    if (this.disposed || this.isTicking) return;
-    this.isTicking = true;
+    if (this.disposed) return;
+
+    if (this.activeTickSeekId === this.globalSeekId) {
+      return;
+    }
+    const tickSeekId = this.globalSeekId;
+    this.activeTickSeekId = tickSeekId;
 
     try {
       const timeline = activeProject.timeline_state;
@@ -62,6 +68,8 @@ export class LookAheadManager {
       }
 
       const clipsInWindowIds = new Set(clipsInWindow.map((c) => c.id));
+
+      if (this.globalSeekId !== tickSeekId || this.disposed) return;
 
       // 3. UNMOUNT clips that are no longer in the look-ahead window
       for (const [clipId, session] of this.sessions.entries()) {
@@ -99,11 +107,14 @@ export class LookAheadManager {
           this.sessions.delete(clip.id);
         }
 
-        if (!this.sessions.has(clip.id) && !this.mountingClipIds.has(clip.id)) {
-          this.mountingClipIds.add(clip.id);
-          const p = this.mountClip(clip, assets).finally(() => {
-            this.mountingClipIds.delete(clip.id);
-          });
+        if (!this.sessions.has(clip.id)) {
+          let p = this.mountingClips.get(clip.id);
+          if (!p) {
+            p = this.mountClip(clip, assets).finally(() => {
+              this.mountingClips.delete(clip.id);
+            });
+            this.mountingClips.set(clip.id, p);
+          }
           mountPromises.push(p);
         } else if (existingSession && !needsRemount) {
           // Update cached clip object to pick up other properties (opacity, transforms, etc.)
@@ -114,12 +125,16 @@ export class LookAheadManager {
         await Promise.all(mountPromises);
       }
 
+      if (this.globalSeekId !== tickSeekId || this.disposed) return;
+
       // 5. DECODE upcoming frames for mounted sessions (Backpressure Aware)
       for (const session of this.sessions.values()) {
         await this.fillQueueForSession(session, playheadSeconds, framerate);
       }
     } finally {
-      this.isTicking = false;
+      if (this.activeTickSeekId === tickSeekId) {
+        this.activeTickSeekId = null;
+      }
     }
   }
 
@@ -140,8 +155,14 @@ export class LookAheadManager {
     if (!demuxer) {
       demuxer = new RangeDemuxer(asset.file_path);
       await demuxer.initialize();
+      if (this.disposed) {
+        demuxer.dispose();
+        return;
+      }
       this.demuxerCache.set(asset.id, demuxer);
     }
+
+    if (this.disposed) return;
 
     // B. Create the FrameQueue
     const queue = new FrameQueue(60);
@@ -185,6 +206,7 @@ export class LookAheadManager {
       return; // Throttling (Backpressure)
     }
 
+    const currentSeekId = session.seekId;
     session.isDecoding = true;
 
     try {
@@ -247,6 +269,8 @@ export class LookAheadManager {
         const { chunks, targetTimestampMicros } =
           await session.demuxer.getGopForTime(sourceTimeSeconds);
 
+        if (session.seekId !== currentSeekId || this.disposed) return;
+
         session.queue.minTimestamp = targetTimestampMicros;
 
         for (const { chunk, info } of chunks) {
@@ -260,6 +284,9 @@ export class LookAheadManager {
         // Wait for the targeted playback frame to be fully decoded before returning,
         // so that the very first frame render can draw the decoded texture immediately.
         await this.waitForFrame(session, targetTimestampMicros);
+
+        if (session.seekId !== currentSeekId || this.disposed) return;
+
         session.queue.minTimestamp = null;
       } else {
         // Sequential decode: pre-decode next frames one by one up to look-ahead limit (e.g. playheadIdx + 60)
@@ -283,6 +310,9 @@ export class LookAheadManager {
 
           // Fetch and decode only this single frame
           const chunk = await session.demuxer.getSingleFrame(nextIndex);
+
+          if (session.seekId !== currentSeekId || this.disposed) return;
+
           session.decoder.decode(chunk);
           session.lastDecodedIndex = nextIndex;
         }
@@ -293,7 +323,9 @@ export class LookAheadManager {
         e,
       );
     } finally {
-      session.isDecoding = false;
+      if (session.seekId === currentSeekId) {
+        session.isDecoding = false;
+      }
     }
   }
 
@@ -303,7 +335,7 @@ export class LookAheadManager {
   private async waitForFrame(
     session: ActiveClipSession,
     targetTimestampMicros: number,
-    timeoutMs = 250,
+    timeoutMs = 1500,
   ): Promise<void> {
     const start = performance.now();
     while (performance.now() - start < timeoutMs) {
@@ -363,6 +395,7 @@ export class LookAheadManager {
   }
 
   public reset() {
+    this.globalSeekId++;
     for (const session of this.sessions.values()) {
       session.decoder.reset();
       session.queue.clear();
