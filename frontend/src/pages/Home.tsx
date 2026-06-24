@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select';
 
 import { useProjectStore } from '@/store/projectStore';
+import { projectApi } from '@/api/project';
 import {
   RESOLUTIONS,
   FPS_OPTIONS,
@@ -58,6 +59,9 @@ const Home = () => {
     DEFAULT_PROJECT_CONFIG.RESOLUTION,
   );
   const [fps, setFps] = useState<FPSValue>(DEFAULT_PROJECT_CONFIG.FPS);
+
+  const [resolutions, setResolutions] = useState(RESOLUTIONS);
+  const [fpsOptions, setFpsOptions] = useState(FPS_OPTIONS);
 
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -101,6 +105,22 @@ const Home = () => {
     fetchProjects();
   }, [fetchProjects]);
 
+  useEffect(() => {
+    projectApi
+      .getPresets()
+      .then((presets) => {
+        if (presets.resolutions && presets.resolutions.length > 0) {
+          setResolutions(presets.resolutions);
+        }
+        if (presets.fpsOptions && presets.fpsOptions.length > 0) {
+          setFpsOptions(presets.fpsOptions);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load presets from backend:', err);
+      });
+  }, []);
+
   return (
     <div className="bg-background text-foreground relative flex h-screen items-center justify-center overflow-hidden p-4">
       <BackgroundBeams />
@@ -139,7 +159,7 @@ const Home = () => {
                       <SelectValue placeholder="Select resolution" />
                     </SelectTrigger>
                     <SelectContent>
-                      {RESOLUTIONS.map((r) => (
+                      {resolutions.map((r) => (
                         <SelectItem key={r.value} value={r.value}>
                           {r.label}
                         </SelectItem>
@@ -158,7 +178,7 @@ const Home = () => {
                       <SelectValue placeholder="Select framerate" />
                     </SelectTrigger>
                     <SelectContent>
-                      {FPS_OPTIONS.map((option) => (
+                      {fpsOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>

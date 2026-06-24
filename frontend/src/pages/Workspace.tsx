@@ -7,12 +7,11 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import type { Project } from '@/types/project';
 import { projectApi } from '@/api/project';
 import { LeftPanel } from '@/components/left-panel';
-import { PreviewPanel } from '@/components/PreviewPanel';
-import { TimelinePanel } from '@/components/TimelinePanel';
-import { PropertiesSidebar } from '@/components/PropertiesSidebar';
+import { PreviewPanel } from '@/components/preview/PreviewPanel';
+import { TimelinePanel } from '@/components/timeline/TimelinePanel';
+import { PropertiesSidebar } from '@/components/properties/PropertiesSidebar';
 import { CaretLeftIcon } from '@phosphor-icons/react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -27,7 +26,6 @@ const Workspace = () => {
   const fetchAssets = useProjectStore((state) => state.fetchAssets);
   const deleteClip = useProjectStore((state) => state.deleteClip);
   const assets = useProjectStore((state) => state.assets);
-  const [project, setProject] = useState<Project | null>(activeProject);
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
@@ -58,43 +56,7 @@ const Workspace = () => {
   }, [deleteClip]);
 
   const handleExport = async () => {
-    if (!project) return;
-
-    const outputPath = window.prompt(
-      'Enter absolute output file path (e.g. C:/videos/output.mp4):',
-      '',
-    );
-    if (!outputPath) return;
-
-    setIsRendering(true);
-    setRenderProgress(0);
-
-    let unlisten: (() => void) | null = null;
-
-    try {
-      const { listen } = await import('@tauri-apps/api/event');
-      unlisten = await listen<{ progress: number }>(
-        'render-progress',
-        (event) => {
-          setRenderProgress(event.payload.progress);
-        },
-      );
-
-      await projectApi.export(project.id, outputPath);
-      alert('Project exported successfully!');
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed: ' + error);
-    } finally {
-      setIsRendering(false);
-      if (unlisten) {
-        unlisten();
-      }
-    }
-  };
-
-  const handleExport2 = async () => {
-    if (!project) return;
+    if (!activeProject) return;
 
     const outputPath = window.prompt(
       'Enter absolute output file path (e.g. C:/videos/output.mp4):',
@@ -106,24 +68,24 @@ const Workspace = () => {
     setRenderProgress(0);
 
     const exportEngine = new ExportEngine(
-      project.viewport_width,
-      project.viewport_height,
+      activeProject.viewport_width,
+      activeProject.viewport_height,
     );
 
     try {
       await exportEngine.initialize();
       await exportEngine.exportTimeline(
-        project,
+        activeProject,
         assets,
         outputPath,
         (progress) => {
           setRenderProgress(progress * 100);
         },
       );
-      alert('Export-2 stream finished successfully!');
+      alert('Project exported successfully!');
     } catch (error) {
-      console.error('Export-2 failed:', error);
-      alert('Export-2 failed: ' + error);
+      console.error('Export failed:', error);
+      alert('Export failed: ' + error);
     } finally {
       exportEngine.dispose();
       setIsRendering(false);
@@ -146,7 +108,6 @@ const Workspace = () => {
 
         if (!isMounted) return;
 
-        setProject(loadedProject);
         setActiveProject(loadedProject);
         await fetchAssets(projectId);
       } catch (error) {
@@ -168,7 +129,7 @@ const Workspace = () => {
     };
   }, [navigate, projectId, setActiveProject]);
 
-  if (isLoading || !project) {
+  if (isLoading || !activeProject) {
     return (
       <div className="bg-background text-foreground flex h-screen items-center justify-center">
         Loading workspace...
@@ -191,10 +152,10 @@ const Workspace = () => {
             <CaretLeftIcon weight="bold" />
           </Button>
           <Separator orientation="vertical" className="h-4" />
-          <h1 className="text-sm font-medium">{project.name}</h1>
+          <h1 className="text-sm font-medium">{activeProject.name}</h1>
           <Badge variant="outline" className="h-5 py-0 text-[10px]">
-            {project.viewport_width}x{project.viewport_height} @{' '}
-            {project.framerate}fps
+            {activeProject.viewport_width}x{activeProject.viewport_height} @{' '}
+            {activeProject.framerate}fps
           </Badge>
         </div>
         <div className="flex items-center gap-2">
@@ -207,16 +168,6 @@ const Workspace = () => {
             {isRendering
               ? `Exporting (${Math.round(renderProgress)}%)`
               : 'Export'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isRendering}
-            onClick={handleExport2}
-          >
-            {isRendering
-              ? `Streaming (${Math.round(renderProgress)}%)`
-              : 'Export-2'}
           </Button>
         </div>
       </header>

@@ -1,29 +1,6 @@
 import * as MP4Box from 'mp4box';
-import { invoke } from '@tauri-apps/api/core';
-
-export interface FrameInfo {
-  index: number;
-  cts: number;
-  duration: number;
-  offset: number;
-  size: number;
-  isKeyframe: boolean;
-}
-
-export interface DemuxerMetadata {
-  codec: string;
-  width: number;
-  height: number;
-  durationSeconds: number;
-  timescale: number;
-  description?: ArrayBuffer;
-}
-
-interface RangeResult {
-  bytes: number[];
-  file_start: number;
-  total_length: number;
-}
+import { assetApi } from '@/api/asset';
+import type { FrameInfo, DemuxerMetadata } from '@/types/demuxer';
 
 export class RangeDemuxer {
   private filePath: string;
@@ -129,11 +106,8 @@ export class RangeDemuxer {
    */
   public async fetchRange(start: number, end: number): Promise<ArrayBuffer> {
     const length = end - start + 1;
-    const result = await invoke<RangeResult>('read_asset_range', {
-      filePath: this.filePath,
-      offset: start,
-      length: length,
-    });
+    const result = await assetApi.readRange(this.filePath, start, length);
+
     return new Uint8Array(result.bytes).buffer;
   }
 
@@ -143,11 +117,7 @@ export class RangeDemuxer {
   private async parseMetadataHeaders() {
     console.log(`[RangeDemuxer] Fetching initial 100 KB header via Rust...`);
     // Step A: Fetch the first 100 KB (usually holds the moov atom/headers)
-    const result = await invoke<RangeResult>('read_asset_range', {
-      filePath: this.filePath,
-      offset: 0,
-      length: 102400,
-    });
+    const result = await assetApi.readRange(this.filePath, 0, 102400);
 
     console.log(
       `[RangeDemuxer] Header fetch result: bytes=${result.bytes ? result.bytes.length : 'null'}, file_start=${result.file_start}, total_length=${result.total_length}`,
@@ -163,9 +133,7 @@ export class RangeDemuxer {
       console.log(
         `[RangeDemuxer] Header did not contain moov atom. Locating and reading entire moov box via Rust...`,
       );
-      const moovResult = await invoke<RangeResult>('read_moov_box', {
-        filePath: this.filePath,
-      });
+      const moovResult = await assetApi.readMoovBox(this.filePath);
 
       console.log(
         `[RangeDemuxer] Moov box fetch result: bytes=${moovResult.bytes ? moovResult.bytes.length : 'null'}, file_start=${moovResult.file_start}, total_length=${moovResult.total_length}`,

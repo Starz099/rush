@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PlusIcon } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AssetCell } from '@/components/AssetCell';
+import { AssetCell } from './AssetCell';
 import { assetApi } from '@/api/asset';
 import type { Asset } from '@/api/bindings';
 import { convertFileSrc } from '@tauri-apps/api/core';

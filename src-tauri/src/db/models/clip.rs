@@ -1,15 +1,6 @@
 use crate::models::TrackType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
-#[serde(rename_all = "snake_case")]
-pub enum EditingTool {
-    Select,
-    Split,
-    Trim,
-    Bg,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
 pub enum BackgroundSource {

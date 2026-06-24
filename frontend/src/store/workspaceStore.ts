@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Asset, EditingTool } from '@/api/bindings';
+import type { Asset } from '@/api/bindings';
+import type { EditingTool } from '@/types/editor';
 
 interface WorkspaceState {
   selectedAsset: Asset | null;
