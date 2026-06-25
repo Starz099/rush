@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExportEngine } from '@/engine/export/ExportEngine';
+import { save } from '@tauri-apps/plugin-dialog';
 
 const Workspace = () => {
   const navigate = useNavigate();
@@ -58,10 +59,15 @@ const Workspace = () => {
   const handleExport = async () => {
     if (!activeProject) return;
 
-    const outputPath = window.prompt(
-      'Enter absolute output file path (e.g. C:/videos/output.mp4):',
-      '',
-    );
+    const outputPath = await save({
+      filters: [
+        {
+          name: 'Video Files',
+          extensions: ['mp4'],
+        },
+      ],
+      defaultPath: 'output.mp4',
+    });
     if (!outputPath) return;
 
     setIsRendering(true);

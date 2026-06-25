@@ -12,7 +12,12 @@ import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useProjectStore } from '@/store/projectStore';
 import { useAppStore } from '@/store/timelineStore';
 import { isVideoTrack, isAudioTrack } from '@/constants/trackConfig';
-
+import { open } from '@tauri-apps/plugin-dialog';
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from '@tauri-apps/plugin-notification';
 interface AssetsTabProps {
   projectId: string;
 }
@@ -62,18 +67,38 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
   };
 
   const handleAddAsset = async () => {
-    const filePath = window.prompt(
-      'Enter absolute file path to an image, video, or MP3:',
-    );
-    if (!filePath) return;
+    const filePaths = await open({
+      multiple: true,
+      directory: false,
+      filters: [
+        {
+          name: 'Supported Media',
+          extensions: ['mp4', 'mp3'],
+        },
+      ],
+    });
+    if (!filePaths || filePaths.length === 0) return;
 
-    try {
-      const duration = await getMediaDuration(filePath);
-      const newAsset = await assetApi.register(projectId, filePath, duration);
-      addAsset(newAsset);
-    } catch (error) {
-      console.error('Failed to register asset:', error);
-      alert('Error registering asset: ' + error);
+    for (const filePath of filePaths) {
+      try {
+        const duration = await getMediaDuration(filePath);
+        const newAsset = await assetApi.register(projectId, filePath, duration);
+        addAsset(newAsset);
+      } catch (error) {
+        console.error(`Failed to register asset ${filePath}:`, error);
+        let permissionGranted = await isPermissionGranted();
+        if (!permissionGranted) {
+          const permission = await requestPermission();
+          permissionGranted = permission === 'granted';
+        }
+
+        if (permissionGranted) {
+          sendNotification({
+            title: 'Asset Import Failed',
+            body: `Could not load: ${filePath.split(/[/\\]/).pop()}`,
+          });
+        }
+      }
     }
   };
 
