@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProjectStore } from '@/store/projectStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExportEngine } from '@/engine/export/ExportEngine';
 import { save } from '@tauri-apps/plugin-dialog';
+import { ExportModal } from '@/components/export/ExportModal';
+import type { ExportPhase } from '@/types/export';
 
 const Workspace = () => {
   const navigate = useNavigate();
@@ -30,6 +32,9 @@ const Workspace = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
+  const [exportPhase, setExportPhase] = useState<ExportPhase>('idle');
+  const [exportError, setExportError] = useState<string | undefined>();
+  const exportEngineRef = useRef<ExportEngine | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,11 +77,14 @@ const Workspace = () => {
 
     setIsRendering(true);
     setRenderProgress(0);
+    setExportPhase('preparing');
+    setExportError(undefined);
 
     const exportEngine = new ExportEngine(
       activeProject.viewport_width,
       activeProject.viewport_height,
     );
+    exportEngineRef.current = exportEngine;
 
     try {
       await exportEngine.initialize();
@@ -87,15 +95,34 @@ const Workspace = () => {
         (progress) => {
           setRenderProgress(progress * 100);
         },
+        (phase) => {
+          setExportPhase(phase);
+        },
       );
-      alert('Project exported successfully!');
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed: ' + error);
+    } catch (error: any) {
+      if (error.message === 'cancelled') {
+        console.log('[Workspace] Export cancelled.');
+      } else {
+        console.error('Export failed:', error);
+        setExportPhase('failed');
+        setExportError(error.toString());
+      }
     } finally {
       exportEngine.dispose();
-      setIsRendering(false);
+      exportEngineRef.current = null;
+      if (exportPhase !== 'failed' && exportPhase !== 'completed') {
+        setIsRendering(false);
+        setExportPhase('idle');
+      }
     }
+  };
+
+  const handleCancelExport = () => {
+    if (exportEngineRef.current) {
+      exportEngineRef.current.dispose();
+    }
+    setIsRendering(false);
+    setExportPhase('idle');
   };
 
   useEffect(() => {
@@ -207,6 +234,17 @@ const Workspace = () => {
           <PropertiesSidebar />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <ExportModal
+        isOpen={isRendering}
+        phase={exportPhase}
+        progress={renderProgress}
+        errorMessage={exportError}
+        onCancel={handleCancelExport}
+        onClose={() => {
+          setIsRendering(false);
+          setExportPhase('idle');
+        }}
+      />
     </div>
   );
 };

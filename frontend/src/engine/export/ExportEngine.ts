@@ -1,6 +1,7 @@
 import { WebGPURenderer } from '../core/Renderer';
 import { LookAheadManager } from '../buffering/LookAheadManager';
 import type { Project, Clip, Asset } from '@/api/bindings';
+import type { ExportPhase } from '@/types/export';
 import { fpsToNumeric } from '../../helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
 import { exportApi } from '@/api/export';
@@ -337,7 +338,9 @@ export class ExportEngine {
     assets: Asset[],
     outputPath: string,
     onProgress?: (progress: number) => void,
+    onPhaseChange?: (phase: ExportPhase) => void,
   ): Promise<void> {
+    if (onPhaseChange) onPhaseChange('preparing');
     const timeline = activeProject.timeline_state;
     const framerate = fpsToNumeric(activeProject.framerate);
     const background = timeline.background;
@@ -397,16 +400,15 @@ export class ExportEngine {
     // Initialize the frontend video encoder
     await this.initVideoEncoder(framerate);
 
+    if (onPhaseChange) onPhaseChange('video');
+
     try {
       let timelinePlayhead = 0;
       let outputFrameIndex = 0;
 
       while (timelinePlayhead < totalFrames) {
         if (this.disposed) {
-          console.log(
-            '[ExportEngine] Export loop terminated because engine was disposed.',
-          );
-          break;
+          throw new Error('cancelled');
         }
 
         const currentTimelineFrame = Math.floor(timelinePlayhead);
@@ -518,7 +520,7 @@ export class ExportEngine {
 
         // 6. Update progress indicator
         if (onProgress) {
-          onProgress(Math.min(1.0, timelinePlayhead / totalFrames));
+          onProgress(0.05 + (timelinePlayhead / totalFrames) * 0.8);
         }
       }
 
@@ -527,6 +529,8 @@ export class ExportEngine {
       await this.encoder.flush();
       await Promise.all(this.pendingChunks);
       console.log('[ExportEngine] All video frames written to backend.');
+
+      if (onPhaseChange) onPhaseChange('audio');
 
       console.log('[Export] Rendering audio timeline in chunks...');
       const durationSeconds = totalFrames / framerate;
@@ -537,7 +541,9 @@ export class ExportEngine {
         startSec < durationSeconds;
         startSec += chunkSizeSeconds
       ) {
-        if (this.disposed) break;
+        if (this.disposed) {
+          throw new Error('cancelled');
+        }
 
         const chunkDuration = Math.min(
           chunkSizeSeconds,
@@ -557,13 +563,28 @@ export class ExportEngine {
 
         // Stream raw PCM bytes to Tauri (will append to temp file)
         await exportApi.writeAudioChunk(pcmBytes);
+
+        if (onProgress) {
+          onProgress(0.85 + (startSec / durationSeconds) * 0.1);
+        }
       }
-    } catch (err) {
-      console.error('[ExportEngine] Export failed inside try block:', err);
+
+      if (onPhaseChange) onPhaseChange('muxing');
+      if (onProgress) onProgress(0.95);
+    } catch (err: any) {
+      if (err.message === 'cancelled') {
+        console.log(
+          '[ExportEngine] Export execution halted due to cancellation.',
+        );
+        await exportApi.cancel();
+      }
       throw err;
     } finally {
-      // 9. Finish encoding and close the stream
-      await exportApi.finish();
+      if (!this.disposed) {
+        await exportApi.finish();
+        if (onProgress) onProgress(1.0);
+        if (onPhaseChange) onPhaseChange('completed');
+      }
     }
 
     console.log('[ExportEngine] Export loop finished.');

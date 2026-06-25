@@ -80,7 +80,8 @@ pub fn run() {
             commands::export::write_video_chunk::write_video_chunk,
             commands::export::write_audio_file::write_audio_file,
             commands::export::write_audio_chunk::write_audio_chunk,
-            commands::export::finish_export::finish_export
+            commands::export::finish_export::finish_export,
+            commands::export::cancel_export::cancel_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

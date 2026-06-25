@@ -4,6 +4,7 @@ import { writeAudioChunk } from './writeAudioChunk';
 import { writeAudioFile } from './writeAudioFile';
 import { finishExport } from './finish';
 import { saveTestFrame } from './saveTestFrame';
+import { cancelExport } from './cancel';
 
 export const exportApi = {
   start: startExport,
@@ -12,4 +13,5 @@ export const exportApi = {
   writeAudioFile,
   finish: finishExport,
   saveTestFrame,
+  cancel: cancelExport,
 };
