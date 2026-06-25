@@ -3,10 +3,13 @@ import { LookAheadManager } from '../buffering/LookAheadManager';
 import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../../helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import { useAppStore } from '../../store/timelineStore';
-
-const AUDIO_CHUNK_SIZE_SECONDS = 120;
+import { exportApi } from '@/api/export';
+import { avcToAnnexB } from './avcToAnnexB';
+import { exportAudioChunk } from './audioExportHelper';
+import {
+  AUDIO_CHUNK_SIZE_SECONDS,
+  EXPORT_VIDEO_BITRATE,
+} from '@/constants/export';
 
 export class ExportEngine {
   private renderer: WebGPURenderer;
@@ -39,7 +42,7 @@ export class ExportEngine {
           codec,
           width: this.width % 2 === 0 ? this.width : this.width - 1,
           height: this.height % 2 === 0 ? this.height : this.height - 1,
-          bitrate: 8_000_000,
+          bitrate: EXPORT_VIDEO_BITRATE,
           framerate,
         };
         const support = await VideoEncoder.isConfigSupported(config);
@@ -58,14 +61,14 @@ export class ExportEngine {
         const chunkData = new Uint8Array(chunk.byteLength);
         chunk.copyTo(chunkData);
 
-        const annexBBuffer = this.avcToAnnexB(
+        const annexBBuffer = avcToAnnexB(
           chunkData,
           chunk.type === 'key',
           metadata,
         );
 
         // Stream compressed H.264 raw packet directly to Tauri backend
-        const p = invoke('write_video_chunk', annexBBuffer);
+        const p = exportApi.writeVideoChunk(annexBBuffer);
         this.pendingChunks.push(p);
       },
       error: (error) => {
@@ -77,7 +80,7 @@ export class ExportEngine {
       codec: selectedCodec,
       width: this.width % 2 === 0 ? this.width : this.width - 1,
       height: this.height % 2 === 0 ? this.height : this.height - 1,
-      bitrate: 8_000_000, // 8 Mbps (high quality 1080p)
+      bitrate: EXPORT_VIDEO_BITRATE,
       framerate: framerate,
       hardwareAcceleration: 'no-preference', // Automatically use GPU but fallback gracefully to software if needed
     });
@@ -301,14 +304,12 @@ export class ExportEngine {
     console.log('Piping raw frame bytes across the binary bridge...');
 
     // Pass dimensions and format via headers to keep IPC payload un-serialized
-    //@ts-ignore
-    await invoke('save_test_frame', frameData, {
-      headers: {
-        'x-width': this.width.toString(),
-        'x-height': this.height.toString(),
-        'x-format': (this.renderer as any).format || 'bgra8unorm',
-      },
-    });
+    await exportApi.saveTestFrame(
+      frameData,
+      this.width,
+      this.height,
+      (this.renderer as any).format || 'bgra8unorm',
+    );
 
     console.log('Backend successfully processed and saved the frame.');
     console.log(
@@ -353,15 +354,28 @@ export class ExportEngine {
           clip.speed_factor !== undefined && clip.speed_factor !== null,
       );
 
-    // 2. Find total duration in frames
-    const allClips = timeline.tracks.flatMap((track: any) => track.clips);
-    const totalFrames = allClips.reduce(
+    // 2. Find total duration in frames based only on video tracks by default
+    const videoTracks = timeline.tracks.filter(isVideoTrack);
+    const allVideoClips = videoTracks.flatMap((track: any) => track.clips);
+    let totalFrames = allVideoClips.reduce(
       (max: number, clip: any) => Math.max(max, clip.timeline_out),
       0,
     );
 
+    // Fallback to all media tracks if there are no video tracks
+    if (totalFrames === 0) {
+      const mediaTracks = timeline.tracks.filter(
+        (t: any) => t.track_type?.toLowerCase() !== 'effects',
+      );
+      const allMediaClips = mediaTracks.flatMap((track: any) => track.clips);
+      totalFrames = allMediaClips.reduce(
+        (max: number, clip: any) => Math.max(max, clip.timeline_out),
+        0,
+      );
+    }
+
     console.log(
-      `[ExportEngine] Starting export to: ${outputPath}. Total frames: ${totalFrames}`,
+      `[ExportEngine] Starting export to: ${outputPath}. Total frames: ${totalFrames} (derived from active media tracks)`,
     );
 
     // Collect speed blocks to send to the backend
@@ -372,13 +386,13 @@ export class ExportEngine {
     }));
 
     // Initialize the backend WebCodecs export session
-    await invoke('start_export', {
-      width: this.width,
-      height: this.height,
-      fps: framerate,
+    await exportApi.start(
+      this.width,
+      this.height,
+      framerate,
       outputPath,
       speedBlocks,
-    });
+    );
 
     // Initialize the frontend video encoder
     await this.initVideoEncoder(framerate);
@@ -534,7 +548,7 @@ export class ExportEngine {
         );
 
         // Render chunk
-        const pcmBytes = await this.exportAudioChunk(
+        const pcmBytes = await exportAudioChunk(
           activeProject,
           assets,
           startSec,
@@ -542,317 +556,16 @@ export class ExportEngine {
         );
 
         // Stream raw PCM bytes to Tauri (will append to temp file)
-        await invoke('write_audio_chunk', pcmBytes);
+        await exportApi.writeAudioChunk(pcmBytes);
       }
     } catch (err) {
       console.error('[ExportEngine] Export failed inside try block:', err);
       throw err;
     } finally {
       // 9. Finish encoding and close the stream
-      await invoke('finish_export');
+      await exportApi.finish();
     }
 
     console.log('[ExportEngine] Export loop finished.');
-  }
-
-  /**
-   * To compile and save the audio for the final export
-   */
-  // private async exportAudio(
-  //   activeProject: Project,
-  //   assets: Asset[],
-  // ): Promise<Uint8Array> {
-  //   const timeline = activeProject.timeline_state;
-  //   const framerate = fpsToNumeric(activeProject.framerate);
-
-  //   // Calculate total duration of the timeline in seconds
-  //   const allClips = timeline.tracks.flatMap((track: any) => track.clips);
-  //   const totalFrames = allClips.reduce(
-  //     (max: number, clip: any) => Math.max(max, clip.timeline_out),
-  //     0,
-  //   );
-  //   const durationSeconds = totalFrames / framerate;
-
-  //   // create an offline mixing board
-  //   const sampleRate = 48000;
-  //   const offlineCtx = new OfflineAudioContext(
-  //     2, // number of channels (stereo)
-  //     sampleRate * durationSeconds, // length in samples
-  //     sampleRate,
-  //   );
-
-  //   for (const track of timeline.tracks) {
-  //     for (const clip of track.clips) {
-  //       const audioBuffer = await this.loadAudioBufferForClip(
-  //         clip,
-  //         assets,
-  //         offlineCtx,
-  //       );
-  //       if (!audioBuffer) continue;
-
-  //       // Create a virtual player node
-  //       const source = offlineCtx.createBufferSource();
-  //       source.buffer = audioBuffer;
-
-  //       // Connect to the master volume/mix
-  //       source.connect(offlineCtx.destination);
-
-  //       // Schedule the clip to play at the right timeline markers
-  //       source.start(
-  //         clip.timeline_in / framerate, // When to play on the timeline (seconds)
-  //         clip.source_in / framerate, // Where to start inside the source file (seconds)
-  //         (clip.timeline_out - clip.timeline_in) / framerate, // Clip duration (seconds)
-  //       );
-  //     }
-  //   }
-
-  //   const renderedBuffer = await offlineCtx.startRendering();
-  //   return audioBufferToWav(renderedBuffer);
-  // }
-
-  /**
-   * Helper to fetch and decode audio bytes for a clip using the OfflineAudioContext
-   */
-  private async loadAudioBufferForClip(
-    clip: Clip,
-    assets: Asset[],
-    offlineCtx: OfflineAudioContext,
-    framerate: number,
-  ): Promise<AudioBuffer | null> {
-    const asset = assets.find((a) => a.id === clip.asset_id);
-    if (!asset) return null;
-
-    // Use the lightweight cached MP3 audio file if available, otherwise fall back to original path
-    const extractedAudioPath = useAppStore.getState().extractedAudios[asset.id];
-    const audioPathToUse = extractedAudioPath || asset.file_path;
-
-    // Calculate source slice range
-    const sourceInSeconds = clip.source_in / framerate;
-    const clipDuration = (clip.timeline_out - clip.timeline_in) / framerate;
-
-    console.log(
-      `[ExportEngine] Slicing audio asset on backend: ${asset.name} at start=${sourceInSeconds.toFixed(2)}s, duration=${clipDuration.toFixed(2)}s`,
-    );
-
-    // Request the backend to slice the audio file using FFmpeg to avoid decoding full assets
-    const slicedAudioPath = await invoke<string>('slice_audio_asset', {
-      filePath: audioPathToUse,
-      startSec: sourceInSeconds,
-      durationSec: clipDuration,
-    });
-
-    // Fetch the sliced file bytes over Tauri's custom asset protocol
-    const url = convertFileSrc(slicedAudioPath);
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
-
-    return await offlineCtx.decodeAudioData(arrayBuffer);
-  }
-
-  private audioBufferToPCM16(buffer: AudioBuffer): Uint8Array {
-    const numChannels = buffer.numberOfChannels;
-    const numSamples = buffer.length;
-
-    const arrayBuffer = new ArrayBuffer(numSamples * numChannels * 2); // 2 bytes per sample (16-bit)
-    const view = new DataView(arrayBuffer);
-
-    const channels = [];
-    for (let c = 0; c < numChannels; c++) {
-      channels.push(buffer.getChannelData(c));
-    }
-
-    let offset = 0;
-    for (let i = 0; i < numSamples; i++) {
-      for (let c = 0; c < numChannels; c++) {
-        let sample = channels[c][i];
-
-        // Clamp floats to prevent noise distortion
-        sample = Math.max(-1.0, Math.min(1.0, sample));
-
-        // Map Float [-1.0, 1.0] to Int16 [-32768, 32767]
-        const pcmSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-        view.setInt16(offset, pcmSample, true);
-        offset += 2;
-      }
-    }
-
-    return new Uint8Array(arrayBuffer);
-  }
-
-  /**
-   * To compile and save the audio in chunks for the final export
-   */
-  private async exportAudioChunk(
-    activeProject: Project,
-    assets: Asset[],
-    startTimeSeconds: number,
-    durationSeconds: number,
-  ): Promise<Uint8Array> {
-    const timeline = activeProject.timeline_state;
-    const framerate = fpsToNumeric(activeProject.framerate);
-    const sampleRate = 48000;
-
-    const offlineCtx = new OfflineAudioContext(
-      2,
-      sampleRate * durationSeconds,
-      sampleRate,
-    );
-
-    const endTimeSeconds = startTimeSeconds + durationSeconds;
-
-    for (const track of timeline.tracks) {
-      for (const clip of track.clips) {
-        const clipInSec = clip.timeline_in / framerate;
-        const clipOutSec = clip.timeline_out / framerate;
-
-        // Check if clip falls within this chunk window
-        const overlaps =
-          clipInSec < endTimeSeconds && clipOutSec > startTimeSeconds;
-        if (!overlaps) continue;
-
-        const audioBuffer = await this.loadAudioBufferForClip(
-          clip,
-          assets,
-          offlineCtx,
-          framerate,
-        );
-        if (!audioBuffer) continue;
-
-        const source = offlineCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(offlineCtx.destination);
-
-        // 1. Where in the chunk context to start playing (0-based relative to startTimeSeconds)
-        const scheduleTime = Math.max(0, clipInSec - startTimeSeconds);
-
-        // 2. Where inside the source buffer we start playing.
-        // Since our source buffer is ALREADY sliced to match the clip's timeline window [clipInSec, clipOutSec],
-        // the beginning of this buffer corresponds to clipInSec.
-        // If the clip started before our chunk (clipInSec < startTimeSeconds), we need to skip the portion
-        // of the buffer that has already played: (startTimeSeconds - clipInSec) seconds.
-        const bufferOffset = Math.max(0, startTimeSeconds - clipInSec);
-
-        // 3. How long to play this clip in the current chunk window
-        const playDuration = Math.min(
-          clipOutSec - startTimeSeconds - scheduleTime,
-          durationSeconds - scheduleTime,
-        );
-
-        source.start(scheduleTime, bufferOffset, playDuration);
-      }
-    }
-
-    const renderedBuffer = await offlineCtx.startRendering();
-    return this.audioBufferToPCM16(renderedBuffer);
-  }
-
-  /**
-   * Converts a size-prefixed AVC/H.264 NAL unit sequence (mp4 format)
-   * into Annex B start-code-prefixed format, prepending SPS/PPS headers on keyframes.
-   */
-  private avcToAnnexB(
-    chunkData: Uint8Array,
-    isKeyframe: boolean,
-    metadata?: EncodedVideoChunkMetadata,
-  ): Uint8Array {
-    let description = metadata?.decoderConfig?.description;
-    let header: Uint8Array | null = null;
-
-    if (isKeyframe && description) {
-      const descView = new DataView(description as ArrayBuffer);
-      if (descView.byteLength >= 7) {
-        let pos = 5;
-        const numSps = descView.getUint8(pos) & 0x1f;
-        pos += 1;
-
-        const spsList: Uint8Array[] = [];
-        for (let i = 0; i < numSps; i++) {
-          const spsLen = descView.getUint16(pos);
-          pos += 2;
-          const sps = new Uint8Array(description as ArrayBuffer, pos, spsLen);
-          spsList.push(sps);
-          pos += spsLen;
-        }
-
-        const numPps = descView.getUint8(pos);
-        pos += 1;
-
-        const ppsList: Uint8Array[] = [];
-        for (let i = 0; i < numPps; i++) {
-          const ppsLen = descView.getUint16(pos);
-          pos += 2;
-          const pps = new Uint8Array(description as ArrayBuffer, pos, ppsLen);
-          ppsList.push(pps);
-          pos += ppsLen;
-        }
-
-        // Combine SPS and PPS into Annex B headers
-        let totalSize = 0;
-        for (const sps of spsList) totalSize += 4 + sps.length;
-        for (const pps of ppsList) totalSize += 4 + pps.length;
-
-        header = new Uint8Array(totalSize);
-        let headerPos = 0;
-        const startCode = new Uint8Array([0, 0, 0, 1]);
-
-        for (const sps of spsList) {
-          header.set(startCode, headerPos);
-          headerPos += 4;
-          header.set(sps, headerPos);
-          headerPos += sps.length;
-        }
-        for (const pps of ppsList) {
-          header.set(startCode, headerPos);
-          headerPos += 4;
-          header.set(pps, headerPos);
-          headerPos += pps.length;
-        }
-      }
-    }
-
-    // Loop through NAL units and swap 4-byte length prefix for 4-byte start codes [0,0,0,1]
-    let pos = 0;
-    const segments: Uint8Array[] = [];
-    if (header) {
-      segments.push(header);
-    }
-
-    while (pos < chunkData.length) {
-      if (pos + 4 > chunkData.length) {
-        break; // Guard against malformed trailing bytes
-      }
-
-      const length =
-        (chunkData[pos] << 24) |
-        (chunkData[pos + 1] << 16) |
-        (chunkData[pos + 2] << 8) |
-        chunkData[pos + 3];
-
-      if (pos + 4 + length > chunkData.length) {
-        break;
-      }
-
-      const nalu = new Uint8Array(4 + length);
-      nalu.set([0, 0, 0, 1], 0);
-      nalu.set(chunkData.subarray(pos + 4, pos + 4 + length), 4);
-      segments.push(nalu);
-
-      pos += 4 + length;
-    }
-
-    // Combine SPS, PPS, and all key/delta frame segments into one contiguous Annex B buffer
-    let totalLen = 0;
-    for (const seg of segments) {
-      totalLen += seg.length;
-    }
-
-    const output = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const seg of segments) {
-      output.set(seg, offset);
-      offset += seg.length;
-    }
-
-    return output;
   }
 }

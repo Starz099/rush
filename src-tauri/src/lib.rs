@@ -1,7 +1,6 @@
 mod commands;
 mod db;
 mod models;
-mod render;
 mod state;
 
 #[cfg(debug_assertions)]
@@ -13,23 +12,26 @@ use tauri_specta::collect_commands;
 macro_rules! run_with_commands {
     ($macro:ident $(, $extra:path)*) => {
         $macro![
-            commands::project::create_project,
-            commands::project::get_projects,
-            commands::project::get_project,
-            commands::project::delete_project,
-            commands::project::update_project_name,
-            commands::project::save_project_timeline,
-            commands::project::export_project,
-            commands::project::dummy_tool_types,
-            commands::asset::register_asset,
-            commands::asset::get_assets,
-            commands::asset::delete_asset,
-            commands::asset::rename_asset,
-            commands::asset::read_asset_bytes,
-            commands::asset::extract_audio,
-            commands::asset::read_asset_range,
-            commands::asset::read_moov_box,
-            commands::asset::slice_audio_asset
+            // --- PROJECT COMMANDS ---
+            commands::project::create_project::create_project,
+            commands::project::get_projects::get_projects,
+            commands::project::get_project::get_project,
+            commands::project::delete_project::delete_project,
+            commands::project::update_project_name::update_project_name,
+            commands::project::save_project_timeline::save_project_timeline,
+            commands::project::get_presets::get_presets,
+            commands::project::get_presets::get_editing_registry,
+
+            // --- ASSET COMMANDS ---
+            commands::asset::register_asset::register_asset,
+            commands::asset::get_assets::get_assets,
+            commands::asset::delete_asset::delete_asset,
+            commands::asset::rename_asset::rename_asset,
+            commands::asset::read_asset_bytes::read_asset_bytes,
+            commands::asset::extract_audio::extract_audio,
+            commands::asset::read_asset_range::read_asset_range,
+            commands::asset::read_moov_box::read_moov_box,
+            commands::asset::slice_audio_asset::slice_audio_asset
             $(, $extra)*
         ]
     };
@@ -62,19 +64,21 @@ pub fn run() {
             app.manage(AppState {
                 db: std::sync::Mutex::new(connection),
             });
-            app.manage(commands::export::ExportState(std::sync::Mutex::new(None)));
+            app.manage(commands::export::types::ExportState(std::sync::Mutex::new(
+                None,
+            )));
 
             Ok(())
         })
         .invoke_handler(run_with_commands![
             generate_handler,
-            commands::export::save_test_frame,
-            commands::export::stream_export_frame,
-            commands::export::start_export,
-            commands::export::write_video_chunk,
-            commands::export::write_audio_file,
-            commands::export::write_audio_chunk,
-            commands::export::finish_export
+            // --- EXPORT PIPELINE COMMANDS ---
+            commands::export::save_test_frame::save_test_frame,
+            commands::export::start_export::start_export,
+            commands::export::write_video_chunk::write_video_chunk,
+            commands::export::write_audio_file::write_audio_file,
+            commands::export::write_audio_chunk::write_audio_chunk,
+            commands::export::finish_export::finish_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

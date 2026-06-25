@@ -54,3 +54,51 @@ pub struct RangeResult {
     pub file_start: f64,
     pub total_length: f64,
 }
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolutionConfig {
+    pub label: String,
+    pub value: ResolutionPreset,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FpsConfig {
+    pub label: String,
+    pub value: FpsPreset,
+}
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetsConfig {
+    pub resolutions: Vec<ResolutionConfig>,
+    pub fps_options: Vec<FpsConfig>,
+}
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolDescriptor {
+    pub name: String,
+    pub label: String,
+    pub description: String,
+}
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectDescriptor {
+    pub name: String,
+    pub label: String,
+    pub description: String,
+    pub default_duration_frames: i32,
+    pub default_config_json: String,
+}
+
+#[derive(serde::Serialize, specta::Type, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EditingRegistry {
+    pub tools: Vec<ToolDescriptor>,
+    pub effects: Vec<EffectDescriptor>,
+}

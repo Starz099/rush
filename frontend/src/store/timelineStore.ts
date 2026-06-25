@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { RangeDemuxer } from '../engine/demuxers/RangeDemuxer';
-import { invoke } from '@tauri-apps/api/core';
+import { DemuxerFactory } from '../engine/demuxers/DemuxerFactory';
+import { assetApi } from '@/api/asset';
 
 interface AppState {
   readyAssets: Record<string, any>;
@@ -61,7 +61,7 @@ export const useAppStore = create<AppState>((set) => ({
       return;
     }
 
-    const demuxer = new RangeDemuxer(filePath);
+    const demuxer = DemuxerFactory.createDemuxer(filePath);
 
     try {
       // 1. Demux metadata using RangeDemuxer (fast range request headers)
@@ -75,10 +75,7 @@ export const useAppStore = create<AppState>((set) => ({
       // 2. Extract audio track using FFmpeg in backend
       let extractedAudioPath = '';
       try {
-        console.log(`[Store] Requesting audio extraction for ${assetId}...`);
-        extractedAudioPath = await invoke<string>('extract_audio', {
-          filePath,
-        });
+        extractedAudioPath = await assetApi.extractAudio(filePath);
         console.log(
           `[Store] Audio extraction succeeded for ${assetId}: ${extractedAudioPath}`,
         );

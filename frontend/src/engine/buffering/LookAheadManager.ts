@@ -1,4 +1,5 @@
 import { RangeDemuxer } from '../demuxers/RangeDemuxer';
+import { DemuxerFactory } from '../demuxers/DemuxerFactory';
 import { VideoDecoderWrapper } from '../decoders/VideoDecoder';
 import { FrameQueue } from './FrameQueue';
 import type { Project, Clip, Asset } from '@/api/bindings';
@@ -153,7 +154,7 @@ export class LookAheadManager {
     // A. Share demuxer if other clips use the same asset to save metadata parsing time
     let demuxer = this.demuxerCache.get(asset.id);
     if (!demuxer) {
-      demuxer = new RangeDemuxer(asset.file_path);
+      demuxer = DemuxerFactory.createDemuxer(asset.file_path);
       await demuxer.initialize();
       if (this.disposed) {
         demuxer.dispose();

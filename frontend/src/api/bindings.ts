@@ -22,11 +22,9 @@ export const commands = {
     typedError<null, string>(
       __TAURI_INVOKE('save_project_timeline', { id, timelineState }),
     ),
-  exportProject: (projectId: string, outputPath: string) =>
-    typedError<null, string>(
-      __TAURI_INVOKE('export_project', { projectId, outputPath }),
-    ),
-  dummyToolTypes: () => __TAURI_INVOKE<EditingTool[]>('dummy_tool_types'),
+  getPresets: () => __TAURI_INVOKE<PresetsConfig>('get_presets'),
+  getEditingRegistry: () =>
+    __TAURI_INVOKE<EditingRegistry>('get_editing_registry'),
   registerAsset: (
     projectId: string,
     filePath: string,
@@ -112,7 +110,10 @@ export type Clip = {
 
 export type EaseCurve = 'linear' | 'ease_in' | 'ease_out';
 
-export type EditingTool = 'select' | 'split' | 'trim' | 'bg';
+export type EditingRegistry = {
+  tools: ToolDescriptor[];
+  effects: EffectDescriptor[];
+};
 
 export type EffectConfig =
   | {
@@ -144,7 +145,25 @@ export type EffectConfig =
       };
     };
 
+export type EffectDescriptor = {
+  name: string;
+  label: string;
+  description: string;
+  defaultDurationFrames: number;
+  defaultConfigJson: string;
+};
+
+export type FpsConfig = {
+  label: string;
+  value: FpsPreset;
+};
+
 export type FpsPreset = '15' | '30' | '60';
+
+export type PresetsConfig = {
+  resolutions: ResolutionConfig[];
+  fpsOptions: FpsConfig[];
+};
 
 export type Project = {
   id: string;
@@ -163,6 +182,13 @@ export type RangeResult = {
   total_length: number | null;
 };
 
+export type ResolutionConfig = {
+  label: string;
+  value: ResolutionPreset;
+  width: number;
+  height: number;
+};
+
 export type ResolutionPreset = '1080p' | '4k' | 'vertical';
 
 export type Shape = 'circle' | 'rectangle' | 'arrow' | 'highlighter';
@@ -171,6 +197,12 @@ export type TimelineState = {
   playhead_position: number;
   tracks: Track[];
   background?: BackgroundConfig | null;
+};
+
+export type ToolDescriptor = {
+  name: string;
+  label: string;
+  description: string;
 };
 
 export type Track = {
