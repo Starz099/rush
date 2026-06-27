@@ -16,7 +16,8 @@
         "width": 800,
         "height": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {
@@ -33,6 +34,7 @@
   },
   "bundle": {
     "active": true,
+    "externalBin": ["binaries/ffmpeg"],
     "targets": "all",
     "icon": [
       "icons/32x32.png",

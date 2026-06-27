@@ -45,7 +45,7 @@ pub fn slice_audio_asset(
     let start_str = start_sec.to_string();
     let duration_str = duration_sec.to_string();
 
-    let status = std::process::Command::new("ffmpeg")
+    let status = crate::commands::process_helper::create_ffmpeg_command()
         .args(&[
             "-y",
             "-ss",
