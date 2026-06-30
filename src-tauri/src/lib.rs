@@ -1,3 +1,4 @@
+mod agent;
 mod commands;
 mod db;
 mod models;

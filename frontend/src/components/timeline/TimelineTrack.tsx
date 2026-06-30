@@ -150,12 +150,19 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
       const deltaFrames = Math.round((deltaX / PIXELS_PER_SECOND) * framerate);
       const newFrameValue = startFrame + deltaFrames;
 
-      await trimClip(track.id, clip.id, edge, newFrameValue);
+      await trimClip(track.id, clip.id, edge, newFrameValue, false);
     };
 
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+
+      const project = useProjectStore.getState().activeProject;
+      if (project) {
+        useProjectStore.getState().saveTimeline(project.id, {
+          ...project.timeline_state,
+        });
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -176,16 +183,34 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
       <div className="relative flex-1 bg-black/20">
         {track.clips.map((clip: Clip) => {
           const isSelected = selectedClipId === clip.id;
+          const isGap =
+            track.track_type?.toLowerCase() === 'effects'
+              ? !clip.asset_id &&
+                !clip.transform &&
+                (clip.speed_factor === undefined ||
+                  clip.speed_factor === null ||
+                  clip.speed_factor === 1.0)
+              : !clip.asset_id;
+
+          let styling = '';
+          if (isSelected) {
+            styling =
+              'z-10 border-blue-400 bg-blue-500/40 ring-1 ring-blue-400/50 text-white';
+          } else if (isGap) {
+            styling =
+              'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600 text-neutral-500';
+          } else {
+            styling = `${borderColor} ${bgColor} hover:border-white/20 ${textColor}`;
+          }
+
           return (
             <div
               key={clip.id}
               onMouseDown={(e) => handleClipMouseDown(e, clip)}
               onClick={(e) => e.stopPropagation()}
-              className={`group/clip absolute top-1 bottom-1 flex items-center justify-center rounded border ${getCursorClass()} ${
-                isSelected
-                  ? 'z-10 border-blue-400 bg-blue-500/40 ring-1 ring-blue-400/50'
-                  : `${borderColor} ${bgColor} hover:border-white/20`
-              } ${isDragging && isSelected ? '' : 'transition-all'} px-2 text-[9px] font-medium ${isSelected ? 'text-white' : textColor}`}
+              className={`group/clip absolute top-1 bottom-1 flex items-center justify-center rounded border ${getCursorClass()} ${styling} ${
+                isDragging && isSelected ? '' : 'transition-all'
+              } px-2 text-[9px] font-medium`}
               style={{
                 left: `${(clip.timeline_in / framerate) * PIXELS_PER_SECOND}px`,
                 width: `${((clip.timeline_out - clip.timeline_in) / framerate) * PIXELS_PER_SECOND}px`,
@@ -198,11 +223,13 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
               />
 
               <span className="truncate">
-                {config?.type === 'effects'
-                  ? clip.transform !== undefined && clip.transform !== null
-                    ? 'Zoom Effect'
-                    : `Speed Effect (${clip.speed_factor ?? 1.0}x)`
-                  : clip.id.slice(0, 8)}
+                {isGap
+                  ? 'Gap'
+                  : config?.type === 'effects'
+                    ? clip.transform !== undefined && clip.transform !== null
+                      ? 'Zoom Effect'
+                      : `Speed Effect (${clip.speed_factor ?? 1.0}x)`
+                    : clip.id.slice(0, 8)}
               </span>
 
               {/* Right Trim Handle */}

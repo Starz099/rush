@@ -60,10 +60,10 @@ export const createProjectSlice: StateCreator<
   },
 
   saveTimeline: async (id, timelineState) => {
-    await projectApi.saveTimeline(id, timelineState);
+    const validatedTimeline = await projectApi.saveTimeline(id, timelineState);
     const active = get().activeProject;
     if (active && active.id === id) {
-      set({ activeProject: { ...active, timeline_state: timelineState } });
+      set({ activeProject: { ...active, timeline_state: validatedTimeline } });
     }
   },
 

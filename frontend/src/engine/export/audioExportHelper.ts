@@ -1,46 +1,43 @@
-import type { Clip, Asset, Project } from '@/api/bindings';
-import { assetApi } from '@/api/asset';
+import type { Asset, Project } from '@/api/bindings';
 import { useAppStore } from '../../store/timelineStore';
 import { fpsToNumeric } from '../../helpers/fps';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
-/**
- * Helper to fetch and decode audio bytes for a clip using the OfflineAudioContext
- */
-export async function loadAudioBufferForClip(
-  clip: Clip,
-  assets: Asset[],
-  offlineCtx: OfflineAudioContext,
-  framerate: number,
-): Promise<AudioBuffer | null> {
-  const asset = assets.find((a) => a.id === clip.asset_id);
-  if (!asset) return null;
+// Cache of decoded AudioBuffers, keyed by asset.id
+const assetAudioBufferCache = new Map<string, AudioBuffer>();
 
-  // Use the lightweight cached MP3 audio file if available, otherwise fall back to original path
+export function clearAudioExportCache() {
+  assetAudioBufferCache.clear();
+}
+
+export async function getAudioBufferForAsset(
+  asset: Asset,
+  offlineCtx: BaseAudioContext,
+): Promise<AudioBuffer | null> {
+  const cached = assetAudioBufferCache.get(asset.id);
+  if (cached) return cached;
+
   const extractedAudioPath = useAppStore.getState().extractedAudios[asset.id];
   const audioPathToUse = extractedAudioPath || asset.file_path;
 
-  // Calculate source slice range
-  const sourceInSeconds = clip.source_in / framerate;
-  const clipDuration = (clip.timeline_out - clip.timeline_in) / framerate;
+  try {
+    console.log(
+      `[ExportEngine] Fetching and decoding full audio for asset ${asset.name} (path: ${audioPathToUse})...`,
+    );
+    const url = convertFileSrc(audioPathToUse);
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
 
-  console.log(
-    `[ExportEngine] Slicing audio asset on backend: ${asset.name} at start=${sourceInSeconds.toFixed(2)}s, duration=${clipDuration.toFixed(2)}s`,
-  );
-
-  // Request the backend to slice the audio file using FFmpeg to avoid decoding full assets
-  const slicedAudioPath = await assetApi.sliceAudio(
-    audioPathToUse,
-    sourceInSeconds,
-    clipDuration,
-  );
-
-  // Fetch the sliced file bytes over Tauri's custom asset protocol
-  const url = convertFileSrc(slicedAudioPath);
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-
-  return await offlineCtx.decodeAudioData(arrayBuffer);
+    const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+    assetAudioBufferCache.set(asset.id, audioBuffer);
+    return audioBuffer;
+  } catch (err) {
+    console.error(
+      `[ExportEngine] Error decoding audio for asset ${asset.name}:`,
+      err,
+    );
+    return null;
+  }
 }
 
 /**
@@ -98,7 +95,10 @@ export async function exportAudioChunk(
   const endTimeSeconds = startTimeSeconds + durationSeconds;
 
   for (const track of timeline.tracks) {
+    if (track.is_muted) continue;
+
     for (const clip of track.clips) {
+      if (!clip.asset_id) continue;
       const clipInSec = clip.timeline_in / framerate;
       const clipOutSec = clip.timeline_out / framerate;
 
@@ -107,12 +107,10 @@ export async function exportAudioChunk(
         clipInSec < endTimeSeconds && clipOutSec > startTimeSeconds;
       if (!overlaps) continue;
 
-      const audioBuffer = await loadAudioBufferForClip(
-        clip,
-        assets,
-        offlineCtx,
-        framerate,
-      );
+      const asset = assets.find((a) => a.id === clip.asset_id);
+      if (!asset) continue;
+
+      const audioBuffer = await getAudioBufferForAsset(asset, offlineCtx);
       if (!audioBuffer) continue;
 
       const source = offlineCtx.createBufferSource();
@@ -123,11 +121,8 @@ export async function exportAudioChunk(
       const scheduleTime = Math.max(0, clipInSec - startTimeSeconds);
 
       // 2. Where inside the source buffer we start playing.
-      // Since our source buffer is ALREADY sliced to match the clip's timeline window [clipInSec, clipOutSec],
-      // the beginning of this buffer corresponds to clipInSec.
-      // If the clip started before our chunk (clipInSec < startTimeSeconds), we need to skip the portion
-      // of the buffer that has already played: (startTimeSeconds - clipInSec) seconds.
-      const bufferOffset = Math.max(0, startTimeSeconds - clipInSec);
+      const bufferSeek = Math.max(0, startTimeSeconds - clipInSec);
+      const sourceStart = clip.source_in / framerate + bufferSeek;
 
       // 3. How long to play this clip in the current chunk window
       const playDuration = Math.min(
@@ -135,7 +130,9 @@ export async function exportAudioChunk(
         durationSeconds - scheduleTime,
       );
 
-      source.start(scheduleTime, bufferOffset, playDuration);
+      if (playDuration > 0) {
+        source.start(scheduleTime, sourceStart, playDuration);
+      }
     }
   }
 

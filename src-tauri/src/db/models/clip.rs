@@ -142,3 +142,121 @@ pub struct Clip {
     #[serde(default)]
     pub effects: Vec<EffectConfig>,
 }
+
+impl Clip {
+    pub fn is_gap(&self, track_type: TrackType) -> bool {
+        match track_type {
+            TrackType::Video | TrackType::Audio => self.asset_id.is_none(),
+            TrackType::Effects => {
+                self.asset_id.is_none()
+                    && self.transform.is_none()
+                    && self.speed_factor == 1.0
+                    && self.effects.is_empty()
+            }
+        }
+    }
+}
+
+impl Track {
+    pub fn validate_and_sort_clips(&mut self) {
+        if self.clips.is_empty() {
+            return;
+        }
+
+        let track_type = self.track_type;
+
+        // 1. Separate clips into media (non-gap) and gap clips
+        let mut media_clips = Vec::new();
+        let mut gap_clips = Vec::new();
+
+        for clip in self.clips.drain(..) {
+            if clip.is_gap(track_type) {
+                gap_clips.push(clip);
+            } else {
+                media_clips.push(clip);
+            }
+        }
+
+        // Sort media clips by timeline_in, then timeline_out
+        media_clips.sort_by(|a, b| {
+            a.timeline_in
+                .cmp(&b.timeline_in)
+                .then(a.timeline_out.cmp(&b.timeline_out))
+        });
+
+        let mut validated = Vec::new();
+        let mut current_time = 0;
+
+        // If there are no media clips, but we have gap clips, preserve the first gap
+        if media_clips.is_empty() && !gap_clips.is_empty() {
+            let mut gap_clip = gap_clips.remove(0);
+            let duration = gap_clip.timeline_out - gap_clip.timeline_in;
+            if duration > 0 {
+                gap_clip.transform = None;
+                gap_clip.effects = Vec::new();
+                gap_clip.speed_factor = 1.0;
+                gap_clip.asset_id = None;
+                gap_clip.timeline_in = 0;
+                gap_clip.timeline_out = duration;
+                validated.push(gap_clip);
+            }
+        }
+
+        for mut clip in media_clips {
+            let duration = clip.timeline_out - clip.timeline_in;
+            if duration <= 0 {
+                continue;
+            }
+
+            if clip.timeline_in > current_time {
+                let gap_duration = clip.timeline_in - current_time;
+                let gap_space_start = current_time;
+                let gap_space_end = clip.timeline_in;
+
+                // Find if there is an existing gap clip that intersects with the gap space [current_time, clip.timeline_in]
+                let existing_gap_index = gap_clips.iter().position(|g| {
+                    let start = g.timeline_in.max(gap_space_start);
+                    let end = g.timeline_out.min(gap_space_end);
+                    start < end
+                });
+
+                let mut gap_clip = if let Some(idx) = existing_gap_index {
+                    gap_clips.remove(idx)
+                } else {
+                    Clip {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        asset_id: None,
+                        timeline_in: current_time,
+                        timeline_out: current_time + gap_duration,
+                        source_in: 0,
+                        source_out: gap_duration,
+                        transform: None,
+                        speed_factor: 1.0,
+                        effects: Vec::new(),
+                    }
+                };
+
+                // Enforce gap constraints
+                gap_clip.transform = None;
+                gap_clip.effects = Vec::new();
+                gap_clip.speed_factor = 1.0;
+                gap_clip.asset_id = None;
+                gap_clip.timeline_in = current_time;
+                gap_clip.timeline_out = current_time + gap_duration;
+                gap_clip.source_in = 0;
+                gap_clip.source_out = gap_duration;
+
+                validated.push(gap_clip);
+                current_time = clip.timeline_in;
+            }
+
+            // Place the media / effect clip (resolving overlaps by shifting it to current_time)
+            clip.timeline_in = current_time;
+            clip.timeline_out = current_time + duration;
+            current_time = clip.timeline_out;
+            validated.push(clip);
+        }
+
+        self.clips = validated;
+    }
+}

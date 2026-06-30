@@ -11,13 +11,22 @@ import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react';
 export const PropertiesSidebar = () => {
   const { selectedAsset, selectedClipId, selectedTrackId, clearSelection } =
     useWorkspaceStore();
-  const { activeProject, updateClipProperties, deleteClip } = useProjectStore();
+  const { activeProject, updateClipProperties, deleteClip, moveClipToTrack } =
+    useProjectStore();
 
   // Find the selected clip object if one exists
   const track = activeProject?.timeline_state.tracks.find(
     (t) => t.id === selectedTrackId,
   );
   const selectedClip = track?.clips.find((c) => c.id === selectedClipId);
+  const isGap =
+    track?.track_type?.toLowerCase() === 'effects'
+      ? !selectedClip?.asset_id &&
+        !selectedClip?.transform &&
+        (selectedClip?.speed_factor === undefined ||
+          selectedClip?.speed_factor === null ||
+          selectedClip?.speed_factor === 1.0)
+      : !selectedClip?.asset_id;
 
   const handleClipUpdate = (props: any) => {
     if (selectedTrackId && selectedClipId) {
@@ -105,319 +114,368 @@ export const PropertiesSidebar = () => {
                 </div>
               </div>
 
-              <Separator className="bg-white/5" />
+              {!isGap && track && activeProject && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1 w-1 rounded-full bg-indigo-500" />
+                    <h3 className="text-[10px] font-bold tracking-tight text-indigo-400/80 uppercase">
+                      Track Assignment
+                    </h3>
+                  </div>
+                  <select
+                    className="h-8 w-full rounded border border-white/5 bg-white/[0.03] px-2 text-xs font-medium text-white/85 focus:outline-none focus-visible:ring-indigo-500/50"
+                    value={selectedTrackId || ''}
+                    onChange={(e) => {
+                      if (selectedTrackId && selectedClipId) {
+                        moveClipToTrack(
+                          selectedTrackId,
+                          e.target.value,
+                          selectedClipId,
+                        );
+                      }
+                    }}
+                  >
+                    {activeProject.timeline_state.tracks
+                      .filter(
+                        (t: any) =>
+                          t.track_type?.toLowerCase() ===
+                          track.track_type?.toLowerCase(),
+                      )
+                      .map((t: any) => (
+                        <option
+                          key={t.id}
+                          value={t.id}
+                          className="bg-[#111] text-white"
+                        >
+                          {t.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
-              {track?.track_type?.toLowerCase() === 'effects' ? (
+              {!isGap && (
                 <>
-                  {selectedClip.transform === undefined ||
-                  selectedClip.transform === null ? (
+                  <Separator className="bg-white/5" />
+
+                  {track?.track_type?.toLowerCase() === 'effects' ? (
                     <>
-                      {/* Speed Multiplier Section */}
+                      {selectedClip.transform === undefined ||
+                      selectedClip.transform === null ? (
+                        <>
+                          {/* Speed Multiplier Section */}
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1 w-1 rounded-full bg-amber-500" />
+                              <h3 className="text-[10px] font-bold tracking-tight text-amber-400/80 uppercase">
+                                Speed Effect Properties
+                              </h3>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                  Speed Multiplier
+                                </Label>
+                                <Input
+                                  type="number"
+                                  className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                  value={selectedClip.speed_factor ?? 1.0}
+                                  step={0.1}
+                                  onChange={(e) => {
+                                    const val =
+                                      parseFloat(e.target.value) || 1.0;
+                                    handleClipUpdate({ speed_factor: val });
+                                  }}
+                                />
+                              </div>
+                              <Slider
+                                value={[selectedClip.speed_factor ?? 1.0]}
+                                min={0.25}
+                                max={4.0}
+                                step={0.1}
+                                onValueChange={([val]) =>
+                                  handleClipUpdate({ speed_factor: val })
+                                }
+                              />
+                            </div>
+
+                            <div className="flex gap-2">
+                              {[0.5, 1.0, 2.0, 4.0].map((preset) => (
+                                <Button
+                                  key={preset}
+                                  variant="outline"
+                                  size="sm"
+                                  className={`h-7 flex-1 border-white/5 text-[10px] ${
+                                    selectedClip.speed_factor === preset
+                                      ? 'border-amber-500/30 bg-amber-500/20 text-amber-400'
+                                      : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
+                                  }`}
+                                  onClick={() =>
+                                    handleClipUpdate({ speed_factor: preset })
+                                  }
+                                >
+                                  {preset}x
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <Separator className="bg-white/5" />
+                        </>
+                      ) : (
+                        <>
+                          {/* Zoom Multiplier Section */}
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1 w-1 rounded-full bg-purple-500" />
+                              <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
+                                Zoom Effect Properties
+                              </h3>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                  Zoom Multiplier
+                                </Label>
+                                <Input
+                                  type="number"
+                                  className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                  value={selectedClip.transform?.scale ?? 1.0}
+                                  step={0.05}
+                                  onChange={(e) => {
+                                    const val =
+                                      parseFloat(e.target.value) || 1.0;
+                                    handleTransformUpdate('scale', val);
+                                  }}
+                                />
+                              </div>
+                              <Slider
+                                value={[selectedClip.transform?.scale ?? 1.0]}
+                                min={0.5}
+                                max={5.0}
+                                step={0.05}
+                                onValueChange={([val]) =>
+                                  handleTransformUpdate('scale', val)
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <Separator className="bg-white/5" />
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Transform Section */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-amber-500" />
-                          <h3 className="text-[10px] font-bold tracking-tight text-amber-400/80 uppercase">
-                            Speed Effect Properties
+                          <div className="h-1 w-1 rounded-full bg-emerald-500" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-emerald-400/80 uppercase">
+                            Transform
                           </h3>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                              Speed Multiplier
-                            </Label>
-                            <Input
-                              type="number"
-                              className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                              value={selectedClip.speed_factor ?? 1.0}
-                              step={0.1}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 1.0;
-                                handleClipUpdate({ speed_factor: val });
-                              }}
+                        <div className="space-y-4">
+                          {/* Position X */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                Position X
+                              </Label>
+                              <Input
+                                type="number"
+                                className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                value={selectedClip.transform?.x ?? 0}
+                                onChange={(e) =>
+                                  handleTransformUpdate(
+                                    'x',
+                                    clamp(
+                                      parseInt(e.target.value) || 0,
+                                      -1920,
+                                      1920,
+                                    ),
+                                  )
+                                }
+                              />
+                            </div>
+                            <Slider
+                              value={[selectedClip.transform?.x ?? 0]}
+                              min={-1920}
+                              max={1920}
+                              step={1}
+                              onValueChange={([val]) =>
+                                handleTransformUpdate('x', val)
+                              }
                             />
                           </div>
-                          <Slider
-                            value={[selectedClip.speed_factor ?? 1.0]}
-                            min={0.25}
-                            max={4.0}
-                            step={0.1}
-                            onValueChange={([val]) =>
-                              handleClipUpdate({ speed_factor: val })
-                            }
-                          />
-                        </div>
 
-                        <div className="flex gap-2">
-                          {[0.5, 1.0, 2.0, 4.0].map((preset) => (
-                            <Button
-                              key={preset}
-                              variant="outline"
-                              size="sm"
-                              className={`h-7 flex-1 border-white/5 text-[10px] ${
-                                selectedClip.speed_factor === preset
-                                  ? 'border-amber-500/30 bg-amber-500/20 text-amber-400'
-                                  : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
-                              }`}
-                              onClick={() =>
-                                handleClipUpdate({ speed_factor: preset })
+                          {/* Position Y */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                Position Y
+                              </Label>
+                              <Input
+                                type="number"
+                                className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                value={selectedClip.transform?.y ?? 0}
+                                onChange={(e) =>
+                                  handleTransformUpdate(
+                                    'y',
+                                    clamp(
+                                      parseInt(e.target.value) || 0,
+                                      -1080,
+                                      1080,
+                                    ),
+                                  )
+                                }
+                              />
+                            </div>
+                            <Slider
+                              value={[selectedClip.transform?.y ?? 0]}
+                              min={-1080}
+                              max={1080}
+                              step={1}
+                              onValueChange={([val]) =>
+                                handleTransformUpdate('y', val)
                               }
-                            >
-                              {preset}x
-                            </Button>
-                          ))}
+                            />
+                          </div>
+
+                          {/* Scale */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                Scale (%)
+                              </Label>
+                              <Input
+                                type="number"
+                                className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                value={Math.round(
+                                  (selectedClip.transform?.scale ?? 1) * 100,
+                                )}
+                                onChange={(e) =>
+                                  handleTransformUpdate(
+                                    'scale',
+                                    clamp(
+                                      parseInt(e.target.value) || 0,
+                                      1,
+                                      200,
+                                    ) / 100,
+                                  )
+                                }
+                              />
+                            </div>
+                            <Slider
+                              value={[selectedClip.transform?.scale ?? 1]}
+                              min={0.01}
+                              max={2}
+                              step={0.01}
+                              onValueChange={([val]) =>
+                                handleTransformUpdate('scale', val)
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <Separator className="bg-white/5" />
-                    </>
-                  ) : (
-                    <>
-                      {/* Zoom Multiplier Section */}
+
+                      {/* Layer Order Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-1 rounded-full bg-orange-500" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-orange-400/80 uppercase">
+                            Layer Order
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
+                            onClick={() => handleZIndexUpdate(1)}
+                          >
+                            <ArrowUpIcon className="mr-1.5 h-3 w-3" />
+                            Bring Forward
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
+                            onClick={() => handleZIndexUpdate(-1)}
+                          >
+                            <ArrowDownIcon className="mr-1.5 h-3 w-3" />
+                            Send Backward
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center justify-between px-1">
+                          <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                            Current Z-Index
+                          </Label>
+                          <Input
+                            type="number"
+                            className="h-6 w-12 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                            value={selectedClip.transform?.z_index || 0}
+                            onChange={(e) =>
+                              handleTransformUpdate(
+                                'z_index',
+                                parseInt(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <Separator className="bg-white/5" />
+
+                      {/* Source Section */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
                           <div className="h-1 w-1 rounded-full bg-purple-500" />
                           <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
-                            Zoom Effect Properties
+                            Source Trim
                           </h3>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
                             <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                              Zoom Multiplier
+                              Source Start
                             </Label>
                             <Input
                               type="number"
-                              className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                              value={selectedClip.transform?.scale ?? 1.0}
-                              step={0.05}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 1.0;
-                                handleTransformUpdate('scale', val);
-                              }}
+                              className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-purple-500/50"
+                              value={selectedClip.source_in}
+                              onChange={(e) =>
+                                handleClipUpdate({
+                                  source_in: parseInt(e.target.value) || 0,
+                                })
+                              }
                             />
                           </div>
-                          <Slider
-                            value={[selectedClip.transform?.scale ?? 1.0]}
-                            min={0.5}
-                            max={5.0}
-                            step={0.05}
-                            onValueChange={([val]) =>
-                              handleTransformUpdate('scale', val)
-                            }
-                          />
+                          <div className="space-y-1.5">
+                            <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                              Source End
+                            </Label>
+                            <Input
+                              type="number"
+                              className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-purple-500/50"
+                              disabled
+                              value={selectedClip.source_out}
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <Separator className="bg-white/5" />
                     </>
                   )}
-                </>
-              ) : (
-                <>
-                  {/* Transform Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-emerald-500" />
-                      <h3 className="text-[10px] font-bold tracking-tight text-emerald-400/80 uppercase">
-                        Transform
-                      </h3>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Position X */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                            Position X
-                          </Label>
-                          <Input
-                            type="number"
-                            className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                            value={selectedClip.transform?.x ?? 0}
-                            onChange={(e) =>
-                              handleTransformUpdate(
-                                'x',
-                                clamp(
-                                  parseInt(e.target.value) || 0,
-                                  -1920,
-                                  1920,
-                                ),
-                              )
-                            }
-                          />
-                        </div>
-                        <Slider
-                          value={[selectedClip.transform?.x ?? 0]}
-                          min={-1920}
-                          max={1920}
-                          step={1}
-                          onValueChange={([val]) =>
-                            handleTransformUpdate('x', val)
-                          }
-                        />
-                      </div>
-
-                      {/* Position Y */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                            Position Y
-                          </Label>
-                          <Input
-                            type="number"
-                            className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                            value={selectedClip.transform?.y ?? 0}
-                            onChange={(e) =>
-                              handleTransformUpdate(
-                                'y',
-                                clamp(
-                                  parseInt(e.target.value) || 0,
-                                  -1080,
-                                  1080,
-                                ),
-                              )
-                            }
-                          />
-                        </div>
-                        <Slider
-                          value={[selectedClip.transform?.y ?? 0]}
-                          min={-1080}
-                          max={1080}
-                          step={1}
-                          onValueChange={([val]) =>
-                            handleTransformUpdate('y', val)
-                          }
-                        />
-                      </div>
-
-                      {/* Scale */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                            Scale (%)
-                          </Label>
-                          <Input
-                            type="number"
-                            className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                            value={Math.round(
-                              (selectedClip.transform?.scale ?? 1) * 100,
-                            )}
-                            onChange={(e) =>
-                              handleTransformUpdate(
-                                'scale',
-                                clamp(parseInt(e.target.value) || 0, 1, 200) /
-                                  100,
-                              )
-                            }
-                          />
-                        </div>
-                        <Slider
-                          value={[selectedClip.transform?.scale ?? 1]}
-                          min={0.01}
-                          max={2}
-                          step={0.01}
-                          onValueChange={([val]) =>
-                            handleTransformUpdate('scale', val)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* Layer Order Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-orange-500" />
-                      <h3 className="text-[10px] font-bold tracking-tight text-orange-400/80 uppercase">
-                        Layer Order
-                      </h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
-                        onClick={() => handleZIndexUpdate(1)}
-                      >
-                        <ArrowUpIcon className="mr-1.5 h-3 w-3" />
-                        Bring Forward
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 border-white/5 bg-white/[0.03] text-[10px] hover:bg-white/10"
-                        onClick={() => handleZIndexUpdate(-1)}
-                      >
-                        <ArrowDownIcon className="mr-1.5 h-3 w-3" />
-                        Send Backward
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between px-1">
-                      <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                        Current Z-Index
-                      </Label>
-                      <Input
-                        type="number"
-                        className="h-6 w-12 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                        value={selectedClip.transform?.z_index || 0}
-                        onChange={(e) =>
-                          handleTransformUpdate(
-                            'z_index',
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <Separator className="bg-white/5" />
-
-                  {/* Source Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-purple-500" />
-                      <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
-                        Source Trim
-                      </h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                          Source Start
-                        </Label>
-                        <Input
-                          type="number"
-                          className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-purple-500/50"
-                          value={selectedClip.source_in}
-                          onChange={(e) =>
-                            handleClipUpdate({
-                              source_in: parseInt(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                          Source End
-                        </Label>
-                        <Input
-                          type="number"
-                          className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-purple-500/50"
-                          disabled
-                          value={selectedClip.source_out}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-white/5" />
                 </>
               )}
 

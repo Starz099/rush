@@ -89,6 +89,7 @@ export function usePlaybackLoop(
         videoTracks.forEach((track: any) => {
           const activeClips = track.clips.filter(
             (clip: any) =>
+              clip.asset_id &&
               playheadFloatRef.current >= clip.timeline_in &&
               playheadFloatRef.current < clip.timeline_out,
           );

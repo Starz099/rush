@@ -8,6 +8,7 @@ import {
   calculateTrimLeft,
   calculateTrimRight,
 } from '@/helpers/clipManipulation';
+import { useWorkspaceStore } from '../workspaceStore';
 
 export interface ClipSlice {
   updateClipProperties: (
@@ -26,8 +27,14 @@ export interface ClipSlice {
     clipId: string,
     edge: 'left' | 'right',
     newFrameValue: number,
+    persist?: boolean,
   ) => Promise<void>;
   deleteClip: (trackId: string, clipId: string) => Promise<void>;
+  moveClipToTrack: (
+    sourceTrackId: string,
+    targetTrackId: string,
+    clipId: string,
+  ) => Promise<void>;
 }
 
 type CombinedState = ProjectSlice & AssetSlice & ClipSlice;
@@ -74,7 +81,8 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       };
     });
 
-    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+    const validatedTracks = validateAndSortClipsLocal(updatedTracks);
+    const updatedTimeline = { ...timeline, tracks: validatedTracks };
 
     set({
       activeProject: {
@@ -135,7 +143,8 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       return t;
     });
 
-    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+    const validatedTracks = validateAndSortClipsLocal(updatedTracks);
+    const updatedTimeline = { ...timeline, tracks: validatedTracks };
 
     set({
       activeProject: {
@@ -147,7 +156,7 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
     await get().saveTimeline(project.id, updatedTimeline);
   },
 
-  trimClip: async (trackId, clipId, edge, newFrameValue) => {
+  trimClip: async (trackId, clipId, edge, newFrameValue, persist = true) => {
     const project = get().activeProject;
     if (!project) return;
 
@@ -162,11 +171,21 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
     let updatedTimeline = timeline;
 
     if (edge === 'left') {
-      // Find preceding clip on this track to prevent overlap
+      // Find preceding non-gap clip on this track to prevent overlap
       const prevClip = track.clips
-        .filter(
-          (c: Clip) => c.timeline_out <= clip.timeline_in && c.id !== clip.id,
-        )
+        .filter((c: Clip) => {
+          if (c.id === clipId || c.timeline_out > clip.timeline_in)
+            return false;
+          const isEffectTrack = track.track_type?.toLowerCase() === 'effects';
+          const isGap = isEffectTrack
+            ? !c.asset_id &&
+              !c.transform &&
+              (c.speed_factor === undefined ||
+                c.speed_factor === null ||
+                c.speed_factor === 1.0)
+            : !c.asset_id;
+          return !isGap;
+        })
         .sort((a: Clip, b: Clip) => b.timeline_in - a.timeline_in)[0];
 
       const { timeline_in, source_in } = calculateTrimLeft(
@@ -195,11 +214,21 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       };
     } else {
       // Trimming Right Edge
-      // Find succeeding clip on this track to prevent overlap
+      // Find succeeding non-gap clip on this track to prevent overlap
       const nextClip = track.clips
-        .filter(
-          (c: Clip) => c.timeline_in >= clip.timeline_out && c.id !== clip.id,
-        )
+        .filter((c: Clip) => {
+          if (c.id === clipId || c.timeline_in < clip.timeline_out)
+            return false;
+          const isEffectTrack = track.track_type?.toLowerCase() === 'effects';
+          const isGap = isEffectTrack
+            ? !c.asset_id &&
+              !c.transform &&
+              (c.speed_factor === undefined ||
+                c.speed_factor === null ||
+                c.speed_factor === 1.0)
+            : !c.asset_id;
+          return !isGap;
+        })
         .sort((a: Clip, b: Clip) => a.timeline_in - b.timeline_in)[0];
 
       const asset = get().assets.find((a) => a.id === clip.asset_id);
@@ -214,12 +243,22 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
         speed,
       );
 
+      const delta = timeline_out - clip.timeline_out;
+
       const updatedClips = track.clips.map((c: Clip) => {
         if (c.id === clipId) {
           return {
             ...c,
             timeline_out,
             source_out,
+          };
+        }
+        // If it starts after the trimmed clip's old timeline_out, shift it by delta
+        if (c.timeline_in >= clip.timeline_out) {
+          return {
+            ...c,
+            timeline_in: c.timeline_in + delta,
+            timeline_out: c.timeline_out + delta,
           };
         }
         return c;
@@ -233,6 +272,12 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       };
     }
 
+    const validatedTracks = validateAndSortClipsLocal(updatedTimeline.tracks);
+    updatedTimeline = {
+      ...updatedTimeline,
+      tracks: validatedTracks,
+    };
+
     set({
       activeProject: {
         ...project,
@@ -240,7 +285,9 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       },
     });
 
-    await get().saveTimeline(project.id, updatedTimeline);
+    if (persist === true) {
+      await get().saveTimeline(project.id, updatedTimeline);
+    }
   },
 
   deleteClip: async (trackId, clipId) => {
@@ -248,15 +295,35 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
     if (!project) return;
 
     const timeline = project.timeline_state;
-    const updatedTracks = timeline.tracks.map((track: any) => {
-      if (track.id !== trackId) return track;
+    const track = timeline.tracks.find((t: any) => t.id === trackId);
+    if (!track) return;
+
+    const clipToDelete = track.clips.find((c: Clip) => c.id === clipId);
+    if (!clipToDelete) return;
+
+    const deleteDuration = clipToDelete.timeline_out - clipToDelete.timeline_in;
+
+    const updatedTracks = timeline.tracks.map((t: any) => {
+      if (t.id !== trackId) return t;
+      const filteredClips = t.clips.filter((clip: Clip) => clip.id !== clipId);
+      const shiftedClips = filteredClips.map((clip: Clip) => {
+        if (clip.timeline_in >= clipToDelete.timeline_out) {
+          return {
+            ...clip,
+            timeline_in: clip.timeline_in - deleteDuration,
+            timeline_out: clip.timeline_out - deleteDuration,
+          };
+        }
+        return clip;
+      });
       return {
-        ...track,
-        clips: track.clips.filter((clip: Clip) => clip.id !== clipId),
+        ...t,
+        clips: shiftedClips,
       };
     });
 
-    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+    const validatedTracks = validateAndSortClipsLocal(updatedTracks);
+    const updatedTimeline = { ...timeline, tracks: validatedTracks };
 
     set({
       activeProject: {
@@ -267,4 +334,168 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
 
     await get().saveTimeline(project.id, updatedTimeline);
   },
+
+  moveClipToTrack: async (sourceTrackId, targetTrackId, clipId) => {
+    const project = get().activeProject;
+    if (!project) return;
+
+    const timeline = project.timeline_state;
+    const sourceTrack = timeline.tracks.find(
+      (t: any) => t.id === sourceTrackId,
+    );
+    const targetTrack = timeline.tracks.find(
+      (t: any) => t.id === targetTrackId,
+    );
+    if (!sourceTrack || !targetTrack) return;
+
+    const clipToMove = sourceTrack.clips.find((c: any) => c.id === clipId);
+    if (!clipToMove) return;
+
+    const updatedTracks = timeline.tracks.map((t: any) => {
+      if (t.id === sourceTrackId) {
+        return {
+          ...t,
+          clips: t.clips.filter((c: any) => c.id !== clipId),
+        };
+      }
+      if (t.id === targetTrackId) {
+        return {
+          ...t,
+          clips: [...t.clips, clipToMove],
+        };
+      }
+      return t;
+    });
+
+    const validatedTracks = validateAndSortClipsLocal(updatedTracks);
+    const updatedTimeline = {
+      ...timeline,
+      tracks: validatedTracks,
+    };
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    });
+
+    useWorkspaceStore.getState().setClipSelection(targetTrackId, clipId);
+    await get().saveTimeline(project.id, updatedTimeline);
+  },
 });
+
+function validateAndSortClipsLocal(tracks: any[]): any[] {
+  return tracks.map((track) => {
+    if (track.clips.length === 0) {
+      return track;
+    }
+
+    const trackType = track.track_type;
+
+    // 1. Separate clips into media (non-gap) and gap clips
+    const mediaClips: any[] = [];
+    const gapClips: any[] = [];
+
+    track.clips.forEach((clip: any) => {
+      const isEffectTrack = trackType?.toLowerCase() === 'effects';
+      const isGap = isEffectTrack
+        ? !clip.asset_id &&
+          !clip.transform &&
+          (clip.speed_factor === undefined ||
+            clip.speed_factor === null ||
+            clip.speed_factor === 1.0) &&
+          (!clip.effects || clip.effects.length === 0)
+        : !clip.asset_id;
+
+      if (isGap) {
+        gapClips.push(clip);
+      } else {
+        mediaClips.push(clip);
+      }
+    });
+
+    // Sort media clips by timeline_in, then timeline_out
+    mediaClips.sort(
+      (a, b) =>
+        a.timeline_in - b.timeline_in || a.timeline_out - b.timeline_out,
+    );
+
+    const validated: any[] = [];
+    let currentTime = 0;
+
+    // If there are no media clips, preserve the first gap
+    if (mediaClips.length === 0 && gapClips.length > 0) {
+      const gapClip = { ...gapClips[0] };
+      const duration = gapClip.timeline_out - gapClip.timeline_in;
+      if (duration > 0) {
+        gapClip.transform = null;
+        gapClip.effects = [];
+        gapClip.speed_factor = 1.0;
+        gapClip.asset_id = null;
+        gapClip.timeline_in = 0;
+        gapClip.timeline_out = duration;
+        validated.push(gapClip);
+      }
+    }
+
+    mediaClips.forEach((clip) => {
+      const duration = clip.timeline_out - clip.timeline_in;
+      if (duration <= 0) return;
+
+      if (clip.timeline_in > currentTime) {
+        const gapDuration = clip.timeline_in - currentTime;
+        const gapSpaceStart = currentTime;
+        const gapSpaceEnd = clip.timeline_in;
+
+        // Find intersecting gap clip
+        const existingGapIdx = gapClips.findIndex((g) => {
+          const start = Math.max(g.timeline_in, gapSpaceStart);
+          const end = Math.min(g.timeline_out, gapSpaceEnd);
+          return start < end;
+        });
+
+        let gapClip: any;
+        if (existingGapIdx !== -1) {
+          gapClip = { ...gapClips[existingGapIdx] };
+          gapClips.splice(existingGapIdx, 1);
+        } else {
+          gapClip = {
+            id: crypto.randomUUID(),
+            asset_id: null,
+            timeline_in: currentTime,
+            timeline_out: currentTime + gapDuration,
+            source_in: 0,
+            source_out: gapDuration,
+            transform: null,
+            speed_factor: 1.0,
+            effects: [],
+          };
+        }
+
+        gapClip.transform = null;
+        gapClip.effects = [];
+        gapClip.speed_factor = 1.0;
+        gapClip.asset_id = null;
+        gapClip.timeline_in = currentTime;
+        gapClip.timeline_out = currentTime + gapDuration;
+        gapClip.source_in = 0;
+        gapClip.source_out = gapDuration;
+
+        validated.push(gapClip);
+        currentTime = clip.timeline_in;
+      }
+
+      const updatedClip = { ...clip };
+      updatedClip.timeline_in = currentTime;
+      updatedClip.timeline_out = currentTime + duration;
+      currentTime = updatedClip.timeline_out;
+      validated.push(updatedClip);
+    });
+
+    return {
+      ...track,
+      clips: validated,
+    };
+  });
+}

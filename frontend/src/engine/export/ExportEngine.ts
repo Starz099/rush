@@ -6,7 +6,7 @@ import { fpsToNumeric } from '../../helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
 import { exportApi } from '@/api/export';
 import { avcToAnnexB } from './avcToAnnexB';
-import { exportAudioChunk } from './audioExportHelper';
+import { exportAudioChunk, clearAudioExportCache } from './audioExportHelper';
 import {
   AUDIO_CHUNK_SIZE_SECONDS,
   EXPORT_VIDEO_BITRATE,
@@ -250,6 +250,7 @@ export class ExportEngine {
     videoTracks.forEach((track: any) => {
       const activeClips = track.clips.filter(
         (clip: any) =>
+          clip.asset_id &&
           playheadFrame >= clip.timeline_in &&
           playheadFrame < clip.timeline_out,
       );
@@ -341,6 +342,7 @@ export class ExportEngine {
     onPhaseChange?: (phase: ExportPhase) => void,
   ): Promise<void> {
     if (onPhaseChange) onPhaseChange('preparing');
+    clearAudioExportCache();
     const timeline = activeProject.timeline_state;
     const framerate = fpsToNumeric(activeProject.framerate);
     const background = timeline.background;
@@ -423,6 +425,7 @@ export class ExportEngine {
         videoTracks.forEach((track: any) => {
           const activeClips = track.clips.filter(
             (clip: any) =>
+              clip.asset_id &&
               currentTimelineFrame >= clip.timeline_in &&
               currentTimelineFrame < clip.timeline_out,
           );

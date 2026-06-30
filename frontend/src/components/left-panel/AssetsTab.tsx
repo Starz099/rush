@@ -27,6 +27,7 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
 
   const selectedAsset = useWorkspaceStore((state) => state.selectedAsset);
   const setSelectedAsset = useWorkspaceStore((state) => state.setSelectedAsset);
+  const selectedTrackId = useWorkspaceStore((state) => state.selectedTrackId);
 
   const activeProject = useProjectStore((state) => state.activeProject);
   const assets = useProjectStore((state) => state.assets);
@@ -144,39 +145,75 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
     const durationMs = asset.duration_ms || 5000;
     const durationFrames = Math.round((durationMs / 1000) * framerate);
 
-    const updatedTracks = timeline.tracks.map((t: any) => {
-      const shouldAddToThisTrack =
-        (isVideoTrack(t) && (isVideo || isImage)) ||
-        (isAudioTrack(t) && isAudio);
+    const isCompatible = (t: any) =>
+      (isVideoTrack(t) && (isVideo || isImage)) || (isAudioTrack(t) && isAudio);
 
-      if (shouldAddToThisTrack) {
-        // Find the next available position on THIS specific track
-        const lastClip = t.clips[t.clips.length - 1];
-        const timelineIn = lastClip ? lastClip.timeline_out : 0;
-        const timelineOut = timelineIn + durationFrames;
+    // Find target track (selected first, otherwise first compatible)
+    let targetTrack = timeline.tracks.find(
+      (t: any) => t.id === selectedTrackId,
+    );
+    if (!targetTrack || !isCompatible(targetTrack)) {
+      targetTrack = timeline.tracks.find(isCompatible);
+    }
 
-        const newClip = {
-          id: crypto.randomUUID(),
-          asset_id: asset.id,
-          timeline_in: timelineIn,
-          timeline_out: timelineOut,
-          source_in: 0,
-          source_out: durationFrames,
-        };
-        return { ...t, clips: [...t.clips, newClip] };
-      }
+    let updatedTracks = [...timeline.tracks];
 
-      return t;
+    // If no compatible track exists, create one!
+    if (!targetTrack) {
+      const trackType = isVideo || isImage ? 'video' : 'audio';
+      const typeName = trackType === 'video' ? 'Video' : 'Audio';
+      const typeCount = timeline.tracks.filter(
+        (t: any) => t.track_type?.toLowerCase() === trackType,
+      ).length;
+
+      targetTrack = {
+        id: `${trackType}-${Date.now()}`,
+        name: `${typeName} ${typeCount + 1}`,
+        track_type: trackType,
+        clips: [],
+        transitions: [],
+        is_muted: false,
+        is_locked: false,
+      };
+
+      updatedTracks.push(targetTrack);
+    }
+
+    // Find last media clip to place the new clip consecutively
+    const nonGapClips = targetTrack.clips.filter((c: any) => {
+      const isEffectTrack = targetTrack.track_type?.toLowerCase() === 'effects';
+      const isGap = isEffectTrack
+        ? !c.asset_id &&
+          !c.transform &&
+          (c.speed_factor === undefined ||
+            c.speed_factor === null ||
+            c.speed_factor === 1.0)
+        : !c.asset_id;
+      return !isGap;
     });
 
-    // Verify if any tracks were actually updated
-    const tracksUpdated = updatedTracks.some(
-      (t, i) => t !== timeline.tracks[i],
-    );
-    if (!tracksUpdated) {
-      alert(`Could not find a suitable track for ${asset.media_type} asset.`);
-      return;
-    }
+    const lastClip = nonGapClips[nonGapClips.length - 1];
+    const timelineIn = lastClip ? lastClip.timeline_out : 0;
+    const timelineOut = timelineIn + durationFrames;
+
+    const newClip = {
+      id: crypto.randomUUID(),
+      asset_id: asset.id,
+      timeline_in: timelineIn,
+      timeline_out: timelineOut,
+      source_in: 0,
+      source_out: durationFrames,
+    };
+
+    updatedTracks = updatedTracks.map((t: any) => {
+      if (t.id === targetTrack.id) {
+        return {
+          ...t,
+          clips: [...t.clips, newClip],
+        };
+      }
+      return t;
+    });
 
     await saveTimeline(activeProject.id, {
       ...timeline,

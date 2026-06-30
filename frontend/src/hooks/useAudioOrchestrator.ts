@@ -36,6 +36,7 @@ export function useAudioOrchestrator(
 
     const clipsToMount = timeline.tracks.flatMap((track: any) =>
       track.clips.filter((clip: any) => {
+        if (!clip.asset_id) return false;
         const asset = assets.find((a) => a.id === clip.asset_id);
         const hasAudio =
           asset &&

@@ -56,6 +56,7 @@ export class LookAheadManager {
 
       for (const track of videoTracks) {
         for (const clip of track.clips) {
+          if (!clip.asset_id) continue;
           // Convert clip timeline positions from frames to seconds
           const clipInSec = clip.timeline_in / framerate;
           const clipOutSec = clip.timeline_out / framerate;

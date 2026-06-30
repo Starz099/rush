@@ -44,15 +44,36 @@ pub fn build_audio_speed_filter(
         let end_sec = block.end_frame as f64 / fps as f64;
 
         let mut factor = block.factor;
-        if factor < 0.5 {
-            factor = 0.5;
+        if factor < 0.1 {
+            factor = 0.1;
         } else if factor > 100.0 {
             factor = 100.0;
         }
 
+        // Chaining atempo filters since a single atempo is limited to [0.5, 2.0]
+        let mut atempo_filters = Vec::new();
+        let mut remaining_factor = factor;
+        while remaining_factor > 2.0 {
+            atempo_filters.push("atempo=2.0".to_string());
+            remaining_factor /= 2.0;
+        }
+        while remaining_factor < 0.5 {
+            atempo_filters.push("atempo=0.5".to_string());
+            remaining_factor /= 0.5;
+        }
+        if (remaining_factor - 1.0).abs() > 0.001 {
+            atempo_filters.push(format!("atempo={:.3}", remaining_factor));
+        }
+
+        let atempo_str = if atempo_filters.is_empty() {
+            String::new()
+        } else {
+            format!(",{}", atempo_filters.join(","))
+        };
+
         filter_parts.push(format!(
-            "[1:a]atrim=start={:.3}:end={:.3},asetpts=PTS-STARTPTS,atempo={:.3}[a{}]",
-            start_sec, end_sec, factor, idx
+            "[1:a]atrim=start={:.3}:end={:.3},asetpts=PTS-STARTPTS{}[a{}]",
+            start_sec, end_sec, atempo_str, idx
         ));
         concat_inputs.push_str(&format!("[a{}]", idx));
     }

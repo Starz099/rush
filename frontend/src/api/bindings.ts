@@ -19,7 +19,7 @@ export const commands = {
       __TAURI_INVOKE('update_project_name', { id, newName }),
     ),
   saveProjectTimeline: (id: string, timelineState: TimelineState) =>
-    typedError<null, string>(
+    typedError<TimelineState, string>(
       __TAURI_INVOKE('save_project_timeline', { id, timelineState }),
     ),
   getPresets: () => __TAURI_INVOKE<PresetsConfig>('get_presets'),
