@@ -32,7 +32,15 @@ macro_rules! run_with_commands {
             commands::asset::extract_audio::extract_audio,
             commands::asset::read_asset_range::read_asset_range,
             commands::asset::read_moov_box::read_moov_box,
-            commands::asset::slice_audio_asset::slice_audio_asset
+            commands::asset::slice_audio_asset::slice_audio_asset,
+
+            // --- ASSET COMMANDS ---
+            commands::agent::run_agent,
+            commands::agent::message::get_messages,
+            commands::agent::message::create_message,
+            commands::agent::session::get_sessions,
+            commands::agent::session::create_session,
+            commands::agent::session::delete_session
             $(, $extra)*
         ]
     };

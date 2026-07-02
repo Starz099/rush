@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
     "@phosphor-icons/react": "^2.1.10",
+    "@shadcn/react": "^0.2.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.11.0",
     "class-variance-authority": "^0.7.1",

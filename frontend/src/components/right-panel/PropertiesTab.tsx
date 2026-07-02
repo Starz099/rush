@@ -8,7 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { ArrowUpIcon, ArrowDownIcon } from '@phosphor-icons/react';
 
-export const PropertiesSidebar = () => {
+const PropertiesTab = () => {
   const { selectedAsset, selectedClipId, selectedTrackId, clearSelection } =
     useWorkspaceStore();
   const { activeProject, updateClipProperties, deleteClip, moveClipToTrack } =
@@ -564,3 +564,5 @@ export const PropertiesSidebar = () => {
     </div>
   );
 };
+
+export default PropertiesTab;

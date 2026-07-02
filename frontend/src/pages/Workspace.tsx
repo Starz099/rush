@@ -11,7 +11,6 @@ import { projectApi } from '@/api/project';
 import { LeftPanel } from '@/components/left-panel';
 import { PreviewPanel } from '@/components/preview/PreviewPanel';
 import { TimelinePanel } from '@/components/timeline/TimelinePanel';
-import { PropertiesSidebar } from '@/components/properties/PropertiesSidebar';
 import { CaretLeftIcon } from '@phosphor-icons/react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import { ExportEngine } from '@/engine/export/ExportEngine';
 import { save } from '@tauri-apps/plugin-dialog';
 import { ExportModal } from '@/components/export/ExportModal';
 import type { ExportPhase } from '@/types/export';
+import { RightPanel } from '@/components/right-panel';
 
 const Workspace = () => {
   const navigate = useNavigate();
@@ -231,7 +231,7 @@ const Workspace = () => {
 
         {/* Right Sidebar */}
         <ResizablePanel maxSize={25} className="border-l">
-          <PropertiesSidebar />
+          <RightPanel projectId={activeProject.id} />
         </ResizablePanel>
       </ResizablePanelGroup>
       <ExportModal
