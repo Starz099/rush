@@ -6,7 +6,7 @@ use tauri::Manager;
 
 #[tauri::command]
 #[specta::specta]
-pub fn run_agent(
+pub async fn run_agent(
     app: tauri::AppHandle,
     project_id: String,
     session_id: String,
@@ -44,7 +44,7 @@ pub fn run_agent(
     )?;
 
     // Get response from the planner
-    let planner_response = run_planner(working_session_id.clone(), prompt)?;
+    let planner_response = run_planner(working_session_id.clone(), prompt).await?;
 
     // Store the agent's response message
     message::create_message(

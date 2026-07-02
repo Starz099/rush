@@ -1,13 +1,17 @@
 pub mod config;
+use reqwest::Client;
 use serde_json::{json, Value};
 
-use reqwest::Client;
-
-#[tokio::main]
-async fn call_llm() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn call_llm(prompt: String) -> Result<String, Box<dyn std::error::Error>> {
     let client = Client::new();
 
-    let response: Value = client
+    println!(
+        "[llm] Sending request to {} using model {}...",
+        config::API_URL,
+        config::MODEL
+    );
+
+    let res = client
         .post(config::API_URL)
         .bearer_auth(config::API_KEY)
         .json(&json!({
@@ -15,17 +19,40 @@ async fn call_llm() -> Result<(), Box<dyn std::error::Error>> {
             "messages": [
                 {
                     "role": "user",
-                    "content": "Hello!"
+                    "content": prompt
                 }
             ]
         }))
         .send()
-        .await?
-        .error_for_status()?
-        .json()
         .await?;
 
-    println!("[llm]:  {}", serde_json::to_string_pretty(&response)?);
+    let status = res.status();
+    if !status.is_success() {
+        let err_text = res
+            .text()
+            .await
+            .unwrap_or_else(|_| "Could not read response body".to_string());
+        eprintln!(
+            "[llm] API request failed with status: {}. Response: {}",
+            status, err_text
+        );
+        return Err(format!(
+            "API request failed with status: {}. Response: {}",
+            status, err_text
+        )
+        .into());
+    }
 
-    Ok(())
+    let response: Value = res.json().await?;
+    println!("[llm] API request succeeded.");
+
+    // Extract the text content from choices[0].message.content
+    let content = response["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("No content returned.")
+        .to_string();
+
+    println!("[llm] Clean Content: {}", content);
+
+    Ok(content)
 }
