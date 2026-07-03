@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { Session, Message } from '@/api/bindings';
 import { agentApi } from '@/api/agent';
+import { projectApi } from '@/api/project';
 
 export interface AgentSlice {
   sessions: Session[];
@@ -70,6 +71,16 @@ export const createAgentSlice: StateCreator<AgentSlice> = (set, get) => ({
 
       // Call Tauri run_agent command
       await agentApi.runAgent(activeProject.id, sessionId, prompt);
+
+      // Fetch the updated project timeline from the database to synchronize UI state
+      const updatedProject = await projectApi.getById(activeProject.id);
+      (set as any)({ activeProject: updatedProject });
+
+      // Synchronize playhead position with the timelineStore
+      const { useAppStore } = await import('@/store/timelineStore');
+      useAppStore
+        .getState()
+        .setPlayhead(updatedProject.timeline_state.playhead_position);
 
       // If starting a fresh chat session, fetch sessions and select the newest one
       if (!currentSession) {

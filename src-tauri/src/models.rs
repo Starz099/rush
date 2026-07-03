@@ -108,4 +108,5 @@ pub struct EditingRegistry {
 pub enum MessageAuthor {
     User,
     Agent,
+    Tool,
 }

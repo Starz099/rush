@@ -1,11 +1,12 @@
 use crate::db::models::agent::message::Message;
 use crate::models::MessageAuthor;
 use crate::state::AppState;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 #[specta::specta]
 pub fn create_message(
+    app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
     role: MessageAuthor,
@@ -16,6 +17,7 @@ pub fn create_message(
     let role_str = match role {
         MessageAuthor::User => "user",
         MessageAuthor::Agent => "agent",
+        MessageAuthor::Tool => "tool",
     };
     db.execute(
         "INSERT INTO messages (id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
@@ -30,6 +32,9 @@ pub fn create_message(
             Message::from_row,
         )
         .map_err(|e| e.to_string())?;
+
+    // Emit live event to synchronize UI changes in real-time
+    let _ = app.emit("agent_message_created", &message);
 
     Ok(message)
 }

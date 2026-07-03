@@ -17,6 +17,7 @@ impl Message {
         let role_str: String = row.get(2)?;
         let role = match role_str.as_str() {
             "user" => MessageAuthor::User,
+            "tool" => MessageAuthor::Tool,
             _ => MessageAuthor::Agent,
         };
         Ok(Self {

@@ -191,7 +191,7 @@ export type Message = {
   updated_at: string;
 };
 
-export type MessageAuthor = 'user' | 'agent';
+export type MessageAuthor = 'user' | 'agent' | 'tool';
 
 export type PresetsConfig = {
   resolutions: ResolutionConfig[];

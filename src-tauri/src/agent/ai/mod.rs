@@ -2,13 +2,14 @@ pub mod config;
 use reqwest::Client;
 use serde_json::{json, Value};
 
-pub async fn call_llm(prompt: String) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn call_llm_messages(messages: Vec<Value>) -> Result<String, Box<dyn std::error::Error>> {
     let client = Client::new();
 
     println!(
-        "[llm] Sending request to {} using model {}...",
+        "[llm] Sending request to {} using model {} with {} messages...",
         config::API_URL,
-        config::MODEL
+        config::MODEL,
+        messages.len()
     );
 
     let res = client
@@ -16,12 +17,10 @@ pub async fn call_llm(prompt: String) -> Result<String, Box<dyn std::error::Erro
         .bearer_auth(config::API_KEY)
         .json(&json!({
             "model": config::MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
+            "messages": messages,
+            "response_format": {
+                "type": "json_object"
+            }
         }))
         .send()
         .await?;
@@ -46,7 +45,6 @@ pub async fn call_llm(prompt: String) -> Result<String, Box<dyn std::error::Erro
     let response: Value = res.json().await?;
     println!("[llm] API request succeeded.");
 
-    // Extract the text content from choices[0].message.content
     let content = response["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("No content returned.")

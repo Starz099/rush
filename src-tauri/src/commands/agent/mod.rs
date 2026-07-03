@@ -37,6 +37,7 @@ pub async fn run_agent(
 
     // Store the user's prompt message
     message::create_message(
+        app.clone(),
         app.state::<AppState>(),
         working_session_id.clone(),
         crate::models::MessageAuthor::User,
@@ -44,10 +45,11 @@ pub async fn run_agent(
     )?;
 
     // Get response from the planner
-    let planner_response = run_planner(working_session_id.clone(), prompt).await?;
+    let planner_response = run_planner(app.clone(), working_session_id.clone(), prompt).await?;
 
     // Store the agent's response message
     message::create_message(
+        app.clone(),
         app.state::<AppState>(),
         working_session_id,
         crate::models::MessageAuthor::Agent,

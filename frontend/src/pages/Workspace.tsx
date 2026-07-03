@@ -142,6 +142,13 @@ const Workspace = () => {
         if (!isMounted) return;
 
         setActiveProject(loadedProject);
+
+        // Sync playhead position to timelineStore
+        const { useAppStore } = await import('@/store/timelineStore');
+        useAppStore
+          .getState()
+          .setPlayhead(loadedProject.timeline_state.playhead_position);
+
         await fetchAssets(projectId);
       } catch (error) {
         if (!isMounted) return;

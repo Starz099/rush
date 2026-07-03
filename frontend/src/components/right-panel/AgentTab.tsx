@@ -14,6 +14,7 @@ import {
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { TrashIcon } from '@phosphor-icons/react';
+import { listen } from '@tauri-apps/api/event';
 
 const AgentTab = ({ projectId }: { projectId: string }) => {
   const sessions: Session[] = useProjectStore((state) => state.sessions);
@@ -41,7 +42,15 @@ const AgentTab = ({ projectId }: { projectId: string }) => {
       await fetchMessages();
     };
     loadMessages();
-    return () => {};
+
+    // Listen for real-time agent message creation events from Tauri backend
+    const unlistenPromise = listen('agent_message_created', () => {
+      loadMessages();
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
   }, [currentSession, fetchMessages]);
 
   const handleSend = async () => {
