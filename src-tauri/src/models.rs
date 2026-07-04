@@ -110,3 +110,20 @@ pub enum MessageAuthor {
     Agent,
     Tool,
 }
+
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentStatus {
+    Thinking,
+    Executing,
+    Error,
+    Idle,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentStatusPayload {
+    pub session_id: String,
+    pub status: AgentStatus,
+    pub message: String,
+}

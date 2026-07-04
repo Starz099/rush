@@ -4,15 +4,25 @@ use crate::agent::tools::execute_tool;
 use crate::db::models::agent::message::Message;
 use crate::db::models::asset::Asset;
 use crate::db::models::project::Project;
+use crate::models::{AgentStatus, AgentStatusPayload};
 use crate::state::AppState;
 use serde_json::Value;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 pub async fn run_planner(
     app: tauri::AppHandle,
     session_id: String,
     _prompt: String,
 ) -> Result<String, String> {
+    let _ = app.emit(
+        "agent_status",
+        AgentStatusPayload {
+            session_id: session_id.clone(),
+            status: AgentStatus::Thinking,
+            message: "Analyzing your request and loading timeline...".to_string(),
+        },
+    );
+
     let state = app.state::<AppState>();
 
     // Scoped database retrieval block to auto-drop stmt and lock
@@ -125,9 +135,26 @@ pub async fn run_planner(
         loop_count += 1;
         println!("[planner] Starting loop iteration {}...", loop_count);
 
+        let _ = app.emit(
+            "agent_status",
+            AgentStatusPayload {
+                session_id: session_id.clone(),
+                status: AgentStatus::Thinking,
+                message: format!("Thinking (iteration {}/{})...", loop_count, MAX_LOOPS),
+            },
+        );
+
         let llm_res = match call_llm_messages(messages.clone()).await {
             Ok(res) => res,
             Err(e) => {
+                let _ = app.emit(
+                    "agent_status",
+                    AgentStatusPayload {
+                        session_id: session_id.clone(),
+                        status: AgentStatus::Error,
+                        message: format!("LLM Call failed: {}", e),
+                    },
+                );
                 eprintln!("[planner] LLM call failed: {}", e);
                 return Err(format!("LLM Call failed: {}", e));
             }
@@ -178,6 +205,15 @@ pub async fn run_planner(
                 for call in calls_list {
                     let tool_name = call["tool"].as_str().unwrap_or("");
                     let args = call["args"].clone();
+
+                    let _ = app.emit(
+                        "agent_status",
+                        AgentStatusPayload {
+                            session_id: session_id.clone(),
+                            status: AgentStatus::Executing,
+                            message: format!("Executing tool: {}", tool_name),
+                        },
+                    );
 
                     let call_msg = format!("● Tool Call: {}(args: {})", tool_name, args);
                     let db_state = app.state::<AppState>();
@@ -259,6 +295,15 @@ pub async fn run_planner(
             break;
         }
     }
+
+    let _ = app.emit(
+        "agent_status",
+        AgentStatusPayload {
+            session_id: session_id.clone(),
+            status: AgentStatus::Idle,
+            message: "".to_string(),
+        },
+    );
 
     Ok(final_response)
 }

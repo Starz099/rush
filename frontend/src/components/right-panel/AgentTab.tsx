@@ -3,6 +3,7 @@ import { useProjectStore } from '@/store/projectStore';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Message, MessageContent } from '@/components/ui/message';
+import { cn } from '@/lib/utils';
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -15,6 +16,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { TrashIcon } from '@phosphor-icons/react';
 import { listen } from '@tauri-apps/api/event';
+import { AGENT_STATUS, type AgentStatus } from '@/types/agent';
 
 const AgentTab = ({ projectId }: { projectId: string }) => {
   const sessions: Session[] = useProjectStore((state) => state.sessions);
@@ -28,6 +30,29 @@ const AgentTab = ({ projectId }: { projectId: string }) => {
 
   const [prompt, setPrompt] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<{
+    status: AgentStatus;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const unlistenPromise = listen<{
+      sessionId: string;
+      status: AgentStatus;
+      message: string;
+    }>('agent_status', (event) => {
+      if (currentSession && event.payload.sessionId === currentSession.id) {
+        setAgentStatus({
+          status: event.payload.status,
+          message: event.payload.message,
+        });
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [currentSession]);
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -115,33 +140,71 @@ const AgentTab = ({ projectId }: { projectId: string }) => {
           <MessageScroller>
             <MessageScrollerViewport className="no-scrollbar">
               <MessageScrollerContent className="p-(--card-spacing)">
-                {messages.map((message) => (
-                  <MessageScrollerItem
-                    key={message.id}
-                    scrollAnchor={message.role === 'user'}
-                  >
-                    <Message align={message.role === 'user' ? 'end' : 'start'}>
-                      <MessageContent
-                        className={
-                          message.role === 'user' ? 'items-end' : 'items-start'
-                        }
-                      >
-                        <div className="text-[10px] font-semibold text-white/30 uppercase">
-                          {message.role}
-                        </div>
-                        <div className="text-xs text-white/90">
-                          {message.content}
-                        </div>
-                      </MessageContent>
-                    </Message>
-                  </MessageScrollerItem>
-                ))}
+                {messages.map((message) => {
+                  const isUser = message.role === 'user';
+                  const isTool = message.role === 'tool';
+                  return (
+                    <MessageScrollerItem key={message.id} scrollAnchor={isUser}>
+                      <Message align={isUser ? 'end' : 'start'}>
+                        <MessageContent
+                          className={cn(
+                            'max-w-[85%] rounded-lg p-2.5 text-xs',
+                            isUser
+                              ? 'ml-auto items-end border border-blue-500/20 bg-blue-600/15 text-right'
+                              : isTool
+                                ? 'mr-auto items-start border border-yellow-500/10 bg-yellow-500/5 font-mono text-[10px] text-yellow-200/80'
+                                : 'mr-auto items-start border border-white/10 bg-white/5',
+                          )}
+                        >
+                          <div className="text-[9px] font-bold tracking-wider text-white/30 uppercase">
+                            {message.role}
+                          </div>
+                          <div
+                            className={cn(
+                              'leading-relaxed wrap-break-word text-white/90',
+                              isTool
+                                ? 'font-mono text-[10px]'
+                                : 'text-left text-xs',
+                            )}
+                          >
+                            {message.content}
+                          </div>
+                        </MessageContent>
+                      </Message>
+                    </MessageScrollerItem>
+                  );
+                })}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />
           </MessageScroller>
         </MessageScrollerProvider>
       </Card>
+
+      {/* Agent Thinking Status logs */}
+      {agentStatus && agentStatus.status !== AGENT_STATUS.Idle && (
+        <div className="flex shrink-0 animate-pulse items-center gap-2 rounded border border-white/10 bg-white/5 p-2 text-[10px] text-white/70">
+          <div
+            className={`h-1.5 w-1.5 animate-ping rounded-full ${
+              agentStatus.status === AGENT_STATUS.Error
+                ? 'bg-red-400'
+                : 'bg-blue-400'
+            }`}
+          />
+          <span
+            className={`font-bold uppercase ${
+              agentStatus.status === AGENT_STATUS.Error
+                ? 'text-red-400'
+                : 'text-blue-400'
+            }`}
+          >
+            {agentStatus.status}:
+          </span>
+          <span className="flex-1 truncate font-mono">
+            {agentStatus.message}
+          </span>
+        </div>
+      )}
 
       {/* Input box */}
       <Card className="flex shrink-0 gap-2 p-2">
