@@ -45,11 +45,12 @@ Use these to perform editing actions.
    - Signature: `delete_clip(clip_id)`
 
 7. `move_clip`
-   - Description: Moves an existing clip to a new start frame position on the timeline (keeps same duration).
+   - Description: Moves an existing clip to a new start frame position on the timeline (keeps same duration). Can optionally move it to a different track.
    - Parameters:
      - `clip_id` (string, required): The ID of the clip to move.
      - `new_timeline_in` (number, required): The new start frame on the timeline.
-   - Signature: `move_clip(clip_id, new_timeline_in)`
+     - `new_track_id` (string, optional): The target track ID if shifting tracks.
+   - Signature: `move_clip(clip_id, new_timeline_in, new_track_id)`
 
 8. `trim_clip`
    - Description: Trims or slides the in/out points of a clip.
@@ -61,16 +62,23 @@ Use these to perform editing actions.
      - `source_out` (number, optional): End trim point in source asset (frames).
    - Signature: `trim_clip(clip_id, timeline_in, timeline_out, source_in, source_out)`
 
-9. `update_transform`
-   - Description: Adjusts scale and 2D translation offsets (x, y) of a clip.
+9. `split_clip`
+   - Description: Splits a single clip at a specific timeline frame into two separate sequential clips.
    - Parameters:
-     - `clip_id` (string, required): Clip ID.
-     - `x` (number, optional): X coordinate translation.
-     - `y` (number, optional): Y coordinate translation.
-     - `scale` (number, optional): Visual size multiplier (e.g. 1.2).
-   - Signature: `update_transform(clip_id, x, y, scale)`
+     - `clip_id` (string, required): The ID of the clip to split.
+     - `split_frame` (number, required): The timeline frame number at which the split occurs.
+   - Signature: `split_clip(clip_id, split_frame)`
 
-10. `add_effect`
+10. `update_transform`
+    - Description: Adjusts scale and 2D translation offsets (x, y) of a clip.
+    - Parameters:
+      - `clip_id` (string, required): Clip ID.
+      - `x` (number, optional): X coordinate translation.
+      - `y` (number, optional): Y coordinate translation.
+      - `scale` (number, optional): Visual size multiplier (e.g. 1.2).
+    - Signature: `update_transform(clip_id, x, y, scale)`
+
+11. `add_effect`
     - Description: Adds a filter, zoom, overlay, or speed adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -82,7 +90,14 @@ Use these to perform editing actions.
         - For "speed": `{ "speed_factor": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
-11. `set_background`
+12. `remove_effect`
+    - Description: Removes an existing effect or speed adjustment from a clip.
+    - Parameters:
+      - `clip_id` (string, required): The ID of the clip.
+      - `effect_type` (string, required): The effect type to remove ("zoom", "highlight", "text_overlay", "speed").
+    - Signature: `remove_effect(clip_id, effect_type)`
+
+13. `set_background`
     - Description: Sets the canvas background style.
     - Parameters:
       - `color_hex` (string, optional): Hex code for solid background (e.g. "#FF0000").
@@ -90,13 +105,13 @@ Use these to perform editing actions.
       - `blur` (number, optional): Blur filter radius.
     - Signature: `set_background(color_hex, gradient_colors, blur)`
 
-12. `set_playhead`
+14. `set_playhead`
     - Description: Changes the current timeline position of the playback cursor.
     - Parameters:
       - `position` (number, required): Frame number.
     - Signature: `set_playhead(position)`
 
-13. `mute_track` / `lock_track`
+15. `mute_track` / `lock_track`
     - Description: Mutes or locks a track.
     - Parameters:
       - `track_id` (string, required): Track ID.

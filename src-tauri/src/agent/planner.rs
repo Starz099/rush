@@ -76,7 +76,23 @@ pub async fn run_planner(
     };
 
     // 5. Build system prompt using the documented tools structure
-    let system_prompt = build_system_prompt();
+    let editing_registry = crate::commands::project::get_presets::get_editing_registry();
+    let mut registry_desc = String::from("Supported Tools:\n");
+    for tool in &editing_registry.tools {
+        registry_desc.push_str(&format!(
+            "- Name: '{}'\n  Label: {}\n  Description: {}\n",
+            tool.name, tool.label, tool.description
+        ));
+    }
+    registry_desc.push_str("\nSupported Effects:\n");
+    for effect in &editing_registry.effects {
+        registry_desc.push_str(&format!(
+            "- Name: '{}'\n  Label: {}\n  Description: {}\n  Default Config: {}\n",
+            effect.name, effect.label, effect.description, effect.default_config_json
+        ));
+    }
+
+    let system_prompt = build_system_prompt(&registry_desc);
 
     // 6. Build the message array for the multi-turn LLM completions call
     let mut messages = Vec::new();

@@ -115,28 +115,51 @@ pub fn move_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<Str
         .as_i64()
         .ok_or_else(|| "Missing 'new_timeline_in' argument".to_string())?
         as i32;
+    let new_track_id = args["new_track_id"].as_str();
 
-    let mut found = false;
-    for track in &mut timeline_state.tracks {
+    let mut found_clip = None;
+    let mut source_track_idx = None;
+
+    // Find and remove clip from its original track
+    for (t_idx, track) in timeline_state.tracks.iter_mut().enumerate() {
         if let Some(pos) = track.clips.iter().position(|c| c.id == clip_id) {
             let mut clip = track.clips.remove(pos);
+            track.validate_and_sort_clips(); // Validate source track
             let duration = clip.timeline_out - clip.timeline_in;
             clip.timeline_in = new_timeline_in;
             clip.timeline_out = new_timeline_in + duration;
-            track.clips.push(clip);
-            track.validate_and_sort_clips();
-            found = true;
+            found_clip = Some(clip);
+            source_track_idx = Some(t_idx);
             break;
         }
     }
 
-    if found {
+    let clip = found_clip.ok_or_else(|| format!("Clip '{}' not found in any track.", clip_id))?;
+
+    if let Some(target_track_id) = new_track_id {
+        // Insert into target track
+        let target_idx = timeline_state
+            .tracks
+            .iter()
+            .position(|t| t.id == target_track_id)
+            .ok_or_else(|| format!("Target track '{}' not found.", target_track_id))?;
+        let target_track = &mut timeline_state.tracks[target_idx];
+        target_track.clips.push(clip);
+        target_track.validate_and_sort_clips();
+        Ok(format!(
+            "Successfully moved clip '{}' to track '{}' at frame position {}.",
+            clip_id, target_track_id, new_timeline_in
+        ))
+    } else {
+        // Put back in original track at new position
+        let source_idx = source_track_idx.ok_or_else(|| "Source track idx mismatch".to_string())?;
+        let source_track = &mut timeline_state.tracks[source_idx];
+        source_track.clips.push(clip);
+        source_track.validate_and_sort_clips();
         Ok(format!(
             "Successfully moved clip '{}' to timeline frame position {}.",
             clip_id, new_timeline_in
         ))
-    } else {
-        Err(format!("Clip '{}' not found in any track.", clip_id))
     }
 }
 
@@ -175,4 +198,64 @@ pub fn trim_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<Str
     } else {
         Err(format!("Clip '{}' not found in any track.", clip_id))
     }
+}
+
+pub fn split_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<String, String> {
+    let clip_id = args["clip_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'clip_id' argument".to_string())?;
+    let split_frame = args["split_frame"]
+        .as_i64()
+        .ok_or_else(|| "Missing 'split_frame' argument".to_string())? as i32;
+
+    let mut found_track_idx = None;
+    let mut found_clip_idx = None;
+
+    for (t_idx, track) in timeline_state.tracks.iter().enumerate() {
+        if let Some(c_idx) = track.clips.iter().position(|c| c.id == clip_id) {
+            found_track_idx = Some(t_idx);
+            found_clip_idx = Some(c_idx);
+            break;
+        }
+    }
+
+    let track_idx = found_track_idx.ok_or_else(|| format!("Clip '{}' not found.", clip_id))?;
+    let clip_idx = found_clip_idx.unwrap();
+    let track = &mut timeline_state.tracks[track_idx];
+    let clip = &track.clips[clip_idx];
+
+    if split_frame <= clip.timeline_in || split_frame >= clip.timeline_out {
+        return Err(format!(
+            "Split position {} is outside clip bounds [{} -> {}].",
+            split_frame, clip.timeline_in, clip.timeline_out
+        ));
+    }
+
+    let speed = clip.speed_factor;
+
+    // Calculate source frames representing the split boundary
+    let frames_from_start = split_frame - clip.timeline_in;
+    let source_split_offset = (frames_from_start as f32 * speed) as i32;
+    let split_source_frame = clip.source_in + source_split_offset;
+
+    let mut clip_a = clip.clone();
+    clip_a.id = Uuid::new_v4().to_string();
+    clip_a.timeline_out = split_frame;
+    clip_a.source_out = split_source_frame;
+
+    let mut clip_b = clip.clone();
+    clip_b.id = Uuid::new_v4().to_string();
+    clip_b.timeline_in = split_frame;
+    clip_b.source_in = split_source_frame;
+
+    // Remove original clip, insert A and B
+    track.clips.remove(clip_idx);
+    track.clips.push(clip_a.clone());
+    track.clips.push(clip_b.clone());
+    track.validate_and_sort_clips();
+
+    Ok(format!(
+        "Successfully split clip '{}' at frame {} into clip '{}' and clip '{}'.",
+        clip_id, split_frame, clip_a.id, clip_b.id
+    ))
 }

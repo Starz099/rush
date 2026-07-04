@@ -35,10 +35,12 @@ pub fn execute_tool(
         "delete_clip" => timeline::delete_clip(&args, timeline_state),
         "move_clip" => timeline::move_clip(&args, timeline_state),
         "trim_clip" => timeline::trim_clip(&args, timeline_state),
+        "split_clip" => timeline::split_clip(&args, timeline_state),
 
         // Effects / Spatial Tools
         "update_transform" => effects::update_transform(&args, timeline_state),
         "add_effect" => effects::add_effect(&args, timeline_state),
+        "remove_effect" => effects::remove_effect(&args, timeline_state),
 
         // Project Tools
         "set_background" => project::set_background(&args, timeline_state),

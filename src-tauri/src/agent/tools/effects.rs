@@ -55,6 +55,16 @@ pub fn add_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<St
         .ok_or_else(|| "Missing 'effect_type' argument".to_string())?;
     let config = &args["config"];
 
+    let registry = crate::commands::project::get_presets::get_editing_registry();
+    let supported_effects: Vec<String> = registry.effects.iter().map(|e| e.name.clone()).collect();
+    let effect_type_lower = effect_type.to_lowercase();
+    if !supported_effects.contains(&effect_type_lower) {
+        return Err(format!(
+                "Error: Effect '{}' is not registered in the project's editing registry. Supported effects are: {:?}",
+                effect_type, supported_effects
+            ));
+    }
+
     let mut found = false;
     for track in &mut timeline_state.tracks {
         if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
@@ -136,5 +146,55 @@ pub fn add_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<St
         ))
     } else {
         Err(format!("Clip '{}' not found.", clip_id))
+    }
+}
+
+pub fn remove_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<String, String> {
+    let clip_id = args["clip_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'clip_id' argument".to_string())?;
+    let effect_type = args["effect_type"]
+        .as_str()
+        .ok_or_else(|| "Missing 'effect_type' argument".to_string())?;
+
+    let mut found = false;
+    for track in &mut timeline_state.tracks {
+        if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
+            match effect_type.to_lowercase().as_str() {
+                "speed" => {
+                    clip.speed_factor = 1.0;
+                    found = true;
+                }
+                other => {
+                    let original_len = clip.effects.len();
+                    clip.effects.retain(|effect| {
+                        let name = match effect {
+                            EffectConfig::Zoom { .. } => "zoom",
+                            EffectConfig::TextOverlay { .. } => "text_overlay",
+                            EffectConfig::Highlight { .. } => "highlight",
+                        };
+                        name != other
+                    });
+                    if clip.effects.len() < original_len {
+                        found = true;
+                    }
+                }
+            }
+            if found {
+                break;
+            }
+        }
+    }
+
+    if found {
+        Ok(format!(
+            "Successfully removed effect '{}' from clip '{}'.",
+            effect_type, clip_id
+        ))
+    } else {
+        Err(format!(
+            "Effect '{}' not found or clip '{}' doesn't exist.",
+            effect_type, clip_id
+        ))
     }
 }
