@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, specta::Type, Clone, Copy, Debug)]
+use specta::Type;
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug)]
 pub enum ResolutionPreset {
     #[serde(rename = "1080p")]
     P1080,
@@ -20,7 +20,7 @@ impl ResolutionPreset {
     }
 }
 
-#[derive(Serialize, Deserialize, specta::Type, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug)]
 pub enum FpsPreset {
     #[serde(rename = "15")]
     F15,
@@ -40,7 +40,7 @@ impl FpsPreset {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum TrackType {
     Video,
@@ -48,14 +48,14 @@ pub enum TrackType {
     Effects,
 }
 
-#[derive(serde::Serialize, specta::Type)]
+#[derive(Serialize, Type)]
 pub struct RangeResult {
     pub bytes: Vec<u8>,
     pub file_start: f64,
     pub total_length: f64,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolutionConfig {
     pub label: String,
@@ -64,21 +64,21 @@ pub struct ResolutionConfig {
     pub height: i32,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FpsConfig {
     pub label: String,
     pub value: FpsPreset,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PresetsConfig {
     pub resolutions: Vec<ResolutionConfig>,
     pub fps_options: Vec<FpsConfig>,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolDescriptor {
     pub name: String,
@@ -86,7 +86,7 @@ pub struct ToolDescriptor {
     pub description: String,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EffectDescriptor {
     pub name: String,
@@ -96,9 +96,34 @@ pub struct EffectDescriptor {
     pub default_config_json: String,
 }
 
-#[derive(serde::Serialize, specta::Type, Clone)]
+#[derive(Serialize, Type, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EditingRegistry {
     pub tools: Vec<ToolDescriptor>,
     pub effects: Vec<EffectDescriptor>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum MessageAuthor {
+    User,
+    Agent,
+    Tool,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentStatus {
+    Thinking,
+    Executing,
+    Error,
+    Idle,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentStatusPayload {
+    pub session_id: String,
+    pub status: AgentStatus,
+    pub message: String,
 }

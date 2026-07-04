@@ -1,7 +1,7 @@
 use crate::models::TrackType;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+use specta::Type;
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
 pub enum BackgroundSource {
     Solid {
@@ -14,7 +14,7 @@ pub enum BackgroundSource {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum TransitionType {
     Fade,
@@ -23,7 +23,7 @@ pub enum TransitionType {
     Zoom,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum EaseCurve {
     Linear,
@@ -31,7 +31,7 @@ pub enum EaseCurve {
     EaseOut,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Shape {
     Circle,
@@ -40,7 +40,7 @@ pub enum Shape {
     Highlighter,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
 pub enum EffectConfig {
     Zoom {
@@ -72,14 +72,14 @@ fn default_blur_value() -> u32 {
     0
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct BackgroundConfig {
     pub source: BackgroundSource,
     #[serde(default = "default_blur_value")]
     pub blur_value: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Transition {
     pub id: String,
     pub from_clip_id: String,
@@ -98,7 +98,7 @@ pub fn default_background() -> BackgroundConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct TimelineState {
     pub playhead_position: i32,
     pub tracks: Vec<Track>,
@@ -106,7 +106,7 @@ pub struct TimelineState {
     pub background: Option<BackgroundConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Track {
     pub id: String,
     pub name: String,
@@ -120,7 +120,7 @@ pub struct Track {
     pub is_locked: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Transform {
     pub x: f32,
     pub y: f32,
@@ -128,7 +128,7 @@ pub struct Transform {
     pub z_index: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Clip {
     pub id: String,
     pub asset_id: Option<String>,

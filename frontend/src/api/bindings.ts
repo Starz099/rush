@@ -61,6 +61,28 @@ export const commands = {
     typedError<string, string>(
       __TAURI_INVOKE('slice_audio_asset', { filePath, startSec, durationSec }),
     ),
+  runAgent: (projectId: string, sessionId: string, prompt: string) =>
+    typedError<string, string>(
+      __TAURI_INVOKE('run_agent', { projectId, sessionId, prompt }),
+    ),
+  getMessages: (sessionId: string) =>
+    typedError<Message[], string>(
+      __TAURI_INVOKE('get_messages', { sessionId }),
+    ),
+  createMessage: (sessionId: string, role: MessageAuthor, content: string) =>
+    typedError<Message, string>(
+      __TAURI_INVOKE('create_message', { sessionId, role, content }),
+    ),
+  getSessions: (projectId: string) =>
+    typedError<Session[], string>(
+      __TAURI_INVOKE('get_sessions', { projectId }),
+    ),
+  createSession: (projectId: string) =>
+    typedError<Session, string>(
+      __TAURI_INVOKE('create_session', { projectId }),
+    ),
+  deleteSession: (sessionId: string) =>
+    typedError<null, string>(__TAURI_INVOKE('delete_session', { sessionId })),
 };
 
 /* Types */
@@ -160,6 +182,17 @@ export type FpsConfig = {
 
 export type FpsPreset = '15' | '30' | '60';
 
+export type Message = {
+  id: string;
+  session_id: string;
+  role: MessageAuthor;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MessageAuthor = 'user' | 'agent' | 'tool';
+
 export type PresetsConfig = {
   resolutions: ResolutionConfig[];
   fpsOptions: FpsConfig[];
@@ -190,6 +223,13 @@ export type ResolutionConfig = {
 };
 
 export type ResolutionPreset = '1080p' | '4k' | 'vertical';
+
+export type Session = {
+  id: string;
+  project_id: string;
+  created_at: string;
+  updated_at: string;
+};
 
 export type Shape = 'circle' | 'rectangle' | 'arrow' | 'highlighter';
 

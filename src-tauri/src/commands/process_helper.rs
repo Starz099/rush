@@ -20,6 +20,9 @@ pub fn create_ffmpeg_command() -> Command {
 
     let mut cmd = Command::new(ffmpeg_path);
 
+    cmd.stdout(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::null());
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;

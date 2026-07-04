@@ -1,40 +1,40 @@
 import { useState } from 'react';
-import { AssetsTab } from './AssetsTab';
-import { ToolsTab } from './ToolsTab';
+import PropertiesTab from './PropertiesTab';
+import AgentTab from './AgentTab';
 
-export const LeftPanel = ({ projectId }: { projectId: string }) => {
-  const [activeTab, setActiveTab] = useState<'assets' | 'tools'>('assets');
+export const RightPanel = ({ projectId }: { projectId: string }) => {
+  const [activeTab, setActiveTab] = useState<'properties' | 'agent'>('agent');
 
   return (
     <div className="flex h-full flex-col">
       {/* Sidebar Tabs */}
       <div className="flex h-10 shrink-0 border-b border-white/5 bg-[#111]">
         <button
-          onClick={() => setActiveTab('assets')}
+          onClick={() => setActiveTab('properties')}
           className={`flex-1 text-[10px] font-bold tracking-wider uppercase transition-all duration-150 ${
-            activeTab === 'assets'
+            activeTab === 'properties'
               ? 'border-b-2 border-blue-500 bg-white/[0.02] text-blue-400'
               : 'text-white/40 hover:text-white/80'
           }`}
         >
-          Assets
+          Properties
         </button>
         <button
-          onClick={() => setActiveTab('tools')}
+          onClick={() => setActiveTab('agent')}
           className={`flex-1 text-[10px] font-bold tracking-wider uppercase transition-all duration-150 ${
-            activeTab === 'tools'
+            activeTab === 'agent'
               ? 'border-b-2 border-blue-500 bg-white/[0.02] text-blue-400'
               : 'text-white/40 hover:text-white/80'
           }`}
         >
-          Tools
+          Agent
         </button>
       </div>
 
-      {activeTab === 'assets' ? (
-        <AssetsTab projectId={projectId} />
+      {activeTab === 'properties' ? (
+        <PropertiesTab />
       ) : (
-        <ToolsTab />
+        <AgentTab projectId={projectId} />
       )}
     </div>
   );

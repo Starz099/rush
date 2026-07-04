@@ -1,4 +1,4 @@
-use rusqlite::Row;
+use rusqlite::{Error, Row};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, specta::Type)]
@@ -14,7 +14,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn from_row(row: &Row) -> Result<Self, rusqlite::Error> {
+    pub fn from_row(row: &Row) -> Result<Self, Error> {
         Ok(Self {
             id: row.get(0)?,
             project_id: row.get(1)?,
