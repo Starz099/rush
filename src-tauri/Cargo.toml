@@ -36,3 +36,5 @@ tauri-plugin-notification = "2"
 reqwest = { version = "0.13.3", features = ["json"] }
 tokio = { version = "1.52.3", features = ["full"] }
 sqlite-vec = "0.1.9"
+hound = "3.5.1"
+whisper-rs = "0.16.0"

@@ -1,6 +1,7 @@
 pub mod delete_asset;
 pub mod extract_audio;
 pub mod get_assets;
+pub mod preprocess;
 pub mod read_asset_bytes;
 pub mod read_asset_range;
 pub mod read_moov_box;

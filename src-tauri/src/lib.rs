@@ -1,8 +1,8 @@
-mod agent;
-mod commands;
-mod db;
-mod models;
-mod state;
+pub mod agent;
+pub mod commands;
+pub mod db;
+pub mod models;
+pub mod state;
 
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;

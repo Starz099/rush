@@ -1,12 +1,13 @@
 use crate::db::models::asset::Asset;
 use crate::state::AppState;
 use std::path::Path;
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 #[tauri::command]
 #[specta::specta]
 pub fn register_asset(
+    app_handle: AppHandle,
     state: State<'_, AppState>,
     project_id: String,
     file_path: String,
@@ -63,6 +64,26 @@ pub fn register_asset(
         ),
     )
     .map_err(|e| e.to_string())?;
+
+    // Spawn background preprocessing task
+    let app_handle_clone = app_handle.clone();
+    let id_clone = id.clone();
+    let file_path_clone = file_path.clone();
+    let media_type_clone = media_type.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = crate::commands::asset::preprocess::preprocess_asset_in_background(
+            app_handle_clone,
+            id_clone,
+            file_path_clone,
+            media_type_clone,
+            duration_ms,
+        )
+        .await
+        {
+            eprintln!("Error preprocessing asset in background: {}", e);
+        }
+    });
 
     let new_asset = db.query_row(
         "SELECT id, project_id, name, file_path, media_type, thumbnail_path, duration_ms, created_at 
