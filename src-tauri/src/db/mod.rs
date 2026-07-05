@@ -72,6 +72,8 @@ pub fn initialize_database(app_data_dir: &Path) -> Connection {
             duration_ms INTEGER DEFAULT 0,
             primary_type TEXT,
             mood_tags TEXT,
+            amplitude_envelope TEXT,
+            beats TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(asset_id) REFERENCES assets(id) ON DELETE CASCADE
         );

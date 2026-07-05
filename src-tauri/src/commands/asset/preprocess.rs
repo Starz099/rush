@@ -56,6 +56,13 @@ pub fn transcribe_audio(
         })
         .collect();
 
+    let envelope = calculate_rms_envelope(&samples);
+    let beats = detect_beats(&envelope);
+    let bpm = calculate_bpm(&beats);
+
+    let serialized_envelope = serde_json::to_string(&envelope).unwrap_or_else(|_| "[]".to_string());
+    let serialized_beats = serde_json::to_string(&beats).unwrap_or_else(|_| "[]".to_string());
+
     // 2. Load Whisper context
     let ctx = WhisperContext::new_with_params(
         model_path.to_str().ok_or("Invalid model path")?,
@@ -92,6 +99,14 @@ pub fn transcribe_audio(
     let tx = db
         .transaction()
         .map_err(|e| format!("Failed to start database transaction: {}", e))?;
+
+    tx.execute(
+        "UPDATE asset_metadata
+             SET bpm = ?1, amplitude_envelope = ?2, beats = ?3
+             WHERE asset_id = ?4",
+        (&bpm, &serialized_envelope, &serialized_beats, asset_id),
+    )
+    .map_err(|e| format!("Failed to update asset metadata: {}", e))?;
 
     // 6. Iterate through segments using modern whisper-rs iterator API
     for segment in state.as_iter() {
@@ -235,4 +250,81 @@ pub async fn preprocess_asset_in_background(
     }
 
     Ok(())
+}
+
+/// Calculates the RMS energy envelope for every 100ms window (1,600 samples at 16kHz)
+pub fn calculate_rms_envelope(samples: &[f32]) -> Vec<f32> {
+    let window_size = 1600; // 100ms at 16kHz
+    let mut envelope = Vec::new();
+
+    for chunk in samples.chunks(window_size) {
+        if chunk.is_empty() {
+            continue;
+        }
+        // Step 1: Sum of squares
+        let sum_sq: f32 = chunk.iter().map(|&x| x * x).sum();
+        // Step 2: Mean square
+        let mean_sq = sum_sq / chunk.len() as f32;
+        // Step 3: Square root
+        let rms = mean_sq.sqrt();
+        envelope.push(rms);
+    }
+
+    envelope
+}
+
+/// Detects beat onsets (sudden volume spikes / beats) from the RMS energy envelope
+pub fn detect_beats(envelope: &[f32]) -> Vec<f32> {
+    let mut beat_timestamps = Vec::new();
+    let window_size = 5; // 500ms sliding average window
+    let threshold = 1.35; // Onset sensitivity multiplier (1.35x average)
+
+    for i in window_size..envelope.len() {
+        let current_energy = envelope[i];
+
+        // Calculate the local average energy of the preceding frames
+        let start = i - window_size;
+        let sum: f32 = envelope[start..i].iter().sum();
+        let local_avg = sum / window_size as f32;
+
+        // If current energy rises significantly above local average, it's an onset!
+        if current_energy > local_avg * threshold && current_energy > 0.015 {
+            // Timestamp in seconds (each envelope index represents 100ms / 0.1s)
+            let timestamp_sec = i as f32 * 0.1;
+            beat_timestamps.push(timestamp_sec);
+        }
+    }
+
+    beat_timestamps
+}
+
+/// Estimates the BPM (Beats Per Minute) from a list of beat timestamps in seconds
+pub fn calculate_bpm(beats: &[f32]) -> f64 {
+    if beats.len() < 2 {
+        return 0.0;
+    }
+
+    // Compute intervals between consecutive beats
+    let intervals: Vec<f32> = beats.windows(2).map(|w| w[1] - w[0]).collect();
+
+    // Filter out intervals that are physically unlikely for music tempo (e.g., < 0.2s or > 2.0s)
+    let valid_intervals: Vec<f32> = intervals
+        .into_iter()
+        .filter(|&interval| interval >= 0.2 && interval <= 2.0)
+        .collect();
+
+    if valid_intervals.is_empty() {
+        return 0.0;
+    }
+
+    let sum: f32 = valid_intervals.iter().sum();
+    let avg_interval = sum / valid_intervals.len() as f32;
+
+    if avg_interval > 0.0 {
+        let raw_bpm = 60.0 / avg_interval;
+        // Round to 1 decimal place for neatness
+        (raw_bpm as f64 * 10.0).round() / 10.0
+    } else {
+        0.0
+    }
 }
