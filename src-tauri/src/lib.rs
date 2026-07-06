@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod asset_processor;
 pub mod commands;
 pub mod db;
 pub mod models;

@@ -72,7 +72,7 @@ pub fn register_asset(
     let media_type_clone = media_type.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = crate::commands::asset::preprocess::preprocess_asset_in_background(
+        if let Err(e) = crate::asset_processor::preprocess_asset_in_background(
             app_handle_clone,
             id_clone,
             file_path_clone,

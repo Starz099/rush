@@ -1,5 +1,5 @@
 use app_lib::agent::ai::models::ensure_whisper_model;
-use app_lib::commands::asset::preprocess::{extract_wav_for_whisper, transcribe_audio};
+use app_lib::asset_processor::audio::{extract_wav_for_whisper, transcribe_audio};
 use std::path::Path;
 
 #[tokio::test]
