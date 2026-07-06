@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod composer;
 pub mod video;
 
 use rusqlite::Connection;

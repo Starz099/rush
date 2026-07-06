@@ -23,6 +23,7 @@ macro_rules! run_with_commands {
             commands::project::save_project_timeline::save_project_timeline,
             commands::project::get_presets::get_presets,
             commands::project::get_presets::get_editing_registry,
+            commands::project::get_timeline_transcript::get_timeline_transcript,
 
             // --- ASSET COMMANDS ---
             commands::asset::register_asset::register_asset,
