@@ -56,7 +56,10 @@ export class WebGPURenderer {
         format: this.format,
         alphaMode: 'premultiplied',
         // COPY_SRC is useful if we ever want to read from preview canvas
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.TEXTURE_BINDING,
       });
     } else {
       // Force RGBA format for offscreen exporting (standard format avoiding driver channels swap)
@@ -65,7 +68,10 @@ export class WebGPURenderer {
       this.offscreenTexture = this.device.createTexture({
         size: [this.width, this.height],
         format: this.format,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.TEXTURE_BINDING,
       });
     }
 

@@ -11,6 +11,7 @@ import {
   AUDIO_CHUNK_SIZE_SECONDS,
   EXPORT_VIDEO_BITRATE,
 } from '@/constants/export';
+import { generateStoryboardImpl } from '../storyboard/StoryboardGenerator';
 
 export class ExportEngine {
   private renderer: WebGPURenderer;
@@ -591,5 +592,39 @@ export class ExportEngine {
     }
 
     console.log('[ExportEngine] Export loop finished.');
+  }
+
+  /**
+   * Generates a tiled storyboard strip of key scene changes.
+   * Utilizes a highly optimized two-pass CPU-GPU visual pipeline.
+   */
+  public async generateStoryboard(
+    activeProject: Project,
+    assets: Asset[],
+    options: {
+      startFrame?: number;
+      endFrame?: number;
+      tileWidth?: number;
+      tileHeight?: number;
+      columns?: number;
+      maxTiles?: number;
+      madThreshold?: number;
+      coverageFloorSeconds?: number;
+      candidateIntervalSeconds?: number;
+    } = {},
+  ): Promise<{
+    pixels: Uint8Array;
+    width: number;
+    height: number;
+    timestamps: number[];
+  }> {
+    return generateStoryboardImpl(
+      this.width,
+      this.height,
+      () => this.disposed,
+      activeProject,
+      assets,
+      options,
+    );
   }
 }

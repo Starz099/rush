@@ -63,3 +63,50 @@ pub fn get_track_details(args: &Value, timeline_state: &TimelineState) -> Result
 
     Ok(format_timeline(std::slice::from_ref(track)))
 }
+
+pub fn get_timeline_transcript(
+    args: &Value,
+    timeline_state: &TimelineState,
+    framerate: i32,
+    app: &tauri::AppHandle,
+) -> Result<String, String> {
+    use crate::state::AppState;
+    use tauri::Manager;
+
+    let start_frame = args["start_frame"].as_i64().ok_or("Missing start_frame")? as i32;
+    let end_frame = args["end_frame"].as_i64().ok_or("Missing end_frame")? as i32;
+
+    let db_state = app.state::<AppState>();
+    let db = db_state.db.lock().map_err(|e| e.to_string())?;
+
+    let composed = crate::asset_processor::composer::audio::compose_transcript(
+        &db,
+        timeline_state,
+        framerate,
+        start_frame,
+        end_frame,
+    )?;
+
+    Ok(composed.text)
+}
+
+pub async fn inspect_timeline(
+    args: &Value,
+    app: tauri::AppHandle,
+    framerate: i32,
+) -> Result<String, String> {
+    let start_frame = args["start_frame"].as_i64().ok_or("Missing start_frame")? as i32;
+    let end_frame = args["end_frame"].as_i64().ok_or("Missing end_frame")? as i32;
+    let default_step = (framerate as i64 / 4).max(1);
+    let step_frames = args["step_frames"].as_i64().unwrap_or(default_step) as i32;
+
+    let base64_image = crate::commands::agent::visual_composer::inspect_timeline(
+        app,
+        start_frame,
+        end_frame,
+        step_frames,
+    )
+    .await?;
+
+    Ok(format!("[STORYBOARD_IMAGE:base64:{}]", base64_image))
+}
