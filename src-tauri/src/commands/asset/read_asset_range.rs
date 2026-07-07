@@ -34,9 +34,12 @@ pub fn read_asset_range(
     file.seek(SeekFrom::Start(start_pos))
         .map_err(|e| e.to_string())?;
 
-    let mut buffer = vec![0u8; length as usize];
-    let bytes_read = file.read(&mut buffer).map_err(|e| e.to_string())?;
-    buffer.truncate(bytes_read);
+    let remaining = file_len - start_pos;
+    let read_len = (length as u64).min(remaining) as usize;
+
+    let mut buffer = vec![0u8; read_len];
+    file.read_exact(&mut buffer)
+        .map_err(|e: std::io::Error| e.to_string())?;
 
     Ok(RangeResult {
         bytes: buffer,

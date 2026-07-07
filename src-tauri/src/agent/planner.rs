@@ -225,7 +225,16 @@ pub async fn run_planner(
                         call_msg,
                     );
 
-                    match execute_tool(tool_name, args, &mut current_timeline, &assets, &project) {
+                    match execute_tool(
+                        &app,
+                        tool_name,
+                        args,
+                        &mut current_timeline,
+                        &assets,
+                        &project,
+                    )
+                    .await
+                    {
                         Ok(msg) => {
                             let result_msg = format!("● Tool Result: Success ({})", msg);
                             let db_state = app.state::<AppState>();
@@ -273,13 +282,49 @@ pub async fn run_planner(
             let feedback_str = feedback.join("\n");
             println!("[planner] Tool execution feedback: {}", feedback_str);
 
+            let mut content_blocks = Vec::new();
+            let mut plain_text = format!("Tool execution feedback:\n{}", feedback_str);
+
+            if let Some(start_idx) = feedback_str.find("[STORYBOARD_IMAGE:base64:") {
+                let tag_prefix = "[STORYBOARD_IMAGE:base64:";
+                if let Some(end_idx) = feedback_str[start_idx..].find(']') {
+                    let full_end = start_idx + end_idx;
+                    let base64_start = start_idx + tag_prefix.len();
+                    let base64_data = &feedback_str[base64_start..full_end];
+
+                    plain_text = format!(
+                        "Tool execution feedback:\n{}[STORYBOARD_IMAGE_ATTACHED]{}",
+                        &feedback_str[..start_idx],
+                        &feedback_str[full_end + 1..]
+                    );
+
+                    content_blocks.push(serde_json::json!({
+                        "type": "text",
+                        "text": plain_text.clone()
+                    }));
+
+                    content_blocks.push(serde_json::json!({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": format!("data:image/jpeg;base64,{}", base64_data)
+                        }
+                    }));
+                }
+            }
+
+            let user_content = if content_blocks.is_empty() {
+                serde_json::json!(plain_text)
+            } else {
+                serde_json::json!(content_blocks)
+            };
+
             messages.push(serde_json::json!({
                 "role": "assistant",
                 "content": cleaned_res
             }));
             messages.push(serde_json::json!({
                 "role": "user",
-                "content": format!("Tool execution feedback:\n{}", feedback_str)
+                "content": user_content
             }));
         } else {
             let message_val = &json_res["message"];

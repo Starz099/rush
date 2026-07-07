@@ -25,6 +25,18 @@ export const commands = {
   getPresets: () => __TAURI_INVOKE<PresetsConfig>('get_presets'),
   getEditingRegistry: () =>
     __TAURI_INVOKE<EditingRegistry>('get_editing_registry'),
+  getTimelineTranscript: (
+    projectId: string,
+    startFrame: number,
+    endFrame: number,
+  ) =>
+    typedError<ComposedTranscript, string>(
+      __TAURI_INVOKE('get_timeline_transcript', {
+        projectId,
+        startFrame,
+        endFrame,
+      }),
+    ),
   registerAsset: (
     projectId: string,
     filePath: string,
@@ -83,6 +95,21 @@ export const commands = {
     ),
   deleteSession: (sessionId: string) =>
     typedError<null, string>(__TAURI_INVOKE('delete_session', { sessionId })),
+  inspectTimeline: (startFrame: number, endFrame: number, stepFrames: number) =>
+    typedError<string, string>(
+      __TAURI_INVOKE('inspect_timeline', { startFrame, endFrame, stepFrames }),
+    ),
+  submitTimelineSnapshots: (requestId: string, storyboardBase64: string) =>
+    typedError<null, string>(
+      __TAURI_INVOKE('submit_timeline_snapshots', {
+        requestId,
+        storyboardBase64,
+      }),
+    ),
+  saveTestStoryboard: (storyboardBase64: string) =>
+    typedError<null, string>(
+      __TAURI_INVOKE('save_test_storyboard', { storyboardBase64 }),
+    ),
 };
 
 /* Types */
@@ -128,6 +155,19 @@ export type Clip = {
   transform: Transform | null;
   speed_factor?: number | null;
   effects?: EffectConfig[];
+};
+
+export type ComposedTranscript = {
+  text: string;
+  words: ComposedWord[];
+};
+
+export type ComposedWord = {
+  word: string;
+  start_frame: number;
+  end_frame: number;
+  start_ms: number;
+  end_ms: number;
 };
 
 export type EaseCurve = 'linear' | 'ease_in' | 'ease_out';

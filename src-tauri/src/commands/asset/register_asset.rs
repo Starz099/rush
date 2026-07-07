@@ -71,7 +71,7 @@ pub fn register_asset(
     let file_path_clone = file_path.clone();
     let media_type_clone = media_type.clone();
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::asset_processor::preprocess_asset_in_background(
             app_handle_clone,
             id_clone,

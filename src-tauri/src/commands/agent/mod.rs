@@ -1,5 +1,7 @@
 pub mod message;
+pub mod save_test_storyboard;
 pub mod session;
+pub mod visual_composer;
 
 use crate::{agent::planner::run_planner, state::AppState};
 use tauri::Manager;

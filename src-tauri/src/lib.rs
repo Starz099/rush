@@ -8,9 +8,9 @@ pub mod state;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 use state::AppState;
+use std::sync::Mutex;
 use tauri::{generate_handler, Manager};
 use tauri_specta::collect_commands;
-
 macro_rules! run_with_commands {
     ($macro:ident $(, $extra:path)*) => {
         $macro![
@@ -42,7 +42,10 @@ macro_rules! run_with_commands {
             commands::agent::message::create_message,
             commands::agent::session::get_sessions,
             commands::agent::session::create_session,
-            commands::agent::session::delete_session
+            commands::agent::session::delete_session,
+            commands::agent::visual_composer::inspect_timeline,
+            commands::agent::visual_composer::submit_timeline_snapshots,
+            commands::agent::save_test_storyboard::save_test_storyboard
             $(, $extra)*
         ]
     };
@@ -75,7 +78,8 @@ pub fn run() {
 
             let connection = db::initialize_database(&app_data_dir);
             app.manage(AppState {
-                db: std::sync::Mutex::new(connection),
+                db: Mutex::new(connection),
+                storyboard_requests: Mutex::new(std::collections::HashMap::new()),
             });
             app.manage(commands::export::types::ExportState(std::sync::Mutex::new(
                 None,
