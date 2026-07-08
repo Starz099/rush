@@ -110,3 +110,95 @@ pub async fn inspect_timeline(
 
     Ok(format!("[STORYBOARD_IMAGE:base64:{}]", base64_image))
 }
+
+pub async fn search_storyboard_embeddings(
+    args: &Value,
+    app: &tauri::AppHandle,
+) -> Result<String, String> {
+    use crate::state::AppState;
+    use tauri::Manager;
+
+    let asset_id = args["asset_id"]
+        .as_str()
+        .ok_or("Missing 'asset_id' argument".to_string())?;
+    let query_text = args["query_text"]
+        .as_str()
+        .ok_or("Missing 'query_text' argument".to_string())?;
+    let limit = args["limit"].as_i64().unwrap_or(5) as i32;
+
+    println!(
+        "[search] Querying semantic frames for asset={} with text='{}' (limit={})",
+        asset_id, query_text, limit
+    );
+
+    // Retrieve app data directory to locate the models
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
+
+    let query_vector =
+        crate::agent::ai::embeddings::get_text_embedding(query_text, &app_data_dir).await?;
+
+    let mut query_blob = Vec::with_capacity(512 * 4);
+    for &val in &query_vector {
+        query_blob.extend_from_slice(&val.to_le_bytes());
+    }
+
+    let db_state = app.state::<AppState>();
+    let db = db_state.db.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = db
+        .prepare(
+            "SELECT
+                s.timestamp_ms,
+                s.description,
+                vec_distance_cosine(e.embedding, ?1) as distance
+            FROM asset_embeddings e
+            JOIN asset_storyboards s ON e.storyboard_id = s.id
+            WHERE s.asset_id = ?2
+            ORDER BY distance ASC
+            LIMIT ?3",
+        )
+        .map_err(|e| format!("Failed to prepare SQL search statement: {}", e))?;
+
+    let matches = stmt
+        .query_map((&query_blob, asset_id, limit), |row| {
+            let timestamp_ms: i64 = row.get(0)?;
+            let description: Option<String> = row.get(1)?;
+            let distance: f64 = row.get(2)?;
+            Ok((timestamp_ms, description, distance))
+        })
+        .map_err(|e| format!("Semantic search query failed: {}", e))?;
+
+    let mut result_summary = String::from(
+        "Semantic Search Matches (Lower distance means higher
+  similarity):\n",
+    );
+
+    let mut count = 0;
+
+    for row in matches {
+        if let Ok((timestamp_ms, description, distance)) = row {
+            count += 1;
+
+            let similarity_score = (1.0 - distance / 2.0) * 100.0; // Convert cosine distance to percentage similarity
+
+            let desc_str = description.unwrap_or_else(|| "No description available".to_string());
+
+            result_summary.push_str(&format!(
+                "- Match #{}: Time: {}ms ({:.2}s) | Similarity: {:.1}% | Description: {}\n",
+                count,
+                timestamp_ms,
+                (timestamp_ms as f32 / 1000.0),
+                similarity_score,
+                desc_str
+            ));
+        }
+    }
+    if count == 0 {
+        return Ok("No relevant visual matches were found in this asset.".to_string());
+    }
+
+    Ok(result_summary)
+}

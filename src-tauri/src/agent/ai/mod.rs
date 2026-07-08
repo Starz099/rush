@@ -1,5 +1,7 @@
 pub mod config;
+pub mod embeddings;
 pub mod models;
+
 use reqwest::Client;
 use serde_json::{json, Value};
 

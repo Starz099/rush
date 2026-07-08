@@ -54,6 +54,7 @@ pub async fn execute_tool(
         "inspect_timeline" => {
             retrieval::inspect_timeline(&args, app.clone(), project.framerate).await
         }
+        "search_storyboard_embeddings" => retrieval::search_storyboard_embeddings(&args, app).await,
         _ => Err(format!("Unsupported tool name: '{}'.", tool_name)),
     }
 }

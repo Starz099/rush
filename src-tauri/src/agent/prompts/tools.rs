@@ -42,11 +42,19 @@ compositor.
       - `step_frames` (number, required): Interval in frames (e.g. 15 frames = 500ms at 30 FPS).
     - Signature: `inspect_timeline(start_frame, end_frame, step_frames)`
 
+7. `search_storyboard_embeddings`
+   - Description: Performs a semantic visual search on the storyboard keyframes of a specific media asset using natural language. Use this to locate visual contents (e.g. "a dog playing", "person smiling", "beach transition") within a raw video.
+   - Parameters:
+     - `asset_id` (string, required): The ID of the media asset.
+     - `query_text` (string, required): The descriptive search query (e.g. "black car").
+     - `limit` (number, optional): Max matches to return (defaults to 5).
+   - Signature: `search_storyboard_embeddings(asset_id, query_text, limit)`
+
 
 ### CATEGORY 2: CONTENT MODIFICATION TOOLS
 Use these to perform editing actions.
 
-7. `add_clip`
+8. `add_clip`
    - Description: Places an asset clip on a specific track.
    - Parameters:
      - `track_id` (string, required): The ID of the track to place the clip on. If the track doesn't exist, provide a new unique track ID.
@@ -55,13 +63,13 @@ Use these to perform editing actions.
      - `duration_frames` (number, required): Duration of the clip in frames.
    - Signature: `add_clip(track_id, asset_id, timeline_in, duration_frames)`
 
-8. `delete_clip`
+9. `delete_clip`
    - Description: Deletes a clip from the timeline.
    - Parameters:
      - `clip_id` (string, required): The ID of the clip to remove.
    - Signature: `delete_clip(clip_id)`
 
-9. `move_clip`
+10. `move_clip`
    - Description: Moves an existing clip to a new start frame position on the timeline (keeps same duration). Can optionally move it to a different track.
    - Parameters:
      - `clip_id` (string, required): The ID of the clip to move.
@@ -69,7 +77,7 @@ Use these to perform editing actions.
      - `new_track_id` (string, optional): The target track ID if shifting tracks.
    - Signature: `move_clip(clip_id, new_timeline_in, new_track_id)`
 
-10. `trim_clip`
+11. `trim_clip`
    - Description: Trims or slides the in/out points of a clip.
    - Parameters:
      - `clip_id` (string, required): The ID of the clip to trim.
@@ -79,14 +87,14 @@ Use these to perform editing actions.
      - `source_out` (number, optional): End trim point in source asset (frames).
    - Signature: `trim_clip(clip_id, timeline_in, timeline_out, source_in, source_out)`
 
-11. `split_clip`
+12. `split_clip`
    - Description: Splits a single clip at a specific timeline frame into two separate sequential clips.
    - Parameters:
      - `clip_id` (string, required): The ID of the clip to split.
      - `split_frame` (number, required): The timeline frame number at which the split occurs.
    - Signature: `split_clip(clip_id, split_frame)`
 
-12. `update_transform`
+13. `update_transform`
     - Description: Adjusts scale and 2D translation offsets (x, y) of a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -95,7 +103,7 @@ Use these to perform editing actions.
       - `scale` (number, optional): Visual size multiplier (e.g. 1.2).
     - Signature: `update_transform(clip_id, x, y, scale)`
 
-13. `add_effect`
+14. `add_effect`
     - Description: Adds a filter, zoom, overlay, or speed adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -107,14 +115,14 @@ Use these to perform editing actions.
         - For "speed": `{ "speed_factor": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
-14. `remove_effect`
+15. `remove_effect`
     - Description: Removes an existing effect or speed adjustment from a clip.
     - Parameters:
       - `clip_id` (string, required): The ID of the clip.
       - `effect_type` (string, required): The effect type to remove ("zoom", "highlight", "text_overlay", "speed").
     - Signature: `remove_effect(clip_id, effect_type)`
 
-15. `set_background`
+16. `set_background`
     - Description: Sets the canvas background style.
     - Parameters:
       - `color_hex` (string, optional): Hex code for solid background (e.g. "#FF0000").
@@ -122,13 +130,13 @@ Use these to perform editing actions.
       - `blur` (number, optional): Blur filter radius.
     - Signature: `set_background(color_hex, gradient_colors, blur)`
 
-16. `set_playhead`
+17. `set_playhead`
     - Description: Changes the current timeline position of the playback cursor.
     - Parameters:
       - `position` (number, required): Frame number.
     - Signature: `set_playhead(position)`
 
-17. `mute_track` / `lock_track`
+18. `mute_track` / `lock_track`
     - Description: Mutes or locks a track.
     - Parameters:
       - `track_id` (string, required): Track ID.

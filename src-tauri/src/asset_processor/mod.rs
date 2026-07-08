@@ -84,8 +84,10 @@ pub async fn preprocess_asset_in_background(
 
     // Run visual pipeline (LumaGrid / keyframes) for video files
     if media_type == "video" {
+        // Ensure local CLIP vision model is downloaded
+        let clip_model_path = crate::agent::ai::models::ensure_clip_model(&app_data_dir).await?;
         println!("Running LumaGrid visual cut sampler...");
-        video::extract_visual_storyboard(&file_path, &asset_id, &db_path)?;
+        video::extract_visual_storyboard(&file_path, &asset_id, &db_path, &clip_model_path)?;
         println!(
             "Background visual indexing finished successfully for asset: {}",
             asset_id
