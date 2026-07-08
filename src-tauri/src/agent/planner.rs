@@ -13,7 +13,32 @@ pub async fn run_planner(
     app: tauri::AppHandle,
     session_id: String,
     _prompt: String,
+    api_url: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
 ) -> Result<String, String> {
+    let resolved_url = api_url
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_API_URL").ok())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1/chat/completions".to_string());
+
+    let resolved_key = api_key
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_API_KEY").ok())
+        .unwrap_or_else(|| {
+            "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".to_string()
+        });
+
+    let resolved_model = model
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_MODEL").ok())
+        .unwrap_or_else(|| "nvidia/nemotron-3-ultra-550b-a55b:free".to_string());
     let _ = app.emit(
         "agent_status",
         AgentStatusPayload {
@@ -112,17 +137,24 @@ pub async fn run_planner(
     }));
 
     for msg in &history_messages {
-        let (role_str, content_str) = match &msg.role {
-            crate::models::MessageAuthor::User => ("user", msg.content.clone()),
-            crate::models::MessageAuthor::Agent => ("assistant", msg.content.clone()),
+        match &msg.role {
             crate::models::MessageAuthor::Tool => {
-                ("user", format!("[Tool Execution Log]: {}", msg.content))
+                // Skip historical tool execution logs from past turns to prevent context bloat
+                continue;
             }
-        };
-        messages.push(serde_json::json!({
-            "role": role_str,
-            "content": content_str
-        }));
+            crate::models::MessageAuthor::User => {
+                messages.push(serde_json::json!({
+                    "role": "user",
+                    "content": msg.content.clone()
+                }));
+            }
+            crate::models::MessageAuthor::Agent => {
+                messages.push(serde_json::json!({
+                    "role": "assistant",
+                    "content": msg.content.clone()
+                }));
+            }
+        }
     }
 
     let mut current_timeline = project.timeline_state.clone();
@@ -144,7 +176,14 @@ pub async fn run_planner(
             },
         );
 
-        let llm_res = match call_llm_messages(messages.clone()).await {
+        let llm_res = match call_llm_messages(
+            messages.clone(),
+            &resolved_url,
+            &resolved_key,
+            &resolved_model,
+        )
+        .await
+        {
             Ok(res) => res,
             Err(e) => {
                 let _ = app.emit(
@@ -225,7 +264,16 @@ pub async fn run_planner(
                         call_msg,
                     );
 
-                    match execute_tool(tool_name, args, &mut current_timeline, &assets, &project) {
+                    match execute_tool(
+                        &app,
+                        tool_name,
+                        args,
+                        &mut current_timeline,
+                        &assets,
+                        &project,
+                    )
+                    .await
+                    {
                         Ok(msg) => {
                             let result_msg = format!("● Tool Result: Success ({})", msg);
                             let db_state = app.state::<AppState>();
@@ -273,13 +321,49 @@ pub async fn run_planner(
             let feedback_str = feedback.join("\n");
             println!("[planner] Tool execution feedback: {}", feedback_str);
 
+            let mut content_blocks = Vec::new();
+            let mut plain_text = format!("Tool execution feedback:\n{}", feedback_str);
+
+            if let Some(start_idx) = feedback_str.find("[STORYBOARD_IMAGE:base64:") {
+                let tag_prefix = "[STORYBOARD_IMAGE:base64:";
+                if let Some(end_idx) = feedback_str[start_idx..].find(']') {
+                    let full_end = start_idx + end_idx;
+                    let base64_start = start_idx + tag_prefix.len();
+                    let base64_data = &feedback_str[base64_start..full_end];
+
+                    plain_text = format!(
+                        "Tool execution feedback:\n{}[STORYBOARD_IMAGE_ATTACHED]{}",
+                        &feedback_str[..start_idx],
+                        &feedback_str[full_end + 1..]
+                    );
+
+                    content_blocks.push(serde_json::json!({
+                        "type": "text",
+                        "text": plain_text.clone()
+                    }));
+
+                    content_blocks.push(serde_json::json!({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": format!("data:image/jpeg;base64,{}", base64_data)
+                        }
+                    }));
+                }
+            }
+
+            let user_content = if content_blocks.is_empty() {
+                serde_json::json!(plain_text)
+            } else {
+                serde_json::json!(content_blocks)
+            };
+
             messages.push(serde_json::json!({
                 "role": "assistant",
                 "content": cleaned_res
             }));
             messages.push(serde_json::json!({
                 "role": "user",
-                "content": format!("Tool execution feedback:\n{}", feedback_str)
+                "content": user_content
             }));
         } else {
             let message_val = &json_res["message"];

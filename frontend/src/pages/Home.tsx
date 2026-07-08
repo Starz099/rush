@@ -6,6 +6,7 @@ import {
   PlusIcon,
   TrashIcon,
   PencilSimpleIcon,
+  GearIcon,
 } from '@phosphor-icons/react';
 
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,34 @@ const Home = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
+  // Settings states
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [apiUrl, setApiUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [modelId, setModelId] = useState('');
+
+  // Load settings on modal open or mount
+  useEffect(() => {
+    const savedUrl =
+      localStorage.getItem('rush_api_url') ||
+      'https://openrouter.ai/api/v1/chat/completions';
+    const savedKey = localStorage.getItem('rush_api_key') || '';
+    const savedModel =
+      localStorage.getItem('rush_model_id') ||
+      'nvidia/nemotron-3-ultra-550b-a55b:free';
+
+    setApiUrl(savedUrl);
+    setApiKey(savedKey);
+    setModelId(savedModel);
+  }, [isSettingsOpen]);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('rush_api_url', apiUrl);
+    localStorage.setItem('rush_api_key', apiKey);
+    localStorage.setItem('rush_model_id', modelId);
+    setIsSettingsOpen(false);
+  };
+
   const handleCreate = async () => {
     try {
       await createProject(projectName, resolution, fps);
@@ -126,70 +155,133 @@ const Home = () => {
       <BackgroundBeams />
       <Card className="relative z-10 w-full max-w-[400px]">
         <CardContent className="flex flex-col gap-5 p-4">
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="w-full">
-                <PlusIcon weight="bold" data-icon="inline-start" />
-                New Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Project Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="My Awesome Video"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="resolution">Resolution</Label>
-                  <Select
-                    value={resolution}
-                    onValueChange={(val) =>
-                      setResolution(val as ResolutionValue)
-                    }
-                  >
-                    <SelectTrigger id="resolution">
-                      <SelectValue placeholder="Select resolution" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {resolutions.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="flex w-full gap-2">
+            <Dialog open={isOpen} onOpenChange={setIsOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="flex-1">
+                  <PlusIcon weight="bold" data-icon="inline-start" />
+                  New Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Project</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Project Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="My Awesome Video"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="resolution">Resolution</Label>
+                    <Select
+                      value={resolution}
+                      onValueChange={(val) =>
+                        setResolution(val as ResolutionValue)
+                      }
+                    >
+                      <SelectTrigger id="resolution">
+                        <SelectValue placeholder="Select resolution" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {resolutions.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>
+                            {r.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="fps">Framerate (FPS)</Label>
-                  <Select
-                    value={fps}
-                    onValueChange={(val) => setFps(val as FPSValue)}
-                  >
-                    <SelectTrigger id="fps">
-                      <SelectValue placeholder="Select framerate" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fpsOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="grid gap-2">
+                    <Label htmlFor="fps">Framerate (FPS)</Label>
+                    <Select
+                      value={fps}
+                      onValueChange={(val) => setFps(val as FPSValue)}
+                    >
+                      <SelectTrigger id="fps">
+                        <SelectValue placeholder="Select framerate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fpsOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-              <Button onClick={handleCreate}>Create Project</Button>
-            </DialogContent>
-          </Dialog>
+                <Button onClick={handleCreate}>Create Project</Button>
+              </DialogContent>
+            </Dialog>
+
+            {/* Settings Dialog */}
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="shrink-0 px-3"
+                  title="AI Settings"
+                >
+                  <GearIcon weight="bold" className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>AI Agent Configurations</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="api-url">API Provider URL</Label>
+                    <Input
+                      id="api-url"
+                      placeholder="https://openrouter.ai/api/v1/chat/completions"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                    />
+                    <span className="text-muted-foreground/60 text-[10px]">
+                      OpenAI-compatible endpoint (e.g. OpenRouter, LM Studio,
+                      etc.)
+                    </span>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="api-key">API Key</Label>
+                    <Input
+                      id="api-key"
+                      type="password"
+                      placeholder="sk-..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                    <span className="text-muted-foreground/60 text-[10px]">
+                      Required for hosted API endpoints like OpenRouter or
+                      OpenAI.
+                    </span>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="model-id">Model ID / Name</Label>
+                    <Input
+                      id="model-id"
+                      placeholder="nvidia/nemotron-3-ultra-550b-a55b:free"
+                      value={modelId}
+                      onChange={(e) => setModelId(e.target.value)}
+                    />
+                    <span className="text-muted-foreground/60 text-[10px]">
+                      The identifier of the LLM model to request.
+                    </span>
+                  </div>
+                </div>
+                <Button onClick={handleSaveSettings}>Save Settings</Button>
+              </DialogContent>
+            </Dialog>
+          </div>
 
           {/* Rename Project Dialog */}
           <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>

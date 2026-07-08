@@ -11,6 +11,7 @@ import { ExportEngine } from '@/engine/export/ExportEngine';
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
 import { fpsToNumeric } from '@/helpers/fps';
 import { isVideoTrack } from '@/constants/trackConfig';
+import { exportApi } from '@/api/export';
 
 export const PreviewPanel = () => {
   const activeProject = useProjectStore((state) => state.activeProject);
@@ -122,44 +123,62 @@ export const PreviewPanel = () => {
   // Temporary listener to test the offscreen rendering & capture pipeline
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
-      // Ctrl + Shift + E to trigger the offscreen export test
+      // Ctrl + Shift + E to trigger the offscreen storyboard composer test
       if (e.key === 'E' && e.ctrlKey && e.shiftKey && activeProject) {
         e.preventDefault();
         console.log(
-          `[Test Export] Triggered offscreen render export test at playhead: ${playheadPosition}`,
+          `[Storyboard Test] Triggering pure GPU-tiled storyboard pipeline test...`,
         );
         try {
-          // We use 1920x1080 to test both the offscreen logic AND non-256-aligned width padding rules!
           const exportWidth = activeProject.viewport_width;
           const exportHeight = activeProject.viewport_height;
+
+          // Instantiate the offscreen engine at timeline dimensions
           const exporter = new ExportEngine(exportWidth, exportHeight);
           await exporter.initialize();
 
-          const pixels = await exporter.testExportSingleFrame(
-            playheadPosition,
+          console.time('[Storyboard Test] Generation Time');
+          const result = await exporter.generateStoryboard(
             activeProject,
             assets,
+            {
+              tileWidth: 320,
+              tileHeight: 180,
+              columns: 6,
+              maxTiles: 36,
+              madThreshold: 0.05, // 4.7% luma difference threshold
+              coverageFloorSeconds: 5.0, // Max 5 seconds gaps
+              candidateIntervalSeconds: 2.0, // Stride every 2.0s
+            },
           );
+          console.timeEnd('[Storyboard Test] Generation Time');
 
           console.log(
-            `%c[Test Export SUCCESS] Captured Frame at Resolution: ${exportWidth}x${exportHeight}`,
+            `%c[Storyboard SUCCESS] Tiled Grid Dimensions: ${result.width}x${result.height}`,
             'color: #00ff00; font-weight: bold;',
           );
           console.log(
-            `[Test Export SUCCESS] Total Bytes Extracted: ${pixels.byteLength}`,
+            `[Storyboard SUCCESS] Keyframes found at timestamps (sec):`,
+            result.timestamps.map((t) => t.toFixed(2)),
           );
-          console.log(
-            `[Test Export SUCCESS] Expected clean byte size: ${exportWidth * exportHeight * 4}`,
+
+          // Pipe the tiled storyboard frame to our Rust-FFmpeg backend to save to disk
+          await exportApi.saveTestFrame(
+            result.pixels,
+            result.width,
+            result.height,
+            'rgba8unorm',
           );
+
           console.log(
-            `[Test Export SUCCESS] First 16 bytes:`,
-            Array.from(pixels.slice(0, 16)),
+            '%c[Storyboard SUCCESS] Stitched image saved to ../test_output.png',
+            'color: #00ff00;',
           );
 
           exporter.dispose();
         } catch (err) {
           console.error(
-            `%c[Test Export ERROR]`,
+            `%c[Storyboard ERROR]`,
             'color: #ff0000; font-weight: bold;',
             err,
           );

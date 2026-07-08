@@ -1,5 +1,7 @@
 pub mod message;
+pub mod save_test_storyboard;
 pub mod session;
+pub mod visual_composer;
 
 use crate::{agent::planner::run_planner, state::AppState};
 use tauri::Manager;
@@ -11,6 +13,9 @@ pub async fn run_agent(
     project_id: String,
     session_id: String,
     prompt: String,
+    api_url: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
 ) -> Result<String, String> {
     // Determine or create the active session ID
     let mut working_session_id = session_id.clone();
@@ -45,7 +50,15 @@ pub async fn run_agent(
     )?;
 
     // Get response from the planner
-    let planner_response = run_planner(app.clone(), working_session_id.clone(), prompt).await?;
+    let planner_response = run_planner(
+        app.clone(),
+        working_session_id.clone(),
+        prompt,
+        api_url,
+        api_key,
+        model,
+    )
+    .await?;
 
     // Store the agent's response message
     message::create_message(

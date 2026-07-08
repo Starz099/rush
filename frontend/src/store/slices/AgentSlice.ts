@@ -69,8 +69,20 @@ export const createAgentSlice: StateCreator<AgentSlice> = (set, get) => ({
         }));
       }
 
+      // Retrieve LLM settings from localStorage
+      const apiUrl = localStorage.getItem('rush_api_url') || null;
+      const apiKey = localStorage.getItem('rush_api_key') || null;
+      const model = localStorage.getItem('rush_model_id') || null;
+
       // Call Tauri run_agent command
-      await agentApi.runAgent(activeProject.id, sessionId, prompt);
+      await agentApi.runAgent(
+        activeProject.id,
+        sessionId,
+        prompt,
+        apiUrl,
+        apiKey,
+        model,
+      );
 
       // Fetch the updated project timeline from the database to synchronize UI state
       const updatedProject = await projectApi.getById(activeProject.id);

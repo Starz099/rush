@@ -8,7 +8,8 @@ use crate::db::models::clip::TimelineState;
 use crate::db::models::project::Project;
 use serde_json::Value;
 
-pub fn execute_tool(
+pub async fn execute_tool(
+    app: &tauri::AppHandle,
     tool_name: &str,
     args: Value,
     timeline_state: &mut TimelineState,
@@ -47,7 +48,13 @@ pub fn execute_tool(
         "set_playhead" => project::set_playhead(&args, timeline_state),
         "mute_track" => project::mute_track(&args, timeline_state),
         "lock_track" => project::lock_track(&args, timeline_state),
-
+        "get_timeline_transcript" => {
+            retrieval::get_timeline_transcript(&args, timeline_state, project.framerate, app)
+        }
+        "inspect_timeline" => {
+            retrieval::inspect_timeline(&args, app.clone(), project.framerate).await
+        }
+        "search_storyboard_embeddings" => retrieval::search_storyboard_embeddings(&args, app).await,
         _ => Err(format!("Unsupported tool name: '{}'.", tool_name)),
     }
 }
