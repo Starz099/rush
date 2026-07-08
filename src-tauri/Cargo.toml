@@ -46,3 +46,6 @@ base64 = "0.22"
 ndarray = "0.17.2"
 ort = "2.0.0-rc.9"
 instant-clip-tokenizer = "0.1.0"
+
+[dev-dependencies]
+tauri = { version = "2.11.2", features = ["test"] }

@@ -137,17 +137,24 @@ pub async fn run_planner(
     }));
 
     for msg in &history_messages {
-        let (role_str, content_str) = match &msg.role {
-            crate::models::MessageAuthor::User => ("user", msg.content.clone()),
-            crate::models::MessageAuthor::Agent => ("assistant", msg.content.clone()),
+        match &msg.role {
             crate::models::MessageAuthor::Tool => {
-                ("user", format!("[Tool Execution Log]: {}", msg.content))
+                // Skip historical tool execution logs from past turns to prevent context bloat
+                continue;
             }
-        };
-        messages.push(serde_json::json!({
-            "role": role_str,
-            "content": content_str
-        }));
+            crate::models::MessageAuthor::User => {
+                messages.push(serde_json::json!({
+                    "role": "user",
+                    "content": msg.content.clone()
+                }));
+            }
+            crate::models::MessageAuthor::Agent => {
+                messages.push(serde_json::json!({
+                    "role": "assistant",
+                    "content": msg.content.clone()
+                }));
+            }
+        }
     }
 
     let mut current_timeline = project.timeline_state.clone();
