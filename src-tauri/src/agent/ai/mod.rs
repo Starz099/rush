@@ -1,25 +1,29 @@
-pub mod config;
 pub mod embeddings;
 pub mod models;
 
 use reqwest::Client;
 use serde_json::{json, Value};
 
-pub async fn call_llm_messages(messages: Vec<Value>) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn call_llm_messages(
+    messages: Vec<Value>,
+    api_url: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let client = Client::new();
 
     println!(
         "[llm] Sending request to {} using model {} with {} messages...",
-        config::API_URL,
-        config::MODEL,
+        api_url,
+        model,
         messages.len()
     );
 
     let res = client
-        .post(config::API_URL)
-        .bearer_auth(config::API_KEY)
+        .post(api_url)
+        .bearer_auth(api_key)
         .json(&json!({
-            "model": config::MODEL,
+            "model": model,
             "messages": messages,
             "response_format": {
                 "type": "json_object"

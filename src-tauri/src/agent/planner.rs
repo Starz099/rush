@@ -13,7 +13,32 @@ pub async fn run_planner(
     app: tauri::AppHandle,
     session_id: String,
     _prompt: String,
+    api_url: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
 ) -> Result<String, String> {
+    let resolved_url = api_url
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_API_URL").ok())
+        .unwrap_or_else(|| "https://openrouter.ai/api/v1/chat/completions".to_string());
+
+    let resolved_key = api_key
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_API_KEY").ok())
+        .unwrap_or_else(|| {
+            "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".to_string()
+        });
+
+    let resolved_model = model
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("RUSH_LLM_MODEL").ok())
+        .unwrap_or_else(|| "nvidia/nemotron-3-ultra-550b-a55b:free".to_string());
     let _ = app.emit(
         "agent_status",
         AgentStatusPayload {
@@ -144,7 +169,14 @@ pub async fn run_planner(
             },
         );
 
-        let llm_res = match call_llm_messages(messages.clone()).await {
+        let llm_res = match call_llm_messages(
+            messages.clone(),
+            &resolved_url,
+            &resolved_key,
+            &resolved_model,
+        )
+        .await
+        {
             Ok(res) => res,
             Err(e) => {
                 let _ = app.emit(

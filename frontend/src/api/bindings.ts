@@ -73,9 +73,23 @@ export const commands = {
     typedError<string, string>(
       __TAURI_INVOKE('slice_audio_asset', { filePath, startSec, durationSec }),
     ),
-  runAgent: (projectId: string, sessionId: string, prompt: string) =>
+  runAgent: (
+    projectId: string,
+    sessionId: string,
+    prompt: string,
+    apiUrl: string | null,
+    apiKey: string | null,
+    model: string | null,
+  ) =>
     typedError<string, string>(
-      __TAURI_INVOKE('run_agent', { projectId, sessionId, prompt }),
+      __TAURI_INVOKE('run_agent', {
+        projectId,
+        sessionId,
+        prompt,
+        apiUrl,
+        apiKey,
+        model,
+      }),
     ),
   getMessages: (sessionId: string) =>
     typedError<Message[], string>(
