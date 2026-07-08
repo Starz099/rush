@@ -3,6 +3,7 @@ use ort::{inputs, session::Session, value::Value};
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
+use tauri::Emitter;
 use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct LumaGrid {
@@ -52,6 +53,7 @@ impl LumaGrid {
 /// computes CLIP vector embeddings for scene cuts, saves both metadata
 /// and embeddings to the database, and cleans up.
 pub fn extract_visual_storyboard(
+    app: &tauri::AppHandle,
     input_path: &str,
     asset_id: &str,
     db_path: &Path,
@@ -107,8 +109,32 @@ pub fn extract_visual_storyboard(
 
     let mut last_kept_grid: Option<LumaGrid> = None;
 
+    let total_frames = paths.len();
+    let mut last_emit = std::time::Instant::now();
+
     // Iterate through sorted frames and compute difference
     for (idx, path) in paths.iter().enumerate() {
+        let progress = (idx as f32 / total_frames as f32) * 100.0;
+
+        if last_emit.elapsed() > std::time::Duration::from_millis(200) || idx == total_frames - 1 {
+            let _ = app.emit(
+                "asset_process_status",
+                crate::agent::ai::models::AssetProcessPayload {
+                    asset_id: Some(asset_id.to_string()),
+                    task_type: "visual_indexing".to_string(),
+                    progress,
+                    status: "progressing".to_string(),
+                    message: format!(
+                        "Analyzing video frame {} of {} ({:.0}%)",
+                        idx + 1,
+                        total_frames,
+                        progress
+                    ),
+                },
+            );
+            last_emit = std::time::Instant::now();
+        }
+
         let grid = LumaGrid::from_image_path(path)?;
 
         // Map frame index linearly to timestamp: each index represents 2 seconds (2000ms)

@@ -104,14 +104,12 @@ Use these to perform editing actions.
     - Signature: `update_transform(clip_id, x, y, scale)`
 
 14. `add_effect`
-    - Description: Adds a filter, zoom, overlay, or speed adjustment to a clip.
+    - Description: Adds a zoom or speed adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
-      - `effect_type` (string, required): One of: "zoom", "highlight", "text_overlay", "speed".
+      - `effect_type` (string, required): One of: "zoom", "speed".
       - `config` (object, required): Configurations map:
         - For "zoom": `{ "start_scale": float, "end_scale": float, "center_x": float, "center_y": float, "ease_curve": "ease_in"|"ease_out"|"linear" }`
-        - For "text_overlay": `{ "text": string, "font_family": string, "font_size": integer, "color_hex": string }`
-        - For "highlight": `{ "shape": "rectangle"|"circle"|"arrow"|"highlighter", "color_hex": string, "stroke_width": integer, "animation": string }`
         - For "speed": `{ "speed_factor": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
@@ -119,7 +117,7 @@ Use these to perform editing actions.
     - Description: Removes an existing effect or speed adjustment from a clip.
     - Parameters:
       - `clip_id` (string, required): The ID of the clip.
-      - `effect_type` (string, required): The effect type to remove ("zoom", "highlight", "text_overlay", "speed").
+      - `effect_type` (string, required): The effect type to remove ("zoom", "speed").
     - Signature: `remove_effect(clip_id, effect_type)`
 
 16. `set_background`

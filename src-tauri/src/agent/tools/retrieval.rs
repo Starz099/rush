@@ -138,7 +138,7 @@ pub async fn search_storyboard_embeddings(
         .map_err(|e| format!("Failed to resolve app data directory: {}", e))?;
 
     let query_vector =
-        crate::agent::ai::embeddings::get_text_embedding(query_text, &app_data_dir).await?;
+        crate::agent::ai::embeddings::get_text_embedding(app, query_text, &app_data_dir).await?;
 
     let mut query_blob = Vec::with_capacity(512 * 4);
     for &val in &query_vector {

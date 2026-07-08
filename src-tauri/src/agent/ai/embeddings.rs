@@ -3,9 +3,13 @@ use ort::{inputs, session::Session, value::Value};
 use std::path::Path;
 
 /// Generates the 512-dimension text embedding for a text query using the local quantized CLIP text ONNX model.
-pub async fn get_text_embedding(text_query: &str, app_data_dir: &Path) -> Result<Vec<f32>, String> {
+pub async fn get_text_embedding(
+    app: &tauri::AppHandle,
+    text_query: &str,
+    app_data_dir: &Path,
+) -> Result<Vec<f32>, String> {
     // 1. Ensure the local CLIP text model is downloaded
-    let model_path = super::models::ensure_clip_text_model(app_data_dir).await?;
+    let model_path = super::models::ensure_clip_text_model(app, app_data_dir).await?;
 
     // 2. Tokenize input text using instant-clip-tokenizer (OpenAI vocabulary)
     let tokenizer = Tokenizer::new();

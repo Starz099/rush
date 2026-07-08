@@ -4,7 +4,7 @@ pub mod video;
 
 use rusqlite::Connection;
 use std::fs;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Core background preprocessor task triggered on media asset import
 pub async fn preprocess_asset_in_background(
@@ -47,7 +47,8 @@ pub async fn preprocess_asset_in_background(
     // Run audio pipeline (speech-to-text / transcripts) for video or audio files
     if media_type == "video" || media_type == "audio" {
         // 1. Ensure Whisper model is downloaded
-        let model_path = crate::agent::ai::models::ensure_whisper_model(&app_data_dir).await?;
+        let model_path =
+            crate::agent::ai::models::ensure_whisper_model(&app_handle, &app_data_dir).await?;
 
         // 2. Setup temp path for wav extraction
         let cache_dir = app_data_dir.join("extracted_audio");
@@ -63,10 +64,32 @@ pub async fn preprocess_asset_in_background(
 
         // 3. Extract audio as WAV
         println!("Extracting WAV file for Whisper...");
+        let _ = app_handle.emit(
+            "asset_process_status",
+            crate::agent::ai::models::AssetProcessPayload {
+                asset_id: Some(asset_id.clone()),
+                task_type: "transcribe_audio".to_string(),
+                progress: 10.0,
+                status: "progressing".to_string(),
+                message: "Extracting audio track from media file...".to_string(),
+            },
+        );
+
         audio::extract_wav_for_whisper(&file_path, temp_wav_str)?;
 
         // 4. Transcribe WAV file and insert into DB
         println!("Running Whisper speech-to-text...");
+        let _ = app_handle.emit(
+            "asset_process_status",
+            crate::agent::ai::models::AssetProcessPayload {
+                asset_id: Some(asset_id.clone()),
+                task_type: "transcribe_audio".to_string(),
+                progress: 40.0,
+                status: "progressing".to_string(),
+                message: "Running Whisper speech-to-text transcribing...".to_string(),
+            },
+        );
+
         let transcribe_res =
             audio::transcribe_audio(&model_path, &temp_wav_path, &asset_id, &db_path);
 
@@ -76,6 +99,17 @@ pub async fn preprocess_asset_in_background(
         }
 
         transcribe_res?;
+
+        let _ = app_handle.emit(
+            "asset_process_status",
+            crate::agent::ai::models::AssetProcessPayload {
+                asset_id: Some(asset_id.clone()),
+                task_type: "transcribe_audio".to_string(),
+                progress: 100.0,
+                status: "completed".to_string(),
+                message: "Audio transcription completed!".to_string(),
+            },
+        );
         println!(
             "Background speech indexing finished successfully for asset: {}",
             asset_id
@@ -85,9 +119,38 @@ pub async fn preprocess_asset_in_background(
     // Run visual pipeline (LumaGrid / keyframes) for video files
     if media_type == "video" {
         // Ensure local CLIP vision model is downloaded
-        let clip_model_path = crate::agent::ai::models::ensure_clip_model(&app_data_dir).await?;
+        let clip_model_path =
+            crate::agent::ai::models::ensure_clip_model(&app_handle, &app_data_dir).await?;
         println!("Running LumaGrid visual cut sampler...");
-        video::extract_visual_storyboard(&file_path, &asset_id, &db_path, &clip_model_path)?;
+        let _ = app_handle.emit(
+            "asset_process_status",
+            crate::agent::ai::models::AssetProcessPayload {
+                asset_id: Some(asset_id.clone()),
+                task_type: "visual_indexing".to_string(),
+                progress: 0.0,
+                status: "started".to_string(),
+                message: "Analyzing keyframes and visual embeddings...".to_string(),
+            },
+        );
+
+        video::extract_visual_storyboard(
+            &app_handle,
+            &file_path,
+            &asset_id,
+            &db_path,
+            &clip_model_path,
+        )?;
+
+        let _ = app_handle.emit(
+            "asset_process_status",
+            crate::agent::ai::models::AssetProcessPayload {
+                asset_id: Some(asset_id.clone()),
+                task_type: "visual_indexing".to_string(),
+                progress: 100.0,
+                status: "completed".to_string(),
+                message: "Visual indexing completed!".to_string(),
+            },
+        );
         println!(
             "Background visual indexing finished successfully for asset: {}",
             asset_id
