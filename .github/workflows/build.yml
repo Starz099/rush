@@ -16,7 +16,7 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'
+          - platform: 'macos-13'
             args: '--target x86_64-apple-darwin'
           - platform: 'ubuntu-latest'
             args: ''
@@ -24,6 +24,8 @@ jobs:
             args: ''
 
     runs-on: ${{ matrix.platform }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +42,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || (matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '') }}
 
       - name: Install system dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
@@ -70,12 +72,13 @@ jobs:
           chmod +x src-tauri/binaries/ffmpeg-*
 
       - name: Install root dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
         with:
           tagName: v__VERSION__
           releaseName: 'Release v__VERSION__'
