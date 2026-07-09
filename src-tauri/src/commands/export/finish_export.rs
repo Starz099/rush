@@ -33,7 +33,7 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
                 );
                 println!("[Backend] Generated filter: {}", filter_complex_str);
 
-                crate::commands::process_helper::create_ffmpeg_command()
+                rush_asset_processor::process_helper::create_ffmpeg_command()
                     .args([
                         "-y",
                         "-f",
@@ -66,7 +66,7 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
                     .map_err(|e| format!("Failed to spawn FFmpeg muxing process: {}", e))?
             } else {
                 println!("[Backend] Muxing H.264 video with 1x audio...");
-                crate::commands::process_helper::create_ffmpeg_command()
+                rush_asset_processor::process_helper::create_ffmpeg_command()
                     .args([
                         "-y",
                         "-f",
@@ -105,7 +105,7 @@ pub fn finish_export(state: State<'_, ExportState>) -> Result<(), String> {
         } else {
             println!("[Backend] No temporary audio file found. Muxing silent video directly...");
 
-            let mux_status = crate::commands::process_helper::create_ffmpeg_command()
+            let mux_status = rush_asset_processor::process_helper::create_ffmpeg_command()
                 .args([
                     "-y",
                     "-f",

@@ -1,17 +1,17 @@
 {
-  "name": "rush",
+  "name": "rush-monorepo",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AI Agentic Video Editor Monorepo",
+  "type": "module",
   "scripts": {
-    "dev": "pnpm tauri dev",
-    "build": "pnpm tauri build",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "format": "prettier --write . && cargo fmt --manifest-path src-tauri/Cargo.toml"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",
     "prettier": "^3.8.3",

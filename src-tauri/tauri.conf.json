@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.rush.dev",
   "build": {
-    "frontendDist": "../frontend/dist",
+    "frontendDist": "../apps/editor/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd frontend && pnpm run dev",
-    "beforeBuildCommand": "cd frontend && pnpm run build"
+    "beforeDevCommand": "pnpm --filter editor dev",
+    "beforeBuildCommand": "pnpm --filter editor build"
   },
   "app": {
     "windows": [

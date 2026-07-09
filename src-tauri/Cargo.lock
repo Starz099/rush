@@ -99,19 +99,15 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "hound",
- "image",
- "instant-clip-tokenizer",
  "log",
- "ndarray",
- "ort",
- "reqwest",
+ "rush-agent",
+ "rush-asset-processor",
+ "rush-db",
  "rusqlite",
  "serde",
  "serde_json",
  "specta",
  "specta-typescript",
- "sqlite-vec",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -120,7 +116,6 @@ dependencies = [
  "tauri-specta",
  "tokio",
  "uuid",
- "whisper-rs",
 ]
 
 [[package]]
@@ -3354,9 +3349,9 @@ dependencies = [
 
 [[package]]
 name = "pxfm"
-version = "0.1.29"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
+checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "quick-xml"
@@ -3726,6 +3721,58 @@ checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
 dependencies = [
  "hashbrown 0.16.1",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "rush-agent"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "rush-asset-processor",
+ "rush-db",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "specta",
+ "tauri",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "rush-asset-processor"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hound",
+ "image",
+ "instant-clip-tokenizer",
+ "ndarray",
+ "ort",
+ "reqwest",
+ "rush-db",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "specta",
+ "sqlite-vec",
+ "tauri",
+ "tokio",
+ "uuid",
+ "whisper-rs",
+]
+
+[[package]]
+name = "rush-db"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "specta",
+ "sqlite-vec",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

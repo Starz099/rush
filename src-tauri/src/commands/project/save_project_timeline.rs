@@ -1,5 +1,5 @@
-use crate::db::models::clip::TimelineState;
-use crate::state::AppState;
+use rush_db::models::clip::TimelineState;
+use rush_db::AppState;
 use tauri::State;
 
 #[tauri::command]

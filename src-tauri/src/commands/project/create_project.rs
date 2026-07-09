@@ -1,7 +1,7 @@
-use crate::db::models::clip::{default_background, TimelineState, Track};
-use crate::db::models::project::Project;
-use crate::models::{FpsPreset, ResolutionPreset, TrackType};
-use crate::state::AppState;
+use rush_db::models::clip::{default_background, TimelineState, Track};
+use rush_db::models::presets::{FpsPreset, ResolutionPreset, TrackType};
+use rush_db::models::project::Project;
+use rush_db::AppState;
 use tauri::State;
 use uuid::Uuid;
 

@@ -1,0 +1,13 @@
+[package]
+name = "rush-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+sqlite-vec = { workspace = true }
+uuid = { workspace = true }
+specta = { workspace = true }
+tokio = { workspace = true }

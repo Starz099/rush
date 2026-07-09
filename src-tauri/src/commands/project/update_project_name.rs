@@ -1,4 +1,4 @@
-use crate::state::AppState;
+use rush_db::AppState;
 use tauri::State;
 
 #[tauri::command]

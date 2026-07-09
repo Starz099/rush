@@ -1,6 +1,5 @@
-use crate::models::{
-    EditingRegistry, EffectDescriptor, FpsConfig, FpsPreset, PresetsConfig, ResolutionConfig,
-    ResolutionPreset, ToolDescriptor,
+use rush_db::models::presets::{
+    EditingRegistry, FpsConfig, FpsPreset, PresetsConfig, ResolutionConfig, ResolutionPreset,
 };
 
 #[tauri::command]
@@ -47,52 +46,5 @@ pub fn get_presets() -> PresetsConfig {
 #[tauri::command]
 #[specta::specta]
 pub fn get_editing_registry() -> EditingRegistry {
-    EditingRegistry {
-        tools: vec![
-            ToolDescriptor {
-                name: "select".to_string(),
-                label: "Select Tool".to_string(),
-                description: "Select and drag clips to reposition them on the timeline tracks."
-                    .to_string(),
-            },
-            ToolDescriptor {
-                name: "split".to_string(),
-                label: "Split Tool".to_string(),
-                description:
-                    "Click on any clip in the timeline to split it at the cursor position."
-                        .to_string(),
-            },
-            ToolDescriptor {
-                name: "trim".to_string(),
-                label: "Trim Tool".to_string(),
-                description: "Drag the edge of any clip on the timeline to crop its duration."
-                    .to_string(),
-            },
-            ToolDescriptor {
-                name: "bg".to_string(),
-                label: "Background Config".to_string(),
-                description:
-                    "Select custom color gradients and blur filters for the viewport background."
-                        .to_string(),
-            },
-        ],
-        effects: vec![
-            EffectDescriptor {
-                name: "zoom".to_string(),
-                label: "Zoom Effect".to_string(),
-                description: "Apply dynamic canvas zoom and camera pan transformations."
-                    .to_string(),
-                default_duration_frames: 150,
-                default_config_json: r#"{"x": 0.0, "y": 0.0, "scale": 1.2, "z_index": 0}"#
-                    .to_string(),
-            },
-            EffectDescriptor {
-                name: "speed".to_string(),
-                label: "Speed Effect".to_string(),
-                description: "Speed up or slow down clip playback speeds.".to_string(),
-                default_duration_frames: 150,
-                default_config_json: r#"{"speed_factor": 2.0}"#.to_string(),
-            },
-        ],
-    }
+    rush_db::models::presets::get_editing_registry()
 }

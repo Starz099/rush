@@ -1,5 +1,5 @@
-use crate::db::models::agent::session::Session;
-use crate::state::AppState;
+use rush_db::models::agent::session::Session;
+use rush_db::AppState;
 use tauri::State;
 
 #[tauri::command]
