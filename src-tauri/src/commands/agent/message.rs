@@ -1,7 +1,7 @@
-use crate::db::models::agent::message::Message;
-use crate::models::MessageAuthor;
-use crate::state::AppState;
-use tauri::{AppHandle, Emitter, State};
+use rush_db::models::agent::message::Message;
+use rush_db::models::presets::MessageAuthor;
+use rush_db::AppState;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 #[specta::specta]
@@ -13,30 +13,7 @@ pub fn create_message(
     content: String,
 ) -> Result<Message, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    let id = uuid::Uuid::new_v4().to_string();
-    let role_str = match role {
-        MessageAuthor::User => "user",
-        MessageAuthor::Agent => "agent",
-        MessageAuthor::Tool => "tool",
-    };
-    db.execute(
-        "INSERT INTO messages (id, session_id, role, content) VALUES (?1, ?2, ?3, ?4)",
-        (&id, &session_id, role_str, &content),
-    )
-    .map_err(|e| e.to_string())?;
-
-    let message = db
-        .query_row(
-            "SELECT * FROM messages WHERE id = ?1",
-            [&id],
-            Message::from_row,
-        )
-        .map_err(|e| e.to_string())?;
-
-    // Emit live event to synchronize UI changes in real-time
-    let _ = app.emit("agent_message_created", &message);
-
-    Ok(message)
+    rush_agent::create_agent_message(&app, &db, &session_id, role, &content)
 }
 
 #[tauri::command]

@@ -1,4 +1,4 @@
-use crate::models::RangeResult;
+use rush_db::models::presets::RangeResult;
 
 #[tauri::command]
 #[specta::specta]

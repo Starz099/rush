@@ -3,7 +3,8 @@ pub mod save_test_storyboard;
 pub mod session;
 pub mod visual_composer;
 
-use crate::{agent::planner::run_planner, state::AppState};
+use rush_agent::planner::run_planner;
+use rush_db::AppState;
 use tauri::Manager;
 
 #[tauri::command]
@@ -45,7 +46,7 @@ pub async fn run_agent(
         app.clone(),
         app.state::<AppState>(),
         working_session_id.clone(),
-        crate::models::MessageAuthor::User,
+        rush_db::models::presets::MessageAuthor::User,
         prompt.clone(),
     )?;
 
@@ -65,7 +66,7 @@ pub async fn run_agent(
         app.clone(),
         app.state::<AppState>(),
         working_session_id,
-        crate::models::MessageAuthor::Agent,
+        rush_db::models::presets::MessageAuthor::Agent,
         planner_response.clone(),
     )?;
 

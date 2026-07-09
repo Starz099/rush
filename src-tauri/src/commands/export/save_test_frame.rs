@@ -38,8 +38,7 @@ pub fn save_test_frame(_app: tauri::AppHandle, request: Request<'_>) -> Result<(
 
             let resolution = format!("{}x{}", width_str, height_str);
 
-            // 1. Configure and spawn the FFmpeg child process
-            let mut child = crate::commands::process_helper::create_ffmpeg_command()
+            let mut child = rush_asset_processor::process_helper::create_ffmpeg_command()
                 .args([
                     "-y", // Overwrite the output file if it exists
                     "-f",

@@ -45,7 +45,7 @@ pub fn extract_audio(app_handle: tauri::AppHandle, file_path: String) -> Result<
     );
 
     // Spawn ffmpeg command to extract audio: ffmpeg -y -i input -vn -acodec libmp3lame -q:a 4 output
-    let status = crate::commands::process_helper::create_ffmpeg_command()
+    let status = rush_asset_processor::process_helper::create_ffmpeg_command()
         .args(&[
             "-y",
             "-i",

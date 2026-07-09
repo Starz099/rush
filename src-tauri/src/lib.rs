@@ -1,13 +1,8 @@
-pub mod agent;
-pub mod asset_processor;
 pub mod commands;
-pub mod db;
-pub mod models;
-pub mod state;
 
+use rush_db::AppState;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
-use state::AppState;
 use std::sync::Mutex;
 use tauri::{generate_handler, Manager};
 use tauri_specta::collect_commands;
@@ -58,7 +53,7 @@ pub fn run() {
 
     #[cfg(debug_assertions)]
     builder
-        .export(Typescript::default(), "../frontend/src/api/bindings.ts")
+        .export(Typescript::default(), "../apps/editor/src/api/bindings.ts")
         .expect("Failed to export specta bindings");
 
     tauri::Builder::default()
@@ -76,7 +71,7 @@ pub fn run() {
                 let _ = std::fs::remove_dir_all(&cache_dir);
             }
 
-            let connection = db::initialize_database(&app_data_dir);
+            let connection = rush_db::initialize_database(&app_data_dir);
             app.manage(AppState {
                 db: Mutex::new(connection),
                 storyboard_requests: Mutex::new(std::collections::HashMap::new()),

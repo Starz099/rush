@@ -1,6 +1,6 @@
-use crate::asset_processor::composer::audio::{compose_transcript, ComposedTranscript};
-use crate::db::models::project::Project;
-use crate::state::AppState;
+use rush_asset_processor::composer::audio::{compose_transcript, ComposedTranscript};
+use rush_db::models::project::Project;
+use rush_db::AppState;
 use tauri::State;
 
 #[tauri::command]

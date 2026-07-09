@@ -1,5 +1,5 @@
-use crate::db::models::asset::Asset;
-use crate::state::AppState;
+use rush_db::models::asset::Asset;
+use rush_db::AppState;
 use std::path::Path;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
@@ -72,7 +72,7 @@ pub fn register_asset(
     let media_type_clone = media_type.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = crate::asset_processor::preprocess_asset_in_background(
+        if let Err(e) = rush_asset_processor::preprocess_asset_in_background(
             app_handle_clone,
             id_clone,
             file_path_clone,

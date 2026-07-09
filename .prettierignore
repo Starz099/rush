@@ -1,7 +1,10 @@
 .git
 node_modules/
-frontend/node_modules/
-frontend/dist/
+apps/editor/node_modules/
+apps/editor/dist/
+apps/landing/node_modules/
+apps/landing/.next/
+apps/landing/out/
 src-tauri/target/
 src-tauri/gen/schemas/
 coverage/

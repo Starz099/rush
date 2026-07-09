@@ -35,7 +35,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 11
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -71,9 +71,6 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install frontend dependencies
-        run: cd frontend && pnpm install --frozen-lockfile
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0

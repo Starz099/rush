@@ -1,5 +1,5 @@
-use crate::db::models::asset::Asset;
-use crate::state::AppState;
+use rush_db::models::asset::Asset;
+use rush_db::AppState;
 use tauri::State;
 
 #[tauri::command]
