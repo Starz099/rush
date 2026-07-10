@@ -4,7 +4,7 @@ import { JetBrains_Mono } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import Providers from './providers';
 import Navbar from '@/components/navbar';
-import { Footer } from '@/components/footer';
+import Footer from '@/components/footer';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],

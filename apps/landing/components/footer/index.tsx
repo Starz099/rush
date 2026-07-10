@@ -1,4 +1,4 @@
-export function Footer() {
+export default function Footer() {
   const cols = [
     {
       title: 'Product',

@@ -55,7 +55,7 @@ export default function Navbar() {
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         className={cn(
-          'fixed right-0 left-0 z-50 mx-auto flex items-center justify-between font-mono',
+          'fixed right-0 left-0 z-50 mx-auto flex items-center justify-center font-mono',
           isScrolled ? 'h-10 shadow-2xl backdrop-blur-md' : 'h-14',
         )}
         style={{
@@ -63,7 +63,7 @@ export default function Navbar() {
         }}
       >
         {/* Left Side: Logo & Brand */}
-        <div className="flex items-center gap-8 pl-6 md:pl-8">
+        <div className="absolute left-6 flex items-center gap-8 md:left-8">
           <a href="#" className="group flex items-center gap-3">
             <Logo />
             <span className="group-hover:text-primary text-md font-mono font-black tracking-widest text-white transition-colors">
@@ -95,7 +95,7 @@ export default function Navbar() {
         </nav>
 
         {/* Right Side: GitHub Star & Download */}
-        <div className="flex items-center gap-4 pr-6 md:pr-8">
+        <div className="absolute right-6 flex items-center gap-4 md:right-8">
           {/* GitHub Star Link */}
 
           <a
@@ -117,10 +117,14 @@ export default function Navbar() {
           <Button
             variant="default"
             size="sm"
-            className="bg-primary hover:bg-primary/90 flex items-center gap-1.5 px-4 text-xs font-bold tracking-wider text-white transition-colors"
+            className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden px-4 text-xs font-bold tracking-wider text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
           >
-            <span>DOWNLOAD</span>
-            <DownloadSimpleIcon size={14} weight="bold" />
+            <span className="relative z-10 flex items-center gap-1.5">
+              <span>DOWNLOAD</span>
+              <DownloadSimpleIcon size={14} weight="bold" />
+            </span>
+            {/* Hardware-accelerated continuous shine */}
+            <span className="custom-shine-element" />
           </Button>
 
           {/* Hamburger Menu (Mobile Only) */}

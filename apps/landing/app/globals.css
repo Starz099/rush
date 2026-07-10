@@ -136,3 +136,77 @@
     @apply font-mono;
   }
 }
+
+/* Global root-level text selection overrides */
+::selection {
+  background-color: #fb5536 !important;
+  color: #ffffff !important;
+}
+::-moz-selection {
+  background-color: #fb5536 !important;
+  color: #ffffff !important;
+}
+
+/* Raw CSS continuous diagonal shine sheen for key primary CTA buttons */
+@keyframes custom-shine-key {
+  0% {
+    left: -150%;
+  }
+  50% {
+    left: 150%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
+.custom-shine-element {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-20deg);
+  animation: custom-shine-key 3.5s infinite ease-in-out;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Custom global scrollbar styling */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: #080808 !important;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: #1f1f23 !important;
+  border-radius: 9999px !important;
+  border: 2px solid #080808 !important;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: #fb5536 !important;
+}
+
+/* Firefox scrollbar compatibility */
+html {
+  scrollbar-color: #1f1f23 #080808 !important;
+  scrollbar-width: thin !important;
+}
