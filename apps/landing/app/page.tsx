@@ -1,5 +1,11 @@
+import Hero from '@/components/hero';
+
 const Home = () => {
-  return <div className="min-h-1800">Rush AI</div>;
+  return (
+    <div className="mt-16">
+      <Hero />
+    </div>
+  );
 };
 
 export default Home;

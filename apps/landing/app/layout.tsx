@@ -3,15 +3,17 @@ import './globals.css';
 import { JetBrains_Mono } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import Providers from './providers';
+import Navbar from '@/components/navbar';
+import { Footer } from '@/components/footer';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-mono',
+  variable: '--font',
 });
 
 export const metadata: Metadata = {
   title: 'Rush: Agentic Video Editor',
-  description: '',
+  description: 'The AI-native agentic video editor for modern creators.',
 };
 
 export default function RootLayout({
@@ -31,13 +33,15 @@ export default function RootLayout({
       )}
       style={{ colorScheme: 'dark' }}
     >
-      <body className="relative flex min-h-full flex-col overflow-x-hidden">
+      <body className="bg-background text-foreground relative flex min-h-full flex-col overflow-x-hidden">
         <div
           aria-hidden="true"
-          className="noise-bg pointer-events-none absolute inset-0 z-0"
+          className="noise-bg pointer-events-none absolute inset-0 z-0 opacity-40"
         />
         <Providers>
+          <Navbar />
           <div className="relative z-10 flex flex-1 flex-col">{children}</div>
+          <Footer />
         </Providers>
       </body>
     </html>
