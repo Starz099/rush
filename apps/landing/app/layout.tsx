@@ -30,7 +30,7 @@ export default function RootLayout({
       <body className="bg-background text-foreground relative flex min-h-full flex-col overflow-x-hidden">
         <div
           aria-hidden="true"
-          className="noise-bg pointer-events-none absolute inset-0 z-0 opacity-40"
+          className="noise-bg pointer-events-none absolute inset-0 z-0"
         />
         <Providers>
           <Navbar />

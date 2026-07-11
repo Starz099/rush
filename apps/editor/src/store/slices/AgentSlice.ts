@@ -51,10 +51,21 @@ export const createAgentSlice: StateCreator<AgentSlice> = (set, get) => ({
       const activeProject = (get() as any).activeProject;
       if (!activeProject) throw new Error('No active project found');
 
-      const currentSession = get().currentSession;
-      const sessionId = currentSession ? currentSession.id : '';
+      let currentSession = get().currentSession;
+      let sessionId = currentSession ? currentSession.id : '';
 
-      // Optimistically append the user's message if a session already exists
+      // If starting a fresh chat session, create the session FIRST in the DB!
+      if (!currentSession) {
+        const session = await agentApi.createSession(activeProject.id);
+        currentSession = session;
+        set({ currentSession: session });
+        sessionId = session.id;
+
+        // Fetch sessions list so the UI shows the new session immediately
+        await get().fetchSessions(activeProject.id);
+      }
+
+      // Optimistically append the user's message
       if (currentSession) {
         const optimisticUserMessage: Message = {
           id: `temp-user-${Date.now()}`,
@@ -93,15 +104,6 @@ export const createAgentSlice: StateCreator<AgentSlice> = (set, get) => ({
       useAppStore
         .getState()
         .setPlayhead(updatedProject.timeline_state.playhead_position);
-
-      // If starting a fresh chat session, fetch sessions and select the newest one
-      if (!currentSession) {
-        await get().fetchSessions(activeProject.id);
-        const updatedSessions = get().sessions;
-        if (updatedSessions.length > 0) {
-          set({ currentSession: updatedSessions[0] });
-        }
-      }
 
       // Re-fetch messages to render the actual database user and agent messages in the viewport
       await get().fetchMessages();
