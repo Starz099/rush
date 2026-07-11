@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { JetBrains_Mono } from 'next/font/google';
+import { Outfit } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import Providers from './providers';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
 
-const jetbrainsMono = JetBrains_Mono({
+const outfit = Outfit({
   subsets: ['latin'],
-  variable: '--font',
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
 });
 
 export const metadata: Metadata = {
@@ -24,13 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        'dark',
-        'h-full',
-        'antialiased',
-        'font-mono',
-        jetbrainsMono.variable,
-      )}
+      className={cn('dark', 'h-full', 'antialiased', outfit.className)}
       style={{ colorScheme: 'dark' }}
     >
       <body className="bg-background text-foreground relative flex min-h-full flex-col overflow-x-hidden">

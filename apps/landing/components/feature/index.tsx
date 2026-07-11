@@ -19,7 +19,7 @@ export default function FeatureSection() {
     <div
       ref={containerRef}
       id="features"
-      className="relative w-full max-w-5xl overflow-visible px-6 py-24 font-mono"
+      className="relative w-full max-w-5xl overflow-visible px-6 py-24"
     >
       {/* Section Header */}
       <div className="mb-20 flex flex-col items-center text-center">

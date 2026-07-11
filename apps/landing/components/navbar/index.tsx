@@ -55,7 +55,7 @@ export default function Navbar() {
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         className={cn(
-          'fixed right-0 left-0 z-50 mx-auto flex items-center justify-center font-mono',
+          'fixed right-0 left-0 z-50 mx-auto flex items-center justify-center',
           isScrolled ? 'h-10 shadow-2xl backdrop-blur-md' : 'h-14',
         )}
         style={{
@@ -66,7 +66,7 @@ export default function Navbar() {
         <div className="absolute left-6 flex items-center gap-8 md:left-8">
           <a href="#" className="group flex items-center gap-3">
             <Logo />
-            <span className="group-hover:text-primary text-md font-mono font-black tracking-widest text-white transition-colors">
+            <span className="group-hover:text-primary text-md font-black tracking-widest text-white transition-colors">
               RUSH
             </span>
           </a>

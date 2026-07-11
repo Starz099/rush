@@ -59,7 +59,7 @@ export default function Showcase() {
   return (
     <div
       id="how-it-works"
-      className="relative flex w-full max-w-7xl flex-col items-start gap-16 px-6 py-24 font-mono lg:flex-row"
+      className="relative flex w-full max-w-7xl flex-col items-start gap-16 px-6 py-24 lg:flex-row"
     >
       {/* Decorative background radial glow behind the mockup */}
       <div
@@ -100,13 +100,13 @@ export default function Showcase() {
               transition={{ duration: 0.35, ease: 'easeOut' }}
               className="flex flex-col"
             >
-              <div className="text-primary mb-1.5 font-mono text-[10px] font-black tracking-widest uppercase">
+              <div className="text-primary mb-1.5 text-[10px] font-black tracking-widest uppercase">
                 // {STEPS[activeIdx].tag}
               </div>
-              <h3 className="mb-3 font-mono text-xl font-black tracking-tight text-white uppercase md:text-2xl">
+              <h3 className="mb-3 text-xl font-black tracking-tight text-white uppercase md:text-2xl">
                 {STEPS[activeIdx].stepNum}. {STEPS[activeIdx].title}
               </h3>
-              <p className="text-muted-foreground max-w-lg font-mono text-[11px] leading-relaxed">
+              <p className="text-muted-foreground max-w-lg text-[11px] leading-relaxed">
                 {STEPS[activeIdx].description}
               </p>
             </motion.div>

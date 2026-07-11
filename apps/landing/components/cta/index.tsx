@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 export default function CtaSection() {
   return (
-    <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-5 overflow-visible px-6 py-24 text-center font-mono">
+    <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-5 overflow-visible px-6 py-24 text-center">
       {/* Version Tag */}
       <span className="text-primary text-[10px] font-bold tracking-widest uppercase">
         // RUSH DESKTOP v0.1.0

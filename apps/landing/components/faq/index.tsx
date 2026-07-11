@@ -16,7 +16,7 @@ export default function FaqSection() {
   return (
     <div
       id="faq"
-      className="relative mx-auto w-full max-w-4xl overflow-visible px-6 py-24 font-mono"
+      className="relative mx-auto w-full max-w-4xl overflow-visible px-6 py-24"
     >
       {/* Centered Heading on Top */}
       <div className="mb-16 flex flex-col items-center text-center">
@@ -96,7 +96,7 @@ export default function FaqSection() {
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="text-muted-foreground pb-5 font-mono text-xs leading-relaxed antialiased md:text-sm">
+                    <div className="text-muted-foreground pb-5 text-xs leading-relaxed antialiased md:text-sm">
                       {faq.answer}
                     </div>
                   </motion.div>
