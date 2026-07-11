@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { customSmoothScroll } from '@/lib/scroll';
+import { useGitHubStars } from '@/hooks/use-github-stars';
 
 // Brand logo matching the favicon.ico
 const Logo = () => (
@@ -34,6 +35,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { formattedStars } = useGitHubStars();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -116,7 +118,7 @@ export default function Navbar() {
             <span className="bg-border h-3 w-[1px]" />
             <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
               <StarIcon size={10} weight="fill" />
-              <span>0</span>
+              <span>{formattedStars}</span>
             </div>
             {/* Hardware-accelerated continuous shine */}
             <span className="custom-shine-element" />
@@ -188,7 +190,7 @@ export default function Navbar() {
                   </div>
                   <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
                     <StarIcon size={12} weight="fill" />
-                    <span>1,248</span>
+                    <span>{formattedStars}</span>
                   </div>
                 </a>
 

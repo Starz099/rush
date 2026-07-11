@@ -1,10 +1,16 @@
 'use client';
 
-import { DownloadSimpleIcon, GithubLogoIcon } from '@phosphor-icons/react';
+import {
+  DownloadSimpleIcon,
+  GithubLogoIcon,
+  StarIcon,
+} from '@phosphor-icons/react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useGitHubStars } from '@/hooks/use-github-stars';
 
 export default function CtaSection() {
+  const { formattedStars } = useGitHubStars();
   return (
     <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-5 overflow-visible px-6 py-24 text-center">
       {/* Heading */}
@@ -46,7 +52,12 @@ export default function CtaSection() {
         >
           <span className="relative z-10 flex items-center gap-2">
             <GithubLogoIcon weight="bold" size={16} />
-            Star on GitHub
+            <span>Star on GitHub</span>
+            <span className="bg-border h-3 w-[1px]" />
+            <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
+              <StarIcon size={10} weight="fill" />
+              <span>{formattedStars}</span>
+            </div>
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
