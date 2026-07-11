@@ -1,9 +1,8 @@
-export type PhaseId = 'silence' | 'embeddings' | 'transform';
+export type StageId = 'import' | 'prompt' | 'adjust' | 'export';
 
-export interface ShowcaseStep {
-  id: PhaseId;
-  stepNum: string;
-  tag: string;
+export interface SubStep {
+  id: string; // e.g. 'BROWSER_OPEN', 'AUDIO_INDEX', etc.
+  duration: number; // in ms
   title: string;
   description: string;
 
@@ -12,16 +11,21 @@ export interface ShowcaseStep {
   offload: string;
   model: string;
 
-  // Workspace properties
-  projectName: string;
-  dimensions: string;
-  framerate: number;
+  // Custom states
   taskToast: {
     type: string;
     message: string;
-    progress: number;
-    status: string;
+    status: 'running' | 'completed';
   } | null;
-  agentPrompt: string;
-  agentResponse: string;
+
+  agentPrompt?: string;
+  agentResponse?: string;
+}
+
+export interface ShowcaseStage {
+  id: StageId;
+  stageNum: string;
+  tag: string;
+  title: string;
+  subSteps: SubStep[];
 }

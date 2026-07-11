@@ -3,209 +3,147 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { STEPS } from './data';
+import { STAGES } from './data';
 import { EditorWorkspace } from './workspace';
 
 export default function Showcase() {
-  const [activeIdx, setActiveIdx] = useState<number>(0);
-  const [prevIdx, setPrevIdx] = useState<number>(0);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+  const [activeStageIdx, setActiveStageIdx] = useState<number>(0);
+  const [activeSubStepIdx, setActiveSubStepIdx] = useState<number>(0);
   const [progress, setProgress] = useState<number>(0);
+  const [isWiping, setIsWiping] = useState<boolean>(false);
 
-  // Auto-cycle slide logic: simply ticks the progress state
+  const activeStage = STAGES[activeStageIdx];
+  const activeSubStep = activeStage.subSteps[activeSubStepIdx];
+
+  // Auto-cycle slide logic: updates the progress state
   useEffect(() => {
-    const slideDuration = 5000; // 5 seconds per slide
-    const intervalTime = 100;
-    const progressStep = (intervalTime / slideDuration) * 100;
+    const duration = activeSubStep.duration;
+    const intervalTime = 50; // update every 50ms
+    const stepIncrement = (intervalTime / duration) * 100;
 
     const timer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) return 100;
-        return prev + progressStep;
+        if (prev >= 100) {
+          return 100;
+        }
+        return prev + stepIncrement;
       });
     }, intervalTime);
 
     return () => clearInterval(timer);
-  }, [activeIdx]);
+  }, [activeStageIdx, activeSubStepIdx, activeSubStep.duration]);
 
   // Handle slide transition trigger when progress reaches 100%
   useEffect(() => {
     if (progress >= 100) {
-      const nextIdx = (activeIdx + 1) % STEPS.length;
-      triggerWipeTransition(nextIdx);
+      const stage = STAGES[activeStageIdx];
+
+      // If there are more sub-steps in this stage, advance to next sub-step
+      if (activeSubStepIdx < stage.subSteps.length - 1) {
+        setActiveSubStepIdx((prev) => prev + 1);
+        setProgress(0);
+      } else {
+        // Otherwise, move to the next stage with the curtain wipe
+        const nextStageIdx = (activeStageIdx + 1) % STAGES.length;
+        triggerWipeTransition(nextStageIdx);
+      }
     }
-  }, [progress, activeIdx]);
+  }, [progress, activeStageIdx, activeSubStepIdx]);
 
-  const triggerWipeTransition = (targetIdx: number) => {
-    if (targetIdx === activeIdx || isTransitioning) return;
+  const triggerWipeTransition = (targetStageIdx: number) => {
+    if (isWiping || targetStageIdx === activeStageIdx) return;
+    setIsWiping(true);
 
-    setPrevIdx(activeIdx);
-    setActiveIdx(targetIdx);
-    setProgress(0);
-    setIsTransitioning(true);
+    // Staggered coverage: swap states at 380ms when screen is fully masked
+    setTimeout(() => {
+      setActiveStageIdx(targetStageIdx);
+      setActiveSubStepIdx(0);
+      setProgress(0);
+    }, 380);
+
+    // Clear wipe at 800ms (0.65s duration + 140ms max delay = 790ms total)
+    setTimeout(() => {
+      setIsWiping(false);
+    }, 800);
   };
-
-  // Sync transition state reset with setTimeout to ensure it never gets stuck
-  useEffect(() => {
-    if (!isTransitioning) return;
-
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 900); // 900ms matches the 0.85s rotation duration
-
-    return () => clearTimeout(timer);
-  }, [isTransitioning]);
 
   return (
     <div
       id="how-it-works"
-      className="relative flex w-full max-w-7xl flex-col items-start gap-16 px-6 py-24 lg:flex-row"
+      className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-24"
     >
-      {/* Decorative background radial glow behind the mockup */}
-      <div
-        className="pointer-events-none absolute top-1/2 right-[-100px] z-0 h-[600px] w-[600px] -translate-y-1/2"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(251, 85, 54, 0.12) 0%, rgba(251, 85, 54, 0.01) 50%, transparent 70%)',
-        }}
-      />
+      {/* 2. Middle Container: Full-Width Video-like Animation Component */}
+      <div className="border-border relative flex h-[480px] w-full flex-col overflow-hidden border bg-[#080808] text-xs shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_50px_-5px_rgba(251,85,54,0.05)]">
+        <EditorWorkspace
+          stageId={activeStage.id}
+          subStepId={activeSubStep.id}
+          progress={progress}
+        />
 
-      {/* Left Column: Descriptive Text & Systems Widget */}
-      <div className="z-10 flex w-full min-w-0 flex-col justify-start gap-6 lg:w-[320px] lg:flex-none lg:pt-6">
-        {/* Step Indicator dots */}
-        <div className="flex items-center gap-2">
-          {STEPS.map((step, idx) => (
-            <button
-              key={step.id}
-              onClick={() => triggerWipeTransition(idx)}
-              className={cn(
-                'h-1.5 cursor-pointer rounded-none border border-transparent transition-all duration-300',
-                idx === activeIdx
-                  ? 'bg-primary w-8'
-                  : 'w-2 bg-white/20 hover:bg-white/40',
-              )}
-              aria-label={`Go to step ${idx + 1}`}
-            />
-          ))}
-        </div>
-
-        {/* Text transition container */}
-        <div className="relative flex h-[120px] flex-col justify-start">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeIdx}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="flex flex-col"
-            >
-              <div className="text-primary mb-1.5 text-[10px] font-black tracking-widest uppercase">
-                {STEPS[activeIdx].tag}
-              </div>
-              <h3 className="mb-3 text-xl font-black tracking-tight text-white uppercase md:text-2xl">
-                {STEPS[activeIdx].stepNum}. {STEPS[activeIdx].title}
-              </h3>
-              <p className="text-muted-foreground max-w-lg text-[11px] leading-relaxed">
-                {STEPS[activeIdx].description}
-              </p>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Systems Telemetry Widget */}
-        <div className="border-border relative flex w-full gap-6 border bg-[#0d0d0d]/80 p-4 text-[10px]">
-          <div className="border-border absolute top-0 right-3 -translate-y-1/2 border-x bg-[#0d0d0d] px-1.5 font-mono text-[8px] font-black tracking-widest text-white/30 uppercase">
-            TELEMETRY
-          </div>
-
-          <div className="flex-1">
-            <span className="text-primary font-mono text-[8px] font-black tracking-widest uppercase">
-              LATENCY
-            </span>
-            <div className="mt-0.5 font-mono font-bold tracking-tight text-white">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={activeIdx}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  {STEPS[activeIdx].latency}
-                </motion.span>
-              </AnimatePresence>
+        {/* Staggered horizontal lines wipe */}
+        <AnimatePresence>
+          {isWiping && (
+            <div className="pointer-events-none absolute inset-0 z-50 flex flex-col overflow-hidden">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="border-primary/20 w-full flex-1 border-b bg-[#080808]/85 shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md"
+                  initial={{ x: '-100%' }}
+                  animate={{ x: ['-100%', '0%', '0%', '100%'] }}
+                  transition={{
+                    duration: 0.65,
+                    times: [0, 0.35, 0.65, 1],
+                    delay: i * 0.02,
+                    ease: [0.76, 0, 0.24, 1],
+                  }}
+                />
+              ))}
             </div>
-          </div>
-
-          <div className="bg-border/80 w-[1px]" />
-
-          <div className="flex-1">
-            <span className="text-primary font-mono text-[8px] font-black tracking-widest uppercase">
-              OFFLOAD
-            </span>
-            <div className="mt-0.5 font-mono font-bold tracking-tight text-white">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={activeIdx}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  {STEPS[activeIdx].offload}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-          </div>
-
-          <div className="bg-border/80 w-[1px]" />
-
-          <div className="flex-1">
-            <span className="text-primary font-mono text-[8px] font-black tracking-widest uppercase">
-              ENGINE MODEL
-            </span>
-            <div className="mt-0.5 truncate font-mono font-bold tracking-tight text-white">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={activeIdx}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  {STEPS[activeIdx].model}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Right Column: Sliding Wipe Editor Workspace */}
-      <div className="z-10 flex w-full min-w-0 flex-1 flex-col items-center justify-center lg:items-end">
-        <div
-          className="border-border relative flex h-[500px] w-full flex-col overflow-hidden border bg-[#080808] text-xs md:w-[680px] lg:w-[780px]"
-          style={{
-            boxShadow:
-              '0 30px 100px -10px rgba(0, 0, 0, 0.8), 0 20px 80px -20px rgba(251, 85, 54, 0.18), 0 4px 20px -5px rgba(251, 85, 54, 0.15)',
-          }}
-        >
-          {/* Base Layer: Renders the NEW active step */}
-          <div className="absolute inset-0 z-0">
-            <EditorWorkspace step={STEPS[activeIdx]} />
-          </div>
+      {/* 3. Consolidated Bottom Card (Controls + Descriptions) */}
+      <div className="border-border relative flex flex-col gap-5 border bg-[#0d0d0f] p-6 text-left shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9),0_0_50px_-5px_rgba(251,85,54,0.05)]">
+        {/* Row 1: Interactive Stepper Tabs (Controls) */}
+        <div className="relative z-10 grid w-full grid-cols-2 gap-1 border-b border-white/5 pb-4 md:grid-cols-4">
+          {STAGES.map((stage, idx) => {
+            const isActive = idx === activeStageIdx;
+            return (
+              <button
+                key={stage.id}
+                onClick={() => triggerWipeTransition(idx)}
+                className={cn(
+                  'relative flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-none border border-transparent px-1 py-3 text-[10px] font-bold tracking-widest uppercase transition-colors duration-300 select-none md:text-[11px]',
+                  isActive
+                    ? 'font-black text-white'
+                    : 'text-white/40 hover:text-white/70',
+                )}
+              >
+                {/* Sliding active background tab wrapper */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeStageTab"
+                    className="border-primary/30 bg-primary/5 absolute inset-0 z-0 border shadow-[inset_0_0_12px_rgba(251,85,54,0.08)]"
+                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  />
+                )}
 
-          {/* Top Layer: Renders the OLD step, rotating out like a falling card hinged at bottom-left */}
-          {isTransitioning && (
-            <motion.div
-              className="border-primary absolute inset-0 z-10 origin-bottom-left overflow-hidden border-t-2 border-r-2 bg-[#080808] shadow-[0_0_30px_rgba(251,85,54,0.25)]"
-              initial={{ rotate: 0 }}
-              animate={{ rotate: -100 }}
-              transition={{ duration: 0.85, ease: [0.76, 0, 0.24, 1] }}
-            >
-              <div className="absolute inset-y-0 left-0 h-full w-full md:w-[680px] lg:w-[780px]">
-                <EditorWorkspace step={STEPS[prevIdx]} />
-              </div>
-            </motion.div>
-          )}
+                {/* Content above the sliding background */}
+                <span className="relative z-10">{stage.title}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 2: Active Sub-step Details */}
+        <div className="flex flex-col gap-1.5">
+          <h4 className="font-sans text-sm font-black tracking-tight text-white uppercase md:text-base">
+            {activeSubStep.title}
+          </h4>
+          <p className="max-w-3xl text-[12px] leading-relaxed text-white/50 md:text-[13px]">
+            {activeSubStep.description}
+          </p>
         </div>
       </div>
     </div>

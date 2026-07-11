@@ -27,7 +27,13 @@ export function useGitHubStars() {
     };
   }, []);
 
-  const formattedStars = new Intl.NumberFormat('en-US').format(stars);
+  const formattedStars = (() => {
+    if (stars < 1000) return stars.toString();
+    const formatted = (stars / 1000).toFixed(1);
+    return formatted.endsWith('.0')
+      ? `${formatted.slice(0, -2)}k`
+      : `${formatted}k`;
+  })();
 
   return { stars, formattedStars };
 }

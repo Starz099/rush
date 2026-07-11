@@ -114,7 +114,7 @@ export default function Navbar() {
             className="border-border text-muted-foreground bg-secondary relative hidden items-center gap-2 overflow-hidden border px-3 py-1.5 text-xs transition-all hover:border-white/20 hover:bg-white/[0.05] hover:text-white md:flex"
           >
             <GithubLogoIcon size={14} weight="bold" />
-            <span>Star</span>
+            <span>Github</span>
             <span className="bg-border h-3 w-[1px]" />
             <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
               <StarIcon size={10} weight="fill" />
