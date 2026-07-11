@@ -60,6 +60,7 @@ const StyledText = ({ text, index }: { text: string; index: number }) => {
           stroke="#fb5536"
           strokeWidth="3.5"
           strokeLinecap="round"
+          suppressHydrationWarning
           animate={{
             pathLength: pathKeyframes,
             opacity: opacityKeyframes,
@@ -115,6 +116,9 @@ export default function Hero() {
         {/* Primary Download Button with Tactile Hover Scale, Glow and Shine */}
         <Button
           size="lg"
+          onClick={() => {
+            window.dispatchEvent(new Event('open-download-modal'));
+          }}
           className="group relative cursor-pointer overflow-hidden rounded-none px-8 py-6 text-sm font-bold tracking-tight uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_35px_rgba(251,85,54,0.35)] active:scale-[0.98]"
         >
           <span className="relative z-10 flex items-center gap-2">

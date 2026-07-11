@@ -141,7 +141,7 @@ export default function Showcase() {
           <h4 className="font-sans text-sm font-black tracking-tight text-white uppercase md:text-base">
             {activeSubStep.title}
           </h4>
-          <p className="max-w-3xl text-[12px] leading-relaxed text-white/50 md:text-[13px]">
+          <p className="h-[20px] w-full overflow-hidden text-[12px] leading-relaxed text-white/50 md:h-[22px] md:text-[13px]">
             {activeSubStep.description}
           </p>
         </div>

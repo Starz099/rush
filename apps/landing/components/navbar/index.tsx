@@ -128,6 +128,9 @@ export default function Navbar() {
           <Button
             variant="default"
             size="sm"
+            onClick={() => {
+              window.dispatchEvent(new Event('open-download-modal'));
+            }}
             className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden rounded-none px-4 text-xs font-bold tracking-tight text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
           >
             <span className="relative z-10 flex items-center gap-1.5">
@@ -197,6 +200,10 @@ export default function Navbar() {
                 <Button
                   variant="default"
                   size="lg"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    window.dispatchEvent(new Event('open-download-modal'));
+                  }}
                   className="bg-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-none text-xs font-bold tracking-tight text-white"
                 >
                   <DownloadSimpleIcon size={16} weight="bold" />

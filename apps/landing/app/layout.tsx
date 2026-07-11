@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import Providers from './providers';
 import Navbar from '@/components/navbar';
 import Footer from '@/components/footer';
+import DownloadModal from '@/components/download-modal';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -26,7 +27,11 @@ export default function RootLayout({
       lang="en"
       className={cn('dark', 'h-full', 'antialiased', outfit.className)}
       style={{ colorScheme: 'dark' }}
+      suppressHydrationWarning
     >
+      <head>
+        <meta name="darkreader-lock" />
+      </head>
       <body className="bg-background text-foreground relative flex min-h-full flex-col overflow-x-hidden">
         <div
           aria-hidden="true"
@@ -36,6 +41,7 @@ export default function RootLayout({
           <Navbar />
           <div className="relative z-10 flex flex-1 flex-col">{children}</div>
           <Footer />
+          <DownloadModal />
         </Providers>
       </body>
     </html>

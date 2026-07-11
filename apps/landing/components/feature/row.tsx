@@ -64,9 +64,7 @@ export function FeatureRow({ feat, index }: FeatureRowProps) {
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           className="border-border relative flex flex-col gap-4 overflow-hidden border bg-[#0d0d0d]/80 p-6 shadow-2xl transition-all duration-300 hover:border-white/20"
-          style={{
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-          }}
+          suppressHydrationWarning
         >
           {/* Mouse-Following Spotlight Radial Glow */}
           <div
