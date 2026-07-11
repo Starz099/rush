@@ -1,9 +1,19 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Outfit } from 'next/font/google';
+import { cn } from '@/lib/utils';
+import Providers from './providers';
+import Navbar from '@/components/navbar';
+import Footer from '@/components/footer';
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+});
 
 export const metadata: Metadata = {
   title: 'Rush: Agentic Video Editor',
-  description: '',
+  description: 'The AI-native agentic video editor for modern creators.',
 };
 
 export default function RootLayout({
@@ -12,16 +22,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full antialiased`}>
-      <body
-        className="relative flex min-h-full flex-col overflow-x-hidden"
-        suppressHydrationWarning={true}
-      >
+    <html
+      lang="en"
+      className={cn('dark', 'h-full', 'antialiased', outfit.className)}
+      style={{ colorScheme: 'dark' }}
+    >
+      <body className="bg-background text-foreground relative flex min-h-full flex-col overflow-x-hidden">
         <div
           aria-hidden="true"
-          className="noise-bg pointer-events-none absolute inset-0 z-0"
+          className="noise-bg pointer-events-none absolute inset-0 z-0 opacity-40"
         />
-        <div className="relative z-10 flex flex-1 flex-col">{children}</div>
+        <Providers>
+          <Navbar />
+          <div className="relative z-10 flex flex-1 flex-col">{children}</div>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
