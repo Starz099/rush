@@ -13,8 +13,31 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://rush.starzz.dev'),
   title: 'Rush: Agentic Video Editor',
   description: 'The AI-native agentic video editor for modern creators.',
+  openGraph: {
+    title: 'Rush: Agentic Video Editor',
+    description: 'The AI-native agentic video editor for modern creators.',
+    url: 'https://rush.starzz.dev',
+    siteName: 'Rush',
+    images: [
+      {
+        url: '/assets/og-rush.png',
+        width: 1200,
+        height: 630,
+        alt: 'Rush: Agentic Video Editor',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Rush: Agentic Video Editor',
+    description: 'The AI-native agentic video editor for modern creators.',
+    images: ['/assets/og-rush.png'],
+  },
 };
 
 export default function RootLayout({
