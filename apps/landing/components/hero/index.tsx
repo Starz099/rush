@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from 'motion/react';
 import { CaretRightIcon, DownloadSimpleIcon } from '@phosphor-icons/react';
 import { Button } from '../ui/button';
+import { customSmoothScroll } from '@/lib/scroll';
 
 // Animated hand-drawn SVG laser underline highlight (Looping timeline)
 const StyledText = ({ text, index }: { text: string; index: number }) => {
@@ -114,11 +115,11 @@ export default function Hero() {
         {/* Primary Download Button with Tactile Hover Scale, Glow and Shine */}
         <Button
           size="lg"
-          className="group relative cursor-pointer overflow-hidden px-8 py-6 text-sm font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_35px_rgba(251,85,54,0.35)] active:scale-[0.98]"
+          className="group relative cursor-pointer overflow-hidden rounded-none px-8 py-6 text-sm font-bold tracking-tight uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_35px_rgba(251,85,54,0.35)] active:scale-[0.98]"
         >
           <span className="relative z-10 flex items-center gap-2">
-            Download now
-            <DownloadSimpleIcon weight="bold" size={15} />
+            <DownloadSimpleIcon weight="bold" size={16} />
+            Download Now
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
@@ -129,11 +130,9 @@ export default function Hero() {
           size="lg"
           variant="outline"
           onClick={() => {
-            document
-              .getElementById('how-it-works')
-              ?.scrollIntoView({ behavior: 'smooth' });
+            customSmoothScroll('how-it-works');
           }}
-          className="group border-border cursor-pointer px-8 py-6 text-sm font-bold tracking-wider uppercase transition-all duration-300 hover:bg-white/5"
+          className="group border-border cursor-pointer rounded-none px-8 py-6 text-sm font-bold tracking-tight uppercase transition-all duration-300 hover:bg-white/5"
         >
           <span className="flex items-center gap-2">
             Learn more

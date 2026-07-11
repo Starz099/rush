@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { customSmoothScroll } from '@/lib/scroll';
 
 // Brand logo matching the favicon.ico
 const Logo = () => (
@@ -78,6 +79,12 @@ export default function Navbar() {
             <a
               key={item.label}
               href={item.href}
+              onClick={(e) => {
+                if (item.href.startsWith('#')) {
+                  e.preventDefault();
+                  customSmoothScroll(item.href.substring(1));
+                }
+              }}
               className="text-muted-foreground relative px-4 py-1.5 text-xs font-semibold transition-colors hover:text-white"
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
@@ -102,7 +109,7 @@ export default function Navbar() {
             href="https://github.com/Starz099/rush"
             target="_blank"
             rel="noopener noreferrer"
-            className="border-border text-muted-foreground bg-secondary hidden items-center gap-2 border px-3 py-1.5 text-xs transition-all hover:border-white/20 hover:bg-white/[0.05] hover:text-white md:flex"
+            className="border-border text-muted-foreground bg-secondary relative hidden items-center gap-2 overflow-hidden border px-3 py-1.5 text-xs transition-all hover:border-white/20 hover:bg-white/[0.05] hover:text-white md:flex"
           >
             <GithubLogoIcon size={14} weight="bold" />
             <span>Star</span>
@@ -111,17 +118,19 @@ export default function Navbar() {
               <StarIcon size={10} weight="fill" />
               <span>0</span>
             </div>
+            {/* Hardware-accelerated continuous shine */}
+            <span className="custom-shine-element" />
           </a>
 
           {/* Download Button */}
           <Button
             variant="default"
             size="sm"
-            className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden px-4 text-xs font-bold tracking-wider text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
+            className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden rounded-none px-4 text-xs font-bold tracking-tight text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
           >
             <span className="relative z-10 flex items-center gap-1.5">
-              <span>DOWNLOAD</span>
               <DownloadSimpleIcon size={14} weight="bold" />
+              <span>DOWNLOAD</span>
             </span>
             {/* Hardware-accelerated continuous shine */}
             <span className="custom-shine-element" />
@@ -152,7 +161,13 @@ export default function Navbar() {
                   <a
                     key={item.label}
                     href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={(e) => {
+                      setIsMobileMenuOpen(false);
+                      if (item.href.startsWith('#')) {
+                        e.preventDefault();
+                        customSmoothScroll(item.href.substring(1));
+                      }
+                    }}
                     className="text-muted-foreground border-b border-white/[0.03] py-2.5 text-xs font-semibold transition-colors hover:text-white"
                   >
                     {item.label.toUpperCase()}
@@ -180,10 +195,10 @@ export default function Navbar() {
                 <Button
                   variant="default"
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 text-xs font-bold tracking-wider text-white"
+                  className="bg-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-none text-xs font-bold tracking-tight text-white"
                 >
-                  <span>DOWNLOAD NOW</span>
                   <DownloadSimpleIcon size={16} weight="bold" />
+                  <span>DOWNLOAD NOW</span>
                 </Button>
               </div>
             </motion.div>

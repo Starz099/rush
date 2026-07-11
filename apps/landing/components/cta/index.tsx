@@ -45,11 +45,15 @@ export default function CtaSection() {
           rel="noopener noreferrer"
           className={cn(
             buttonVariants({ variant: 'outline' }),
-            'border-border flex h-11 cursor-pointer items-center gap-2 rounded-none px-8 font-bold tracking-tight uppercase transition-all duration-300 hover:bg-white/5',
+            'border-border relative flex h-11 cursor-pointer items-center gap-2 overflow-hidden rounded-none px-8 font-bold tracking-tight uppercase transition-all duration-300 hover:bg-white/5',
           )}
         >
-          <GithubLogoIcon weight="bold" size={16} />
-          Star on GitHub
+          <span className="relative z-10 flex items-center gap-2">
+            <GithubLogoIcon weight="bold" size={16} />
+            Star on GitHub
+          </span>
+          {/* Hardware-accelerated continuous shine */}
+          <span className="custom-shine-element" />
         </a>
       </div>
     </div>
