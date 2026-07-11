@@ -101,7 +101,7 @@ export default function Showcase() {
               className="flex flex-col"
             >
               <div className="text-primary mb-1.5 text-[10px] font-black tracking-widest uppercase">
-                // {STEPS[activeIdx].tag}
+                {STEPS[activeIdx].tag}
               </div>
               <h3 className="mb-3 text-xl font-black tracking-tight text-white uppercase md:text-2xl">
                 {STEPS[activeIdx].stepNum}. {STEPS[activeIdx].title}

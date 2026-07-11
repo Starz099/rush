@@ -23,11 +23,8 @@ export default function FeatureSection() {
     >
       {/* Section Header */}
       <div className="mb-20 flex flex-col items-center text-center">
-        <h2 className="text-primary mb-1.5 text-xs font-bold tracking-widest uppercase">
-          // ENGINE CAPABILITIES
-        </h2>
         <h3 className="max-w-md text-2xl leading-tight font-black tracking-tight text-white uppercase">
-          A Modular Architecture for Modern Creators
+          Built for speed, privacy, and control
         </h3>
         <div className="bg-primary/30 mt-4 h-[1px] w-20" />
       </div>

@@ -20,16 +20,9 @@ export default function FaqSection() {
     >
       {/* Centered Heading on Top */}
       <div className="mb-16 flex flex-col items-center text-center">
-        <h2 className="text-primary mb-1.5 text-[10px] font-bold tracking-widest uppercase md:text-xs">
-          // DIAGNOSTICS & SYSTEM FAQ
-        </h2>
         <h3 className="text-2xl leading-tight font-black tracking-tight text-white uppercase md:text-3xl">
-          Frequently Resolved Cases
+          Frequently Asked Questions
         </h3>
-        <p className="text-muted-foreground mt-4 max-w-lg text-xs leading-relaxed md:text-sm">
-          Detailed information about the core engineering, GPU rendering
-          pipelines, and security architecture of the editor.
-        </p>
         <div className="bg-primary/30 mt-6 h-[1px] w-20" />
       </div>
 

@@ -4,14 +4,14 @@ export const STEPS: ShowcaseStep[] = [
   {
     id: 'silence',
     stepNum: '01',
-    tag: 'SPEECH EDITS',
-    title: 'Automated Audio Cleanup',
+    tag: 'AI ASSISTANT',
+    title: 'Edit Video by Chatting',
     description:
-      'Remove silent segments from waveforms automatically. Rush runs local audio transcription and slices the timeline, collapsing gaps without losing sync.',
+      'A chat panel docked next to your timeline. Type commands like "remove silences" or "trim the intro hook," and the agent makes frame-accurate edits for you automatically.',
     latency: '< 18ms',
     offload: '100% LOCAL',
     model: 'Whisper Base',
-    projectName: 'interview_cleanup_v1.rsh',
+    projectName: 'interview_cleanup.rsh',
     dimensions: '1920x1080',
     framerate: 24,
     taskToast: {
@@ -27,14 +27,14 @@ export const STEPS: ShowcaseStep[] = [
   {
     id: 'embeddings',
     stepNum: '02',
-    tag: 'SEMANTIC INDEXING',
-    title: 'Semantic Storyboard Search',
+    tag: 'SMART SEARCH',
+    title: 'Search Video in Plain English',
     description:
-      'Query visual concepts across video footage in natural language. The Rust preprocessor indexes storyboard tiles with local CLIP embeddings for instant search.',
+      'Quickly find the exact moment in hours of footage. Search your media bin for visual concepts like "drone shot of coffee" or "laughing face," and see matching clips highlighted instantly.',
     latency: '< 8ms',
     offload: '100% GPU',
     model: 'CLIP ViT-B/32',
-    projectName: 'cinematic_broll_v2.rsh',
+    projectName: 'cinematic_broll.rsh',
     dimensions: '3840x2160',
     framerate: 30,
     taskToast: {
@@ -50,24 +50,24 @@ export const STEPS: ShowcaseStep[] = [
   {
     id: 'transform',
     stepNum: '03',
-    tag: 'WEBGPU RENDERING',
-    title: 'WebGPU Spatial Transforms',
+    tag: 'PREVENT CRASHES',
+    title: 'Smooth, Lightweight Timeline',
     description:
-      'Scale, rotate, and reposition clips by describing your vision. Commands compile to transform matrices rendered in real-time via WebGPU pipelines.',
+      'A fast, keyboard-first timeline built for speed. Move clips, preview adjustments, and adjust scale or crop handles manually with zero latency and low memory usage.',
     latency: '< 2ms',
     offload: '100% LOCAL',
     model: 'Rush Engine',
-    projectName: 'transform_grades.rsh',
+    projectName: 'timeline_transforms.rsh',
     dimensions: '1920x1080',
     framerate: 24,
     taskToast: {
       type: 'Model Weights',
-      message: 'Tauri assets checking completed.',
+      message: 'Timeline assets checking completed.',
       progress: 100,
       status: 'completed',
     },
     agentPrompt: 'scale active video clip to 140%',
     agentResponse:
-      '✓ Calculated transform matrix. Scaled selected segment to 1.40x. Rendered WebGPU viewport.',
+      '✓ Calculated transform matrix. Scaled selected segment to 1.40x. Rendered canvas viewport.',
   },
 ];
