@@ -45,13 +45,14 @@ export default function Footer() {
             </div>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <a
-                  href="#"
-                  onClick={handleScrollToTop}
-                  className="text-foreground/75 transition-colors hover:text-white"
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new Event('open-download-modal'));
+                  }}
+                  className="text-foreground/75 cursor-pointer text-left transition-colors hover:text-white"
                 >
                   Download
-                </a>
+                </button>
               </li>
               <li>
                 <a

@@ -27,8 +27,10 @@ export default function CtaSection() {
 
       {/* Action Buttons */}
       <div className="mt-2 flex flex-col items-center justify-center gap-4 sm:flex-row">
-        <a
-          href="#"
+        <button
+          onClick={() => {
+            window.dispatchEvent(new Event('open-download-modal'));
+          }}
           className={cn(
             buttonVariants({ variant: 'default' }),
             'group relative flex h-11 cursor-pointer items-center gap-2 overflow-hidden rounded-none px-8 font-bold tracking-tight uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,85,54,0.3)] active:scale-[0.98]',
@@ -40,7 +42,7 @@ export default function CtaSection() {
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
-        </a>
+        </button>
         <a
           href="https://github.com/Starz099/rush"
           target="_blank"
