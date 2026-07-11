@@ -74,8 +74,8 @@ const PropertiesTab = () => {
               {/* Timing Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-blue-500" />
-                  <h3 className="text-[10px] font-bold tracking-tight text-blue-400/80 uppercase">
+                  <div className="h-1 w-1 rounded-full bg-white/40" />
+                  <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                     Timeline Position
                   </h3>
                 </div>
@@ -87,7 +87,7 @@ const PropertiesTab = () => {
                     </Label>
                     <Input
                       type="number"
-                      className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-blue-500/50"
+                      className="focus-visible:ring-primary/50 h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs"
                       value={selectedClip.timeline_in}
                       onChange={(e) =>
                         handleClipUpdate({
@@ -102,7 +102,7 @@ const PropertiesTab = () => {
                     </Label>
                     <Input
                       type="number"
-                      className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-blue-500/50"
+                      className="focus-visible:ring-primary/50 h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs"
                       value={selectedClip.timeline_out}
                       onChange={(e) =>
                         handleClipUpdate({
@@ -117,13 +117,13 @@ const PropertiesTab = () => {
               {!isGap && track && activeProject && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="h-1 w-1 rounded-full bg-indigo-500" />
-                    <h3 className="text-[10px] font-bold tracking-tight text-indigo-400/80 uppercase">
+                    <div className="h-1 w-1 rounded-full bg-white/40" />
+                    <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                       Track Assignment
                     </h3>
                   </div>
                   <select
-                    className="h-8 w-full rounded border border-white/5 bg-white/[0.03] px-2 text-xs font-medium text-white/85 focus:outline-none focus-visible:ring-indigo-500/50"
+                    className="focus-visible:ring-primary/50 h-8 w-full rounded border border-white/5 bg-white/[0.03] px-2 text-xs font-medium text-white/85 focus:outline-none"
                     value={selectedTrackId || ''}
                     onChange={(e) => {
                       if (selectedTrackId && selectedClipId) {
@@ -166,8 +166,8 @@ const PropertiesTab = () => {
                           {/* Speed Multiplier Section */}
                           <div className="space-y-4">
                             <div className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-amber-500" />
-                              <h3 className="text-[10px] font-bold tracking-tight text-amber-400/80 uppercase">
+                              <div className="h-1 w-1 rounded-full bg-white/40" />
+                              <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                                 Speed Effect Properties
                               </h3>
                             </div>
@@ -208,7 +208,7 @@ const PropertiesTab = () => {
                                   size="sm"
                                   className={`h-7 flex-1 border-white/5 text-[10px] ${
                                     selectedClip.speed_factor === preset
-                                      ? 'border-amber-500/30 bg-amber-500/20 text-amber-400'
+                                      ? 'border-primary/30 bg-primary/20 text-primary'
                                       : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
                                   }`}
                                   onClick={() =>
@@ -228,8 +228,8 @@ const PropertiesTab = () => {
                           {/* Zoom Multiplier Section */}
                           <div className="space-y-4">
                             <div className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-purple-500" />
-                              <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
+                              <div className="h-1 w-1 rounded-full bg-white/40" />
+                              <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                                 Zoom Effect Properties
                               </h3>
                             </div>
@@ -272,8 +272,8 @@ const PropertiesTab = () => {
                       {/* Transform Section */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-emerald-500" />
-                          <h3 className="text-[10px] font-bold tracking-tight text-emerald-400/80 uppercase">
+                          <div className="h-1 w-1 rounded-full bg-white/40" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                             Transform
                           </h3>
                         </div>
@@ -437,8 +437,8 @@ const PropertiesTab = () => {
                       {/* Source Section */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-purple-500" />
-                          <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
+                          <div className="h-1 w-1 rounded-full bg-white/40" />
+                          <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
                             Source Trim
                           </h3>
                         </div>
@@ -450,7 +450,7 @@ const PropertiesTab = () => {
                             </Label>
                             <Input
                               type="number"
-                              className="h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs focus-visible:ring-purple-500/50"
+                              className="focus-visible:ring-primary/50 h-7 border-white/5 bg-white/[0.03] px-2 font-mono text-xs"
                               value={selectedClip.source_in}
                               onChange={(e) =>
                                 handleClipUpdate({

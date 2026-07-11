@@ -150,9 +150,9 @@ const AgentTab = ({ projectId }: { projectId: string }) => {
                           className={cn(
                             'max-w-[85%] rounded-lg p-2.5 text-xs',
                             isUser
-                              ? 'ml-auto items-end border border-blue-500/20 bg-blue-600/15 text-right'
+                              ? 'border-primary/20 bg-primary/10 ml-auto items-end border text-right'
                               : isTool
-                                ? 'mr-auto items-start border border-yellow-500/10 bg-yellow-500/5 font-mono text-[10px] text-yellow-200/80'
+                                ? 'mr-auto items-start border border-white/5 bg-white/[0.02] font-mono text-[10px] text-white/50'
                                 : 'mr-auto items-start border border-white/10 bg-white/5',
                           )}
                         >
@@ -188,14 +188,14 @@ const AgentTab = ({ projectId }: { projectId: string }) => {
             className={`h-1.5 w-1.5 animate-ping rounded-full ${
               agentStatus.status === AGENT_STATUS.Error
                 ? 'bg-red-400'
-                : 'bg-blue-400'
+                : 'bg-primary'
             }`}
           />
           <span
             className={`font-bold uppercase ${
               agentStatus.status === AGENT_STATUS.Error
                 ? 'text-red-400'
-                : 'text-blue-400'
+                : 'text-primary'
             }`}
           >
             {agentStatus.status}:

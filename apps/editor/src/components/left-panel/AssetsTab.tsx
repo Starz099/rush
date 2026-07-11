@@ -236,7 +236,7 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b p-3">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           Assets
@@ -251,8 +251,8 @@ export const AssetsTab = ({ projectId }: AssetsTabProps) => {
           <PlusIcon weight="bold" />
         </Button>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-1 p-2">
+      <ScrollArea className="w-full flex-1 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:!w-full">
+        <div className="flex w-full min-w-0 flex-col gap-1 p-2">
           {assets.length === 0 ? (
             <p className="text-muted-foreground p-4 text-center text-xs">
               No assets yet. Click + to add.

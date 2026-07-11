@@ -13,7 +13,7 @@ export const RightPanel = ({ projectId }: { projectId: string }) => {
           onClick={() => setActiveTab('properties')}
           className={`flex-1 text-[10px] font-bold tracking-wider uppercase transition-all duration-150 ${
             activeTab === 'properties'
-              ? 'border-b-2 border-blue-500 bg-white/[0.02] text-blue-400'
+              ? 'border-primary text-primary border-b-2 bg-white/[0.02]'
               : 'text-white/40 hover:text-white/80'
           }`}
         >
@@ -23,7 +23,7 @@ export const RightPanel = ({ projectId }: { projectId: string }) => {
           onClick={() => setActiveTab('agent')}
           className={`flex-1 text-[10px] font-bold tracking-wider uppercase transition-all duration-150 ${
             activeTab === 'agent'
-              ? 'border-b-2 border-blue-500 bg-white/[0.02] text-blue-400'
+              ? 'border-primary text-primary border-b-2 bg-white/[0.02]'
               : 'text-white/40 hover:text-white/80'
           }`}
         >

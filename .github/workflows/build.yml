@@ -16,8 +16,6 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
-          - platform: 'macos-13'
-            args: '--target x86_64-apple-darwin'
           - platform: 'ubuntu-latest'
             args: ''
           - platform: 'windows-latest'
@@ -42,7 +40,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || (matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '') }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Install system dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-latest'
@@ -58,9 +56,6 @@ jobs:
           # We download the matching architecture binaries for all targeted platforms
           echo "Downloading macOS Apple Silicon ffmpeg sidecar..."
           curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64 -o src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-
-          echo "Downloading macOS Intel ffmpeg sidecar..."
-          curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64 -o src-tauri/binaries/ffmpeg-x86_64-apple-darwin
 
           echo "Downloading Linux ffmpeg sidecar..."
           curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-linux-x64 -o src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu

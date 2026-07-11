@@ -195,7 +195,7 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
           let styling = '';
           if (isSelected) {
             styling =
-              'z-10 border-blue-400 bg-blue-500/40 ring-1 ring-blue-400/50 text-white';
+              'z-10 border-primary bg-primary/30 ring-1 ring-primary/40 text-white';
           } else if (isGap) {
             styling =
               'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600 text-neutral-500';
@@ -218,7 +218,7 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
             >
               {/* Left Trim Handle */}
               <div
-                className="absolute top-0 bottom-0 left-0 z-20 w-2 cursor-ew-resize bg-blue-500/40 opacity-0 transition-opacity group-hover/clip:opacity-100"
+                className="bg-primary/40 absolute top-0 bottom-0 left-0 z-20 w-2 cursor-ew-resize opacity-0 transition-opacity group-hover/clip:opacity-100"
                 onMouseDown={(e) => handleTrimMouseDown(e, clip, 'left')}
               />
 
@@ -234,7 +234,7 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
 
               {/* Right Trim Handle */}
               <div
-                className="absolute top-0 right-0 bottom-0 z-20 w-2 cursor-ew-resize bg-blue-500/40 opacity-0 transition-opacity group-hover/clip:opacity-100"
+                className="bg-primary/40 absolute top-0 right-0 bottom-0 z-20 w-2 cursor-ew-resize opacity-0 transition-opacity group-hover/clip:opacity-100"
                 onMouseDown={(e) => handleTrimMouseDown(e, clip, 'right')}
               />
             </div>

@@ -162,7 +162,7 @@ export const TimelinePanel = () => {
           {title} ({count})
         </button>
         <button
-          className="px-1 text-[9px] font-semibold text-blue-400 hover:text-blue-300"
+          className="text-primary hover:text-primary/80 px-1 text-[9px] font-bold"
           onClick={() => handleAddTrack(group)}
         >
           + Add

@@ -30,27 +30,27 @@ export const AssetCell = ({
   return (
     <div
       onClick={onClick}
-      className={`group hover:bg-accent relative flex cursor-pointer items-center gap-2 rounded-md p-2 text-left text-sm transition-colors ${
+      className={`group hover:bg-accent relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-none p-2 text-left text-sm transition-colors ${
         isSelected ? 'bg-accent text-accent-foreground' : ''
       }`}
     >
       {asset.media_type === 'video' ? (
-        <FileVideoIcon className="size-4 shrink-0 text-blue-500" />
+        <FileVideoIcon className="size-4 shrink-0 text-white/70" />
       ) : asset.media_type === 'image' ? (
-        <FileImageIcon className="size-4 shrink-0 text-green-500" />
+        <FileImageIcon className="size-4 shrink-0 text-white/70" />
       ) : asset.media_type === 'audio' ||
         asset.file_path.toLowerCase().endsWith('.mp3') ? (
-        <FileAudioIcon className="size-4 shrink-0 text-purple-500" />
+        <FileAudioIcon className="size-4 shrink-0 text-white/70" />
       ) : (
         <FileIcon className="text-muted-foreground size-4 shrink-0" />
       )}
-      <span className="flex-1 truncate">{asset.name}</span>
+      <span className="min-w-0 flex-1 truncate">{asset.name}</span>
 
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="bg-accent pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-4 rounded-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         <Button
           variant="ghost"
           size="icon"
-          className="size-6 text-blue-500 hover:text-blue-600"
+          className="text-primary hover:text-primary/80 size-6"
           onClick={onAddToTimeline}
           title="Add to Timeline"
         >

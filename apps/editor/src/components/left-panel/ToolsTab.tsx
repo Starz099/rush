@@ -74,23 +74,23 @@ const TOOL_STYLES: Record<
 > = {
   select: {
     icon: CursorClickIcon,
-    colorClass: 'border-blue-500 bg-blue-500/10 text-white',
-    iconClass: 'text-blue-400',
+    colorClass: 'border-primary bg-primary/10 text-white',
+    iconClass: 'text-primary',
   },
   split: {
     icon: ScissorsIcon,
-    colorClass: 'border-red-500 bg-red-500/10 text-white',
-    iconClass: 'text-red-400',
+    colorClass: 'border-primary bg-primary/10 text-white',
+    iconClass: 'text-primary',
   },
   trim: {
     icon: CropIcon,
-    colorClass: 'border-green-500 bg-green-500/10 text-white',
-    iconClass: 'text-green-400',
+    colorClass: 'border-primary bg-primary/10 text-white',
+    iconClass: 'text-primary',
   },
   bg: {
     icon: EyedropperIcon,
-    colorClass: 'border-violet-500 bg-violet-500/10 text-white',
-    iconClass: 'text-violet-400',
+    colorClass: 'border-primary bg-primary/10 text-white',
+    iconClass: 'text-primary',
   },
 };
 
@@ -98,8 +98,8 @@ const TOOL_STYLES: Record<
  * Icon and style mappings for the timeline effects.
  */
 const EFFECT_STYLES: Record<string, { icon: any; iconClass: string }> = {
-  zoom: { icon: SparkleIcon, iconClass: 'text-purple-400' },
-  speed: { icon: TimerIcon, iconClass: 'text-amber-400' },
+  zoom: { icon: SparkleIcon, iconClass: 'text-primary' },
+  speed: { icon: TimerIcon, iconClass: 'text-primary' },
 };
 
 /**
@@ -206,8 +206,8 @@ export const ToolsTab = () => {
         {tools.map((tool) => {
           const style = TOOL_STYLES[tool.name] || {
             icon: CursorClickIcon,
-            colorClass: 'border-blue-500 bg-blue-500/10 text-white',
-            iconClass: 'text-blue-400',
+            colorClass: 'border-primary bg-primary/10 text-white',
+            iconClass: 'text-primary',
           };
           const Icon = style.icon;
           const isActive = activeTool === tool.name;
@@ -243,7 +243,7 @@ export const ToolsTab = () => {
         {effects.map((effect) => {
           const style = EFFECT_STYLES[effect.name] || {
             icon: SparkleIcon,
-            iconClass: 'text-purple-400',
+            iconClass: 'text-primary',
           };
           const Icon = style.icon;
 
