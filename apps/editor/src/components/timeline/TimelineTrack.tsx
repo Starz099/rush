@@ -14,6 +14,23 @@ interface TimelineTrackProps {
   framerate: number;
 }
 
+function getEffectClipLabel(clip: any): string {
+  if (!clip.effect_type) {
+    return 'Unknown Effect';
+  }
+
+  switch (clip.effect_type) {
+    case 'zoom':
+      return 'Zoom Effect';
+    case 'speed':
+      return `Speed Effect (${clip.speed_factor ?? 1.0}x)`;
+    case 'text':
+      return `Text Effect ("${clip.effect_config?.text ?? 'Hello'}")`;
+    default:
+      return `${clip.effect_type.charAt(0).toUpperCase() + clip.effect_type.slice(1)} Effect`;
+  }
+}
+
 export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
   const config = getTrackUIConfig(track);
   const bgColor = config?.bgClass || 'bg-white/5';
@@ -189,7 +206,8 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
                 !clip.transform &&
                 (clip.speed_factor === undefined ||
                   clip.speed_factor === null ||
-                  clip.speed_factor === 1.0)
+                  clip.speed_factor === 1.0) &&
+                !clip.effect_type
               : !clip.asset_id;
 
           let styling = '';
@@ -226,9 +244,7 @@ export const TimelineTrack = ({ track, framerate }: TimelineTrackProps) => {
                 {isGap
                   ? 'Gap'
                   : config?.type === 'effects'
-                    ? clip.transform !== undefined && clip.transform !== null
-                      ? 'Zoom Effect'
-                      : `Speed Effect (${clip.speed_factor ?? 1.0}x)`
+                    ? getEffectClipLabel(clip)
                     : clip.id.slice(0, 8)}
               </span>
 

@@ -399,14 +399,7 @@ function validateAndSortClipsLocal(tracks: any[]): any[] {
 
     track.clips.forEach((clip: any) => {
       const isEffectTrack = trackType?.toLowerCase() === 'effects';
-      const isGap = isEffectTrack
-        ? !clip.asset_id &&
-          !clip.transform &&
-          (clip.speed_factor === undefined ||
-            clip.speed_factor === null ||
-            clip.speed_factor === 1.0) &&
-          (!clip.effects || clip.effects.length === 0)
-        : !clip.asset_id;
+      const isGap = isEffectTrack ? !clip.effect_type : !clip.asset_id;
 
       if (isGap) {
         gapClips.push(clip);
@@ -430,7 +423,8 @@ function validateAndSortClipsLocal(tracks: any[]): any[] {
       const duration = gapClip.timeline_out - gapClip.timeline_in;
       if (duration > 0) {
         gapClip.transform = null;
-        gapClip.effects = [];
+        gapClip.effect_type = null;
+        gapClip.effect_config = null;
         gapClip.speed_factor = 1.0;
         gapClip.asset_id = null;
         gapClip.timeline_in = 0;
@@ -469,12 +463,14 @@ function validateAndSortClipsLocal(tracks: any[]): any[] {
             source_out: gapDuration,
             transform: null,
             speed_factor: 1.0,
-            effects: [],
+            effect_type: null,
+            effect_config: null,
           };
         }
 
         gapClip.transform = null;
-        gapClip.effects = [];
+        gapClip.effect_type = null;
+        gapClip.effect_config = null;
         gapClip.speed_factor = 1.0;
         gapClip.asset_id = null;
         gapClip.timeline_in = currentTime;

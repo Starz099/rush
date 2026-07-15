@@ -40,30 +40,6 @@ pub enum Shape {
     Highlighter,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Type)]
-#[serde(tag = "type", content = "params", rename_all = "snake_case")]
-pub enum EffectConfig {
-    Zoom {
-        start_scale: f32,
-        end_scale: f32,
-        center_x: f32,
-        center_y: f32,
-        ease_curve: EaseCurve,
-    },
-    Highlight {
-        shape: Shape,
-        color_hex: String,
-        stroke_width: i32,
-        animation: String,
-    },
-    TextOverlay {
-        text: String,
-        font_family: String,
-        font_size: i32,
-        color_hex: String,
-    },
-}
-
 fn default_speed_factor() -> f32 {
     1.0
 }
@@ -140,19 +116,17 @@ pub struct Clip {
     #[serde(default = "default_speed_factor")]
     pub speed_factor: f32,
     #[serde(default)]
-    pub effects: Vec<EffectConfig>,
+    pub effect_type: Option<String>,
+    #[serde(default)]
+    #[specta(type = Option<specta_typescript::Any>)]
+    pub effect_config: Option<serde_json::Value>,
 }
 
 impl Clip {
     pub fn is_gap(&self, track_type: TrackType) -> bool {
         match track_type {
             TrackType::Video | TrackType::Audio => self.asset_id.is_none(),
-            TrackType::Effects => {
-                self.asset_id.is_none()
-                    && self.transform.is_none()
-                    && self.speed_factor == 1.0
-                    && self.effects.is_empty()
-            }
+            TrackType::Effects => self.effect_type.is_none(),
         }
     }
 }
@@ -193,7 +167,8 @@ impl Track {
             let duration = gap_clip.timeline_out - gap_clip.timeline_in;
             if duration > 0 {
                 gap_clip.transform = None;
-                gap_clip.effects = Vec::new();
+                gap_clip.effect_type = None;
+                gap_clip.effect_config = None;
                 gap_clip.speed_factor = 1.0;
                 gap_clip.asset_id = None;
                 gap_clip.timeline_in = 0;
@@ -232,13 +207,15 @@ impl Track {
                         source_out: gap_duration,
                         transform: None,
                         speed_factor: 1.0,
-                        effects: Vec::new(),
+                        effect_type: None,
+                        effect_config: None,
                     }
                 };
 
                 // Enforce gap constraints
                 gap_clip.transform = None;
-                gap_clip.effects = Vec::new();
+                gap_clip.effect_type = None;
+                gap_clip.effect_config = None;
                 gap_clip.speed_factor = 1.0;
                 gap_clip.asset_id = None;
                 gap_clip.timeline_in = current_time;

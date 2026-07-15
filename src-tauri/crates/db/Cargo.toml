@@ -10,4 +10,5 @@ rusqlite = { workspace = true }
 sqlite-vec = { workspace = true }
 uuid = { workspace = true }
 specta = { workspace = true }
+specta-typescript = { workspace = true }
 tokio = { workspace = true }

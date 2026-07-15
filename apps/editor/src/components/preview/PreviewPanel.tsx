@@ -51,6 +51,20 @@ export const PreviewPanel = () => {
       ? assets.find((a) => a.id === activeClips[0].asset_id)
       : null;
 
+  const effectsTracks =
+    timeline?.tracks.filter(
+      (t: any) => t.track_type?.toLowerCase() === 'effects',
+    ) || [];
+
+  const activeTextClips = effectsTracks
+    .flatMap((t: any) => t.clips)
+    .filter(
+      (clip: any) =>
+        clip.effect_type === 'text' &&
+        playheadPosition >= clip.timeline_in &&
+        playheadPosition < clip.timeline_out,
+    );
+
   const previewWidth = activeProject?.viewport_width ?? 1920;
   const previewHeight = activeProject?.viewport_height ?? 1080;
   const projectFps = fpsToNumeric(activeProject?.framerate);
@@ -254,11 +268,6 @@ export const PreviewPanel = () => {
           (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
         );
 
-        // Find active global zoom multiplier
-        const effectsTracks =
-          timeline?.tracks.filter(
-            (t: any) => t.track_type?.toLowerCase() === 'effects',
-          ) || [];
         const activeEffectsClip = effectsTracks
           .flatMap((t: any) => t.clips)
           .find(
@@ -266,7 +275,10 @@ export const PreviewPanel = () => {
               targetPlayhead >= clip.timeline_in &&
               targetPlayhead < clip.timeline_out,
           );
-        const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+        const globalZoom =
+          activeEffectsClip?.effect_type === 'zoom'
+            ? (activeEffectsClip.effect_config?.scale ?? 1.0)
+            : 1.0;
 
         // Render the frame immediately
         videoEngine.renderFrame(
@@ -335,6 +347,34 @@ export const PreviewPanel = () => {
             className="h-full w-full bg-white/5 object-contain"
           />
         )}
+
+        {/* TEXT OVERLAY LAYER */}
+        {activeTextClips.map((clip: any) => {
+          const config = clip.effect_config || {};
+          const text = config.text ?? 'Hello Worrrld';
+          const fontSize = config.font_size ?? 24;
+          const color = config.color ?? '#FFFFFF';
+          const position = config.position || { x: 0.5, y: 0.5 };
+          const zIndex = config.z_index ?? 0;
+
+          return (
+            <div
+              key={clip.id}
+              className="pointer-events-none absolute text-center font-bold drop-shadow-md select-none"
+              style={{
+                left: `${position.x * 100}%`,
+                top: `${position.y * 100}%`,
+                transform: 'translate(-50%, -50%)',
+                fontSize: `${fontSize}px`,
+                color: color,
+                zIndex: zIndex + 20,
+                fontFamily: config.font_family || 'Outfit, sans-serif',
+              }}
+            >
+              {text}
+            </div>
+          );
+        })}
 
         {/* FALLBACKS */}
         {!activeAsset && !isInitializing && !isActiveAssetLoading && (

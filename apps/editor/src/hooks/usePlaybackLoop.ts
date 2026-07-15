@@ -124,12 +124,13 @@ export function usePlaybackLoop(
           .flatMap((t: any) => t.clips)
           .find(
             (clip: any) =>
-              clip.transform?.scale !== undefined &&
-              clip.transform?.scale !== null &&
               playheadFloatRef.current >= clip.timeline_in &&
               playheadFloatRef.current < clip.timeline_out,
           );
-        const globalZoom = activeEffectsClip?.transform?.scale ?? 1.0;
+        const globalZoom =
+          activeEffectsClip?.effect_type === 'zoom'
+            ? (activeEffectsClip.effect_config?.scale ?? 1.0)
+            : 1.0;
 
         // Render the pre-decoded frames to the WebGPU canvas
         videoEngine.renderFrame(

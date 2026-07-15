@@ -70,7 +70,8 @@ pub fn add_clip(
             z_index: 0,
         }),
         speed_factor: 1.0,
-        effects: vec![],
+        effect_type: None,
+        effect_config: None,
     };
 
     track.clips.push(clip.clone());

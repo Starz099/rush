@@ -6,6 +6,7 @@ import {
   EyedropperIcon,
   SparkleIcon,
   TimerIcon,
+  TextTIcon,
 } from '@phosphor-icons/react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useProjectStore } from '@/store/projectStore';
@@ -46,26 +47,6 @@ const DEFAULT_TOOLS = [
 ];
 
 /**
- * Fallback effects list to maintain UI functionality if backend fetch fails.
- */
-const DEFAULT_EFFECTS: EffectDescriptor[] = [
-  {
-    name: 'zoom',
-    label: 'Zoom Effect',
-    description: 'Apply dynamic canvas zoom and camera pan transformations.',
-    defaultDurationFrames: 150,
-    defaultConfigJson: '{"x": 0.0, "y": 0.0, "scale": 1.2, "z_index": 0}',
-  },
-  {
-    name: 'speed',
-    label: 'Speed Effect',
-    description: 'Speed up or slow down clip playback speeds.',
-    defaultDurationFrames: 150,
-    defaultConfigJson: '{"speed_factor": 2.0}',
-  },
-];
-
-/**
  * Icon and style mappings for the editing tools.
  */
 const TOOL_STYLES: Record<
@@ -100,6 +81,7 @@ const TOOL_STYLES: Record<
 const EFFECT_STYLES: Record<string, { icon: any; iconClass: string }> = {
   zoom: { icon: SparkleIcon, iconClass: 'text-primary' },
   speed: { icon: TimerIcon, iconClass: 'text-primary' },
+  text: { icon: TextTIcon, iconClass: 'text-primary' },
 };
 
 /**
@@ -135,7 +117,7 @@ export const ToolsTab = () => {
   }
 
   const tools = registry?.tools || DEFAULT_TOOLS;
-  const effects = registry?.effects || DEFAULT_EFFECTS;
+  const effects = registry?.effects || [];
 
   /**
    * Spawns a new effect block on the timeline's effects track at the current playhead.
@@ -173,12 +155,13 @@ export const ToolsTab = () => {
       source_out: duration,
     };
 
+    newClip.effect_type = effect.name;
+    newClip.effect_config = parsedConfig;
+
     if (effect.name === 'zoom') {
       newClip.transform = parsedConfig;
     } else if (effect.name === 'speed') {
       newClip.speed_factor = parsedConfig.speed_factor;
-    } else {
-      Object.assign(newClip, parsedConfig);
     }
 
     const updatedTracks = timeline.tracks.map((t: any) => {

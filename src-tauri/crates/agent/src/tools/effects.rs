@@ -1,4 +1,4 @@
-use rush_db::models::clip::{EaseCurve, EffectConfig, Shape, TimelineState, Transform};
+use rush_db::models::clip::{TimelineState, Transform};
 use serde_json::Value;
 
 pub fn update_transform(
@@ -68,72 +68,25 @@ pub fn add_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<St
     let mut found = false;
     for track in &mut timeline_state.tracks {
         if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
-            match effect_type.to_lowercase().as_str() {
-                "zoom" => {
-                    let start_scale = config["start_scale"].as_f64().unwrap_or(1.0) as f32;
-                    let end_scale = config["end_scale"].as_f64().unwrap_or(1.2) as f32;
-                    let center_x = config["center_x"].as_f64().unwrap_or(0.0) as f32;
-                    let center_y = config["center_y"].as_f64().unwrap_or(0.0) as f32;
-                    let ease_curve = match config["ease_curve"].as_str().unwrap_or("ease_in") {
-                        "ease_out" => EaseCurve::EaseOut,
-                        "linear" => EaseCurve::Linear,
-                        _ => EaseCurve::EaseIn,
-                    };
-                    clip.effects.push(EffectConfig::Zoom {
-                        start_scale,
-                        end_scale,
-                        center_x,
-                        center_y,
-                        ease_curve,
-                    });
-                }
-                "text_overlay" => {
-                    let text = config["text"]
-                        .as_str()
-                        .unwrap_or("Text Overlay")
-                        .to_string();
-                    let font_family = config["font_family"]
-                        .as_str()
-                        .unwrap_or("Outfit")
-                        .to_string();
-                    let font_size = config["font_size"].as_i64().unwrap_or(48) as i32;
-                    let color_hex = config["color_hex"]
-                        .as_str()
-                        .unwrap_or("#FFFFFF")
-                        .to_string();
-                    clip.effects.push(EffectConfig::TextOverlay {
-                        text,
-                        font_family,
-                        font_size,
-                        color_hex,
-                    });
-                }
-                "highlight" => {
-                    let shape = match config["shape"].as_str().unwrap_or("rectangle") {
-                        "circle" => Shape::Circle,
-                        "arrow" => Shape::Arrow,
-                        "highlighter" => Shape::Highlighter,
-                        _ => Shape::Rectangle,
-                    };
-                    let color_hex = config["color_hex"]
-                        .as_str()
-                        .unwrap_or("#FFFC00")
-                        .to_string();
-                    let stroke_width = config["stroke_width"].as_i64().unwrap_or(4) as i32;
-                    let animation = config["animation"].as_str().unwrap_or("fade").to_string();
-                    clip.effects.push(EffectConfig::Highlight {
-                        shape,
-                        color_hex,
-                        stroke_width,
-                        animation,
-                    });
-                }
-                "speed" => {
-                    let speed = config["speed_factor"].as_f64().unwrap_or(1.0) as f32;
-                    clip.speed_factor = speed;
-                }
-                _ => return Err(format!("Unknown effect type: '{}'", effect_type)),
+            clip.effect_type = Some(effect_type_lower.clone());
+            clip.effect_config = Some(config.clone());
+
+            // Mirror to legacy properties for video engine compatibility
+            if effect_type_lower == "zoom" {
+                let start_scale = config["start_scale"].as_f64().unwrap_or(1.2) as f32;
+                let mut current_transform = clip.transform.take().unwrap_or(Transform {
+                    x: 0.0,
+                    y: 0.0,
+                    scale: 1.0,
+                    z_index: 0,
+                });
+                current_transform.scale = start_scale;
+                clip.transform = Some(current_transform);
+            } else if effect_type_lower == "speed" {
+                let speed = config["speed_factor"].as_f64().unwrap_or(1.0) as f32;
+                clip.speed_factor = speed;
             }
+
             found = true;
             break;
         }
@@ -160,25 +113,21 @@ pub fn remove_effect(args: &Value, timeline_state: &mut TimelineState) -> Result
     let mut found = false;
     for track in &mut timeline_state.tracks {
         if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
-            match effect_type.to_lowercase().as_str() {
-                "speed" => {
+            let matches = if let Some(ref current_type) = clip.effect_type {
+                current_type.eq_ignore_ascii_case(effect_type)
+            } else {
+                false
+            };
+
+            if matches {
+                let current_type = clip.effect_type.take().unwrap();
+                clip.effect_config = None;
+                if current_type == "zoom" {
+                    clip.transform = None;
+                } else if current_type == "speed" {
                     clip.speed_factor = 1.0;
-                    found = true;
                 }
-                other => {
-                    let original_len = clip.effects.len();
-                    clip.effects.retain(|effect| {
-                        let name = match effect {
-                            EffectConfig::Zoom { .. } => "zoom",
-                            EffectConfig::TextOverlay { .. } => "text_overlay",
-                            EffectConfig::Highlight { .. } => "highlight",
-                        };
-                        name != other
-                    });
-                    if clip.effects.len() < original_len {
-                        found = true;
-                    }
-                }
+                found = true;
             }
             if found {
                 break;

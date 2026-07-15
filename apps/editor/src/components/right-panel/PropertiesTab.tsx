@@ -49,6 +49,37 @@ const PropertiesTab = () => {
     });
   };
 
+  const handleEffectConfigUpdate = (key: string, value: any) => {
+    const currentConfig = selectedClip?.effect_config || {};
+    const updatedConfig = {
+      ...currentConfig,
+      [key]: value,
+    };
+
+    const updates: any = {
+      effect_config: updatedConfig,
+    };
+
+    const effectType =
+      selectedClip?.effect_type ||
+      (selectedClip?.transform !== undefined && selectedClip?.transform !== null
+        ? 'zoom'
+        : 'speed');
+
+    if (effectType === 'zoom') {
+      updates.transform = {
+        x: updatedConfig.x ?? selectedClip?.transform?.x ?? 0,
+        y: updatedConfig.y ?? selectedClip?.transform?.y ?? 0,
+        scale: updatedConfig.scale ?? selectedClip?.transform?.scale ?? 1.2,
+        z_index: updatedConfig.z_index ?? selectedClip?.transform?.z_index ?? 0,
+      };
+    } else if (effectType === 'speed') {
+      updates.speed_factor = updatedConfig.speed_factor ?? 1.0;
+    }
+
+    handleClipUpdate(updates);
+  };
+
   const handleZIndexUpdate = (delta: number) => {
     if (selectedClip) {
       const currentZ = selectedClip.transform?.z_index || 0;
@@ -160,112 +191,277 @@ const PropertiesTab = () => {
 
                   {track?.track_type?.toLowerCase() === 'effects' ? (
                     <>
-                      {selectedClip.transform === undefined ||
-                      selectedClip.transform === null ? (
-                        <>
-                          {/* Speed Multiplier Section */}
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-white/40" />
-                              <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
-                                Speed Effect Properties
-                              </h3>
-                            </div>
+                      {(() => {
+                        const effectType =
+                          selectedClip.effect_type ||
+                          (selectedClip.transform !== undefined &&
+                          selectedClip.transform !== null
+                            ? 'zoom'
+                            : 'speed');
 
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                                  Speed Multiplier
-                                </Label>
-                                <Input
-                                  type="number"
-                                  className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                                  value={selectedClip.speed_factor ?? 1.0}
-                                  step={0.1}
-                                  onChange={(e) => {
-                                    const val =
-                                      parseFloat(e.target.value) || 1.0;
-                                    handleClipUpdate({ speed_factor: val });
-                                  }}
-                                />
+                        if (effectType === 'speed') {
+                          const speedFactor =
+                            selectedClip.effect_config?.speed_factor ??
+                            selectedClip.speed_factor ??
+                            1.0;
+                          return (
+                            <>
+                              {/* Speed Multiplier Section */}
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1 w-1 rounded-full bg-white/40" />
+                                  <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
+                                    Speed Effect Properties
+                                  </h3>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                      Speed Multiplier
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                      value={speedFactor}
+                                      step={0.1}
+                                      onChange={(e) => {
+                                        const val =
+                                          parseFloat(e.target.value) || 1.0;
+                                        handleEffectConfigUpdate(
+                                          'speed_factor',
+                                          val,
+                                        );
+                                      }}
+                                    />
+                                  </div>
+                                  <Slider
+                                    value={[speedFactor]}
+                                    min={0.25}
+                                    max={4.0}
+                                    step={0.1}
+                                    onValueChange={([val]) =>
+                                      handleEffectConfigUpdate(
+                                        'speed_factor',
+                                        val,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div className="flex gap-2">
+                                  {[0.5, 1.0, 2.0, 4.0].map((preset) => (
+                                    <Button
+                                      key={preset}
+                                      variant="outline"
+                                      size="sm"
+                                      className={`h-7 flex-1 border-white/5 text-[10px] ${
+                                        speedFactor === preset
+                                          ? 'border-primary/30 bg-primary/20 text-primary'
+                                          : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
+                                      }`}
+                                      onClick={() =>
+                                        handleEffectConfigUpdate(
+                                          'speed_factor',
+                                          preset,
+                                        )
+                                      }
+                                    >
+                                      {preset}x
+                                    </Button>
+                                  ))}
+                                </div>
                               </div>
-                              <Slider
-                                value={[selectedClip.speed_factor ?? 1.0]}
-                                min={0.25}
-                                max={4.0}
-                                step={0.1}
-                                onValueChange={([val]) =>
-                                  handleClipUpdate({ speed_factor: val })
-                                }
-                              />
-                            </div>
 
-                            <div className="flex gap-2">
-                              {[0.5, 1.0, 2.0, 4.0].map((preset) => (
-                                <Button
-                                  key={preset}
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-7 flex-1 border-white/5 text-[10px] ${
-                                    selectedClip.speed_factor === preset
-                                      ? 'border-primary/30 bg-primary/20 text-primary'
-                                      : 'bg-white/[0.02] text-white/60 hover:bg-white/10'
-                                  }`}
-                                  onClick={() =>
-                                    handleClipUpdate({ speed_factor: preset })
-                                  }
-                                >
-                                  {preset}x
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
+                              <Separator className="bg-white/5" />
+                            </>
+                          );
+                        }
 
-                          <Separator className="bg-white/5" />
-                        </>
-                      ) : (
-                        <>
-                          {/* Zoom Multiplier Section */}
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                              <div className="h-1 w-1 rounded-full bg-white/40" />
-                              <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
-                                Zoom Effect Properties
-                              </h3>
-                            </div>
+                        if (effectType === 'zoom') {
+                          const scale =
+                            selectedClip.effect_config?.scale ??
+                            selectedClip.transform?.scale ??
+                            1.0;
+                          return (
+                            <>
+                              {/* Zoom Multiplier Section */}
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1 w-1 rounded-full bg-white/40" />
+                                  <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
+                                    Zoom Effect Properties
+                                  </h3>
+                                </div>
 
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[9px] font-semibold text-white/40 uppercase">
-                                  Zoom Multiplier
-                                </Label>
-                                <Input
-                                  type="number"
-                                  className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
-                                  value={selectedClip.transform?.scale ?? 1.0}
-                                  step={0.05}
-                                  onChange={(e) => {
-                                    const val =
-                                      parseFloat(e.target.value) || 1.0;
-                                    handleTransformUpdate('scale', val);
-                                  }}
-                                />
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                      Zoom Multiplier
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      className="h-6 w-16 border-none bg-transparent p-0 text-right font-mono text-[10px] text-white/60 focus-visible:ring-0"
+                                      value={scale}
+                                      step={0.05}
+                                      onChange={(e) => {
+                                        const val =
+                                          parseFloat(e.target.value) || 1.0;
+                                        handleEffectConfigUpdate('scale', val);
+                                      }}
+                                    />
+                                  </div>
+                                  <Slider
+                                    value={[scale]}
+                                    min={0.5}
+                                    max={5.0}
+                                    step={0.05}
+                                    onValueChange={([val]) =>
+                                      handleEffectConfigUpdate('scale', val)
+                                    }
+                                  />
+                                </div>
                               </div>
-                              <Slider
-                                value={[selectedClip.transform?.scale ?? 1.0]}
-                                min={0.5}
-                                max={5.0}
-                                step={0.05}
-                                onValueChange={([val]) =>
-                                  handleTransformUpdate('scale', val)
-                                }
-                              />
-                            </div>
-                          </div>
 
-                          <Separator className="bg-white/5" />
-                        </>
-                      )}
+                              <Separator className="bg-white/5" />
+                            </>
+                          );
+                        }
+
+                        if (effectType === 'text') {
+                          const config = selectedClip.effect_config || {};
+                          return (
+                            <>
+                              {/* Text Effect Properties */}
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1 w-1 rounded-full bg-white/40" />
+                                  <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
+                                    Text Effect Properties
+                                  </h3>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                    Overlay Text
+                                  </Label>
+                                  <Input
+                                    type="text"
+                                    className="focus-visible:ring-primary/50 h-8 border-white/5 bg-white/[0.03] px-2 text-xs text-white"
+                                    value={config.text ?? ''}
+                                    onChange={(e) =>
+                                      handleEffectConfigUpdate(
+                                        'text',
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                      Font Size
+                                    </Label>
+                                    <span className="font-mono text-[10px] text-white/60">
+                                      {config.font_size ?? 24}px
+                                    </span>
+                                  </div>
+                                  <Slider
+                                    value={[config.font_size ?? 24]}
+                                    min={8}
+                                    max={120}
+                                    step={1}
+                                    onValueChange={([val]) =>
+                                      handleEffectConfigUpdate('font_size', val)
+                                    }
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                    Text Color
+                                  </Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="text"
+                                      className="focus-visible:ring-primary/50 h-8 flex-1 border-white/5 bg-white/[0.03] px-2 font-mono text-xs text-white"
+                                      value={config.color ?? '#FFFFFF'}
+                                      onChange={(e) =>
+                                        handleEffectConfigUpdate(
+                                          'color',
+                                          e.target.value,
+                                        )
+                                      }
+                                    />
+                                    <input
+                                      type="color"
+                                      className="h-8 w-8 cursor-pointer rounded border border-white/5 bg-transparent p-0"
+                                      value={config.color ?? '#FFFFFF'}
+                                      onChange={(e) =>
+                                        handleEffectConfigUpdate(
+                                          'color',
+                                          e.target.value,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                    Position X (%)
+                                  </Label>
+                                  <Slider
+                                    value={[(config.position?.x ?? 0.5) * 100]}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    onValueChange={([val]) =>
+                                      handleEffectConfigUpdate('position', {
+                                        ...(config.position || {
+                                          x: 0.5,
+                                          y: 0.5,
+                                        }),
+                                        x: val / 100,
+                                      })
+                                    }
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                    Position Y (%)
+                                  </Label>
+                                  <Slider
+                                    value={[(config.position?.y ?? 0.5) * 100]}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    onValueChange={([val]) =>
+                                      handleEffectConfigUpdate('position', {
+                                        ...(config.position || {
+                                          x: 0.5,
+                                          y: 0.5,
+                                        }),
+                                        y: val / 100,
+                                      })
+                                    }
+                                  />
+                                </div>
+                              </div>
+
+                              <Separator className="bg-white/5" />
+                            </>
+                          );
+                        }
+
+                        return (
+                          <div className="p-2 text-center text-xs text-white/40 italic">
+                            Generic Effect: {effectType}
+                          </div>
+                        );
+                      })()}
                     </>
                   ) : (
                     <>

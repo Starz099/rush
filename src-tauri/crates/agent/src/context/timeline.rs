@@ -41,10 +41,10 @@ pub fn format_timeline(tracks: &[Track]) -> String {
                     ));
                 }
 
-                if !clip.effects.is_empty() {
-                    output.push_str("    Effects:\n");
-                    for effect in &clip.effects {
-                        output.push_str(&format!("      * {:?}\n", effect));
+                if let Some(ref effect_type) = clip.effect_type {
+                    output.push_str(&format!("    Effect Type: {}\n", effect_type));
+                    if let Some(ref config) = clip.effect_config {
+                        output.push_str(&format!("    Effect Config: {}\n", config));
                     }
                 }
             }

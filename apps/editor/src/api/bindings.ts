@@ -168,7 +168,8 @@ export type Clip = {
   source_out: number;
   transform: Transform | null;
   speed_factor?: number | null;
-  effects?: EffectConfig[];
+  effect_type?: string | null;
+  effect_config?: any | null;
 };
 
 export type ComposedTranscript = {
@@ -190,36 +191,6 @@ export type EditingRegistry = {
   tools: ToolDescriptor[];
   effects: EffectDescriptor[];
 };
-
-export type EffectConfig =
-  | {
-      type: 'zoom';
-      params: {
-        start_scale: number | null;
-        end_scale: number | null;
-        center_x: number | null;
-        center_y: number | null;
-        ease_curve: EaseCurve;
-      };
-    }
-  | {
-      type: 'highlight';
-      params: {
-        shape: Shape;
-        color_hex: string;
-        stroke_width: number;
-        animation: string;
-      };
-    }
-  | {
-      type: 'text_overlay';
-      params: {
-        text: string;
-        font_family: string;
-        font_size: number;
-        color_hex: string;
-      };
-    };
 
 export type EffectDescriptor = {
   name: string;
@@ -284,8 +255,6 @@ export type Session = {
   created_at: string;
   updated_at: string;
 };
-
-export type Shape = 'circle' | 'rectangle' | 'arrow' | 'highlighter';
 
 export type TimelineState = {
   playhead_position: number;
