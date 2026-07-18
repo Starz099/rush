@@ -6,6 +6,8 @@ import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../helpers/fps';
 import { isVideoTrack } from '../helpers/track';
 
+const DEBUG_LOG = false;
+
 interface ActiveClipSession {
   clip: Clip;
   demuxer: RangeDemuxer;
@@ -378,18 +380,22 @@ export class LookAheadManager {
     }
 
     if (newFrame) {
-      console.log(
-        `[LookAhead] getFrame clip=${clipId} playhead=${playheadSeconds.toFixed(3)}s newFrameTimestamp=${(newFrame.timestamp / 1e6).toFixed(3)}s`,
-      );
+      if (DEBUG_LOG) {
+        console.log(
+          `[LookAhead] getFrame clip=${clipId} playhead=${playheadSeconds.toFixed(3)}s newFrameTimestamp=${(newFrame.timestamp / 1e6).toFixed(3)}s`,
+        );
+      }
       if (session.currentFrame) {
         session.currentFrame.close();
       }
       session.currentFrame = newFrame;
     } else {
       if (!session.currentFrame) {
-        console.warn(
-          `[LookAhead] getFrame clip=${clipId} playhead=${playheadSeconds.toFixed(3)}s sourcePlayhead=${sourcePlayheadSeconds.toFixed(3)}s - NO FRAME AVAILABLE (Queue Empty & No Cache)`,
-        );
+        if (DEBUG_LOG) {
+          console.warn(
+            `[LookAhead] getFrame clip=${clipId} playhead=${playheadSeconds.toFixed(3)}s sourcePlayhead=${sourcePlayheadSeconds.toFixed(3)}s - NO FRAME AVAILABLE (Queue Empty & No Cache)`,
+          );
+        }
       }
     }
 

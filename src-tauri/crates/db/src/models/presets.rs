@@ -180,7 +180,7 @@ pub fn get_editing_registry() -> EditingRegistry {
                 label: "Text Effect".to_string(),
                 description: "Overlay text captions and titles on top of clips.".to_string(),
                 default_duration_frames: 150,
-                default_config_json: r#"{"text": "Hello World", "font_size": 24, "color": "\#FFFFFF", "position": {"x": 0.5, "y": 0.5}, "z_index": 0}"#.to_string(),
+                default_config_json: r#"{"text": "Hellooo World", "font_size": 48, "color": "\#FFFFFF", "position": {"x": 0.5, "y": 0.5}, "z_index": 0}"#.to_string(),
             }
         ],
     }

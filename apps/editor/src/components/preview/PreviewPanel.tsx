@@ -9,6 +9,7 @@ import {
   VideoEngine,
   AudioEngine,
   ExportEngine,
+  getZIndex,
 } from '@rush/engine';
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
 import { fpsToNumeric } from '@/helpers/fps';
@@ -55,15 +56,6 @@ export const PreviewPanel = () => {
     timeline?.tracks.filter(
       (t: any) => t.track_type?.toLowerCase() === 'effects',
     ) || [];
-
-  const activeTextClips = effectsTracks
-    .flatMap((t: any) => t.clips)
-    .filter(
-      (clip: any) =>
-        clip.effect_type === 'text' &&
-        playheadPosition >= clip.timeline_in &&
-        playheadPosition < clip.timeline_out,
-    );
 
   const previewWidth = activeProject?.viewport_width ?? 1920;
   const previewHeight = activeProject?.viewport_height ?? 1080;
@@ -263,9 +255,22 @@ export const PreviewPanel = () => {
           return;
         }
 
-        // Sort by z_index so overlays are rendered correctly
-        const sortedClips = [...activeClips].sort(
-          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
+        // Query active text overlay clips using the existing effectsTracks definition
+        const activeTextClips = effectsTracks
+          .flatMap((t: any) => t.clips)
+          .filter(
+            (clip: any) =>
+              clip.effect_type === 'text' &&
+              targetPlayhead >= clip.timeline_in &&
+              targetPlayhead < clip.timeline_out,
+          );
+
+        // Interleave video clips and text clips
+        const clipsToRender = [...activeClips, ...activeTextClips];
+
+        // Sort by z_index so they render in correct layered order
+        const sortedClips = clipsToRender.sort(
+          (a, b) => getZIndex(a) - getZIndex(b),
         );
 
         const activeEffectsClip = effectsTracks
@@ -347,34 +352,6 @@ export const PreviewPanel = () => {
             className="h-full w-full bg-white/5 object-contain"
           />
         )}
-
-        {/* TEXT OVERLAY LAYER */}
-        {activeTextClips.map((clip: any) => {
-          const config = clip.effect_config || {};
-          const text = config.text ?? 'Hello Worrrld';
-          const fontSize = config.font_size ?? 24;
-          const color = config.color ?? '#FFFFFF';
-          const position = config.position || { x: 0.5, y: 0.5 };
-          const zIndex = config.z_index ?? 0;
-
-          return (
-            <div
-              key={clip.id}
-              className="pointer-events-none absolute text-center font-bold drop-shadow-md select-none"
-              style={{
-                left: `${position.x * 100}%`,
-                top: `${position.y * 100}%`,
-                transform: 'translate(-50%, -50%)',
-                fontSize: `${fontSize}px`,
-                color: color,
-                zIndex: zIndex + 20,
-                fontFamily: config.font_family || 'Outfit, sans-serif',
-              }}
-            >
-              {text}
-            </div>
-          );
-        })}
 
         {/* FALLBACKS */}
         {!activeAsset && !isInitializing && !isActiveAssetLoading && (

@@ -71,6 +71,8 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
           const isTargetClip = track.id === trackId && clip.id === clipId;
           const isLinkedClip =
             targetAssetId &&
+            sourceTrack &&
+            track.track_type !== sourceTrack.track_type &&
             clip.asset_id === targetAssetId &&
             clip.timeline_in === targetOriginalTimelineIn;
 

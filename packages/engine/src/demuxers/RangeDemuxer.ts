@@ -9,6 +9,10 @@ export class RangeDemuxer {
   public metadata: DemuxerMetadata | null = null;
   private disposed = false;
 
+  private cacheBuffer: ArrayBuffer | null = null;
+  private cacheStart = -1;
+  private cacheEnd = -1;
+
   constructor(filePath: string) {
     this.filePath = filePath;
     this.mp4box = MP4Box.createFile();
@@ -102,13 +106,36 @@ export class RangeDemuxer {
   }
 
   /**
-   * Helper to fetch a specific byte slice from the Tauri asset server
+   * Helper to fetch a specific byte slice with a 2MB read-ahead cache
    */
   public async fetchRange(start: number, end: number): Promise<ArrayBuffer> {
     const length = end - start + 1;
-    const result = await assetApi.readRange(this.filePath, start, length);
 
-    return new Uint8Array(result.bytes).buffer;
+    // 1. Check if the requested range fits entirely inside our read-ahead cache
+    if (this.cacheBuffer && start >= this.cacheStart && end <= this.cacheEnd) {
+      const offset = start - this.cacheStart;
+      return this.cacheBuffer.slice(offset, offset + length);
+    }
+
+    // 2. Cache miss: Fetch a larger block (2 MB window) to pre-buffer future frames
+    const readAheadSize = Math.max(length, 2 * 1024 * 1024); // 2 MB
+    const result = await assetApi.readRange(
+      this.filePath,
+      start,
+      readAheadSize,
+    );
+
+    this.cacheBuffer = new Uint8Array(result.bytes).buffer;
+    this.cacheStart = start;
+    this.cacheEnd = start + this.cacheBuffer.byteLength - 1;
+
+    // 3. Return the specific slice requested
+    const offset = start - this.cacheStart;
+    const requestedLength = Math.min(
+      length,
+      this.cacheBuffer.byteLength - offset,
+    );
+    return this.cacheBuffer.slice(offset, offset + requestedLength);
   }
 
   /**

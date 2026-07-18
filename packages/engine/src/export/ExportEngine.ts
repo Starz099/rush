@@ -11,7 +11,15 @@ import {
   AUDIO_CHUNK_SIZE_SECONDS,
   EXPORT_VIDEO_BITRATE,
 } from '../constants/export';
+import { getZIndex } from '../helpers/clip';
+import { drawTextToCanvas } from '../VideoEngine';
 import { generateStoryboardImpl } from '../storyboard/StoryboardGenerator';
+const yieldToMainThread = () =>
+  new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => resolve(null);
+    channel.port2.postMessage(null);
+  });
 
 export class ExportEngine {
   private renderer: WebGPURenderer;
@@ -21,6 +29,11 @@ export class ExportEngine {
   public disposed = false;
   private encoder!: VideoEncoder;
   private pendingChunks: Promise<any>[] = [];
+
+  private textCanvasCache = new Map<
+    string,
+    { canvas: OffscreenCanvas; config: any; width: number; height: number }
+  >();
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -226,16 +239,17 @@ export class ExportEngine {
     const effectsTracks = timeline.tracks.filter(
       (t: any) => t.track_type?.toLowerCase() === 'effects',
     );
+
     const activeZoomClip = effectsTracks
       .flatMap((t: any) => t.clips)
       .find(
         (clip: any) =>
-          clip.transform?.scale !== undefined &&
-          clip.transform?.scale !== null &&
+          clip.effect_type === 'zoom' &&
           playheadFrame >= clip.timeline_in &&
           playheadFrame < clip.timeline_out,
       );
-    const activeZoom = activeZoomClip?.transform?.scale ?? 1.0;
+    const activeZoom = activeZoomClip?.effect_config?.scale ?? 1.0;
+
     const resolvedZoom = globalZoom !== 1.0 ? globalZoom : activeZoom;
 
     console.log(
@@ -258,48 +272,103 @@ export class ExportEngine {
       activeClipsToRender.push(...activeClips);
     });
 
+    effectsTracks.forEach((track: any) => {
+      const activeClips = track.clips.filter(
+        (clip: any) =>
+          clip.effect_type === 'text' &&
+          playheadFrame >= clip.timeline_in &&
+          playheadFrame < clip.timeline_out,
+      );
+      activeClipsToRender.push(...activeClips);
+    });
+
     // Sort by z-index
-    activeClipsToRender.sort(
-      (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-    );
+    activeClipsToRender.sort((a, b) => getZIndex(a) - getZIndex(b));
 
     // Synchronously block until all active frames are decoded into the session queues
     for (const clip of activeClipsToRender) {
-      await this.awaitFrameDecoded(
-        clip,
-        playheadFrame,
-        framerate,
-        activeProject,
-        assets,
-      );
+      if (clip.effect_type !== 'text') {
+        await this.awaitFrameDecoded(
+          clip,
+          playheadFrame,
+          framerate,
+          activeProject,
+          assets,
+        );
+      }
     }
 
     console.log(`[ExportEngine] Rendering frame ${playheadFrame} offscreen...`);
 
     // Render
+    const tempFramesToClose: VideoFrame[] = [];
+
     this.renderer.beginFrame(background);
     for (const clip of activeClipsToRender) {
-      const frame = this.lookAhead.getFrame(clip.id, playheadFrame, framerate);
-      if (frame) {
-        const originalTransform = clip.transform;
-        const modifiedTransform = originalTransform
-          ? {
-              x: (originalTransform.x ?? 0) * resolvedZoom,
-              y: (originalTransform.y ?? 0) * resolvedZoom,
-              scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-              z_index: originalTransform.z_index,
-            }
-          : {
-              x: 0,
-              y: 0,
-              scale: resolvedZoom,
-              z_index: 0,
-            };
+      if (clip.effect_type === 'text') {
+        const config = clip.effect_config || {};
 
-        this.renderer.drawClip(frame, modifiedTransform);
+        let canvas: OffscreenCanvas;
+        const cached = this.textCanvasCache.get(clip.id);
+
+        if (
+          cached &&
+          cached.config === config &&
+          cached.width === this.width &&
+          cached.height === this.height
+        ) {
+          canvas = cached.canvas;
+        } else {
+          canvas = new OffscreenCanvas(this.width, this.height);
+          drawTextToCanvas(canvas, clip);
+          this.textCanvasCache.set(clip.id, {
+            canvas,
+            config,
+            width: this.width,
+            height: this.height,
+          });
+        }
+
+        const textFrame = new VideoFrame(canvas, { timestamp: 0 });
+        tempFramesToClose.push(textFrame);
+        const zIndex = config.z_index ?? 0;
+        this.renderer.drawClip(textFrame, {
+          x: 0,
+          y: 0,
+          scale: resolvedZoom,
+          z_index: zIndex,
+        });
+      } else {
+        const frame = this.lookAhead.getFrame(
+          clip.id,
+          playheadFrame,
+          framerate,
+        );
+        if (frame) {
+          const originalTransform = clip.transform;
+          const modifiedTransform = originalTransform
+            ? {
+                x: (originalTransform.x ?? 0) * resolvedZoom,
+                y: (originalTransform.y ?? 0) * resolvedZoom,
+                scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
+                z_index: originalTransform.z_index,
+              }
+            : {
+                x: 0,
+                y: 0,
+                scale: resolvedZoom,
+                z_index: 0,
+              };
+
+          this.renderer.drawClip(frame, modifiedTransform);
+        }
       }
     }
     this.renderer.endFrame();
+
+    for (const frame of tempFramesToClose) {
+      frame.close();
+    }
 
     console.log(`[ExportEngine] Copying offscreen frame to staging buffer...`);
     const frameData = await this.captureFrameData();
@@ -434,20 +503,30 @@ export class ExportEngine {
           activeClipsToRender.push(...activeClips);
         });
 
-        // Sort by z-index
-        activeClipsToRender.sort(
-          (a, b) => (a.transform?.z_index || 0) - (b.transform?.z_index || 0),
-        );
+        effectsTracks.forEach((track: any) => {
+          const activeClips = track.clips.filter(
+            (clip: any) =>
+              clip.effect_type === 'text' &&
+              currentTimelineFrame >= clip.timeline_in &&
+              currentTimelineFrame < clip.timeline_out,
+          );
+          activeClipsToRender.push(...activeClips);
+        });
+
+        // Sort by z_index
+        activeClipsToRender.sort((a, b) => getZIndex(a) - getZIndex(b));
 
         // Synchronously block until all active frames are decoded into the session queues
         for (const clip of activeClipsToRender) {
-          await this.awaitFrameDecoded(
-            clip,
-            currentTimelineFrame,
-            framerate,
-            activeProject,
-            assets,
-          );
+          if (clip.effect_type !== 'text') {
+            await this.awaitFrameDecoded(
+              clip,
+              currentTimelineFrame,
+              framerate,
+              activeProject,
+              assets,
+            );
+          }
         }
 
         // Resolve zoom scale factor active at this specific frameIndex
@@ -455,41 +534,81 @@ export class ExportEngine {
           .flatMap((t: any) => t.clips)
           .find(
             (clip: any) =>
-              clip.transform?.scale !== undefined &&
-              clip.transform?.scale !== null &&
+              clip.effect_type === 'zoom' &&
               currentTimelineFrame >= clip.timeline_in &&
               currentTimelineFrame < clip.timeline_out,
           );
-        const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
+        const resolvedZoom = activeZoomClip?.effect_config?.scale ?? 1.0;
 
         // 3. Render offscreen directly into canvas
+        const tempFramesToClose: VideoFrame[] = [];
+
         this.renderer.beginFrame(background);
         for (const clip of activeClipsToRender) {
-          const frame = this.lookAhead.getFrame(
-            clip.id,
-            currentTimelineFrame,
-            framerate,
-          );
-          if (frame) {
-            const originalTransform = clip.transform;
-            const modifiedTransform = originalTransform
-              ? {
-                  x: (originalTransform.x ?? 0) * resolvedZoom,
-                  y: (originalTransform.y ?? 0) * resolvedZoom,
-                  scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                  z_index: originalTransform.z_index,
-                }
-              : {
-                  x: 0,
-                  y: 0,
-                  scale: resolvedZoom,
-                  z_index: 0,
-                };
+          if (clip.effect_type === 'text') {
+            const config = clip.effect_config || {};
 
-            this.renderer.drawClip(frame, modifiedTransform);
+            let canvas: OffscreenCanvas;
+            const cached = this.textCanvasCache.get(clip.id);
+
+            if (
+              cached &&
+              cached.config === config &&
+              cached.width === this.width &&
+              cached.height === this.height
+            ) {
+              canvas = cached.canvas;
+            } else {
+              canvas = new OffscreenCanvas(this.width, this.height);
+              drawTextToCanvas(canvas, clip);
+              this.textCanvasCache.set(clip.id, {
+                canvas,
+                config,
+                width: this.width,
+                height: this.height,
+              });
+            }
+
+            const textFrame = new VideoFrame(canvas, { timestamp: 0 });
+            tempFramesToClose.push(textFrame);
+            const zIndex = config.z_index ?? 0;
+            this.renderer.drawClip(textFrame, {
+              x: 0,
+              y: 0,
+              scale: resolvedZoom,
+              z_index: zIndex,
+            });
+          } else {
+            const frame = this.lookAhead.getFrame(
+              clip.id,
+              currentTimelineFrame,
+              framerate,
+            );
+            if (frame) {
+              const originalTransform = clip.transform;
+              const modifiedTransform = originalTransform
+                ? {
+                    x: (originalTransform.x ?? 0) * resolvedZoom,
+                    y: (originalTransform.y ?? 0) * resolvedZoom,
+                    scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
+                    z_index: originalTransform.z_index,
+                  }
+                : {
+                    x: 0,
+                    y: 0,
+                    scale: resolvedZoom,
+                    z_index: 0,
+                  };
+
+              this.renderer.drawClip(frame, modifiedTransform);
+            }
           }
         }
         this.renderer.endFrame();
+
+        for (const frame of tempFramesToClose) {
+          frame.close();
+        }
 
         // 4. Create a VideoFrame directly from the OffscreenCanvas (no GPU-CPU backread!)
         const offscreenCanvas = (this.renderer as any).canvas;
@@ -510,6 +629,18 @@ export class ExportEngine {
         // 5. Feed the frame to the hardware encoder
         this.encoder.encode(videoFrame);
         videoFrame.close();
+
+        // Backpressure: Yield to main thread instantly if WebCodecs queue is full
+        while (this.encoder.encodeQueueSize > 24) {
+          await yieldToMainThread();
+        }
+
+        // Backpressure: Thread-safe await of Tauri writes if more than 64 are pending
+        if (this.pendingChunks.length > 64) {
+          const chunksToWait = [...this.pendingChunks];
+          this.pendingChunks = [];
+          await Promise.all(chunksToWait);
+        }
 
         // Resolve the active speed factor at the current timeline frame position
         const activeSpeedClip = speedClips.find(

@@ -21,8 +21,8 @@ const PropertiesTab = () => {
   const selectedClip = track?.clips.find((c) => c.id === selectedClipId);
   const isGap =
     track?.track_type?.toLowerCase() === 'effects'
-      ? !selectedClip?.asset_id &&
-        !selectedClip?.transform &&
+      ? !selectedClip?.effect_type &&
+        !selectedClip?.asset_id &&
         (selectedClip?.speed_factor === undefined ||
           selectedClip?.speed_factor === null ||
           selectedClip?.speed_factor === 1.0)
@@ -359,6 +359,61 @@ const PropertiesTab = () => {
                                 </div>
 
                                 <div className="space-y-2">
+                                  <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                    Font Family
+                                  </Label>
+                                  <select
+                                    className="focus-visible:ring-primary/50 h-8 w-full rounded border border-white/5 bg-white/[0.03] px-2 text-xs text-white focus:outline-none"
+                                    value={
+                                      config.font_family ?? 'Outfit, sans-serif'
+                                    }
+                                    onChange={(e) =>
+                                      handleEffectConfigUpdate(
+                                        'font_family',
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option
+                                      value="Outfit, sans-serif"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Outfit (Modern)
+                                    </option>
+                                    <option
+                                      value="Inter, sans-serif"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Inter (Clean)
+                                    </option>
+                                    <option
+                                      value="Arial, sans-serif"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Arial (Standard)
+                                    </option>
+                                    <option
+                                      value="Impact, sans-serif"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Impact (Meme/Caption)
+                                    </option>
+                                    <option
+                                      value="Georgia, serif"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Georgia (Elegant Serif)
+                                    </option>
+                                    <option
+                                      value="Courier New, monospace"
+                                      className="bg-[#111] text-white"
+                                    >
+                                      Courier (Typewriter)
+                                    </option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-2">
                                   <div className="flex items-center justify-between">
                                     <Label className="text-[9px] font-semibold text-white/40 uppercase">
                                       Font Size
@@ -407,6 +462,87 @@ const PropertiesTab = () => {
                                     />
                                   </div>
                                 </div>
+
+                                <div className="space-y-2 border-t border-white/5 pt-3">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                      Enable Background Box
+                                    </Label>
+                                    <input
+                                      type="checkbox"
+                                      className="text-primary focus:ring-primary focus:ring-opacity-50 h-4 w-4 cursor-pointer rounded border-white/10 bg-white/[0.03]"
+                                      checked={config.bg_enable ?? false}
+                                      onChange={(e) =>
+                                        handleEffectConfigUpdate(
+                                          'bg_enable',
+                                          e.target.checked,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </div>
+
+                                {config.bg_enable && (
+                                  <>
+                                    <div className="space-y-2">
+                                      <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                        Background Color
+                                      </Label>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          type="text"
+                                          className="focus-visible:ring-primary/50 h-8 flex-1 border-white/5 bg-white/[0.03] px-2 font-mono text-xs text-white"
+                                          value={config.bg_color ?? '#000000'}
+                                          onChange={(e) =>
+                                            handleEffectConfigUpdate(
+                                              'bg_color',
+                                              e.target.value,
+                                            )
+                                          }
+                                        />
+                                        <input
+                                          type="color"
+                                          className="h-8 w-8 cursor-pointer rounded border border-white/5 bg-transparent p-0"
+                                          value={config.bg_color ?? '#000000'}
+                                          onChange={(e) =>
+                                            handleEffectConfigUpdate(
+                                              'bg_color',
+                                              e.target.value,
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <Label className="text-[9px] font-semibold text-white/40 uppercase">
+                                          Background Opacity
+                                        </Label>
+                                        <span className="font-mono text-[10px] text-white/60">
+                                          {Math.round(
+                                            (config.bg_opacity ?? 0.5) * 100,
+                                          )}
+                                          %
+                                        </span>
+                                      </div>
+                                      <Slider
+                                        value={[
+                                          (config.bg_opacity ?? 0.5) * 100,
+                                        ]}
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        onValueChange={([val]) =>
+                                          handleEffectConfigUpdate(
+                                            'bg_opacity',
+                                            val / 100,
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </>
+                                )}
 
                                 <div className="space-y-2">
                                   <Label className="text-[9px] font-semibold text-white/40 uppercase">

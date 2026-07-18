@@ -1,3 +1,5 @@
+const DEBUG_LOG = false;
+
 export class FrameQueue {
   private queue: VideoFrame[] = [];
   private maxSize: number;
@@ -16,23 +18,29 @@ export class FrameQueue {
       this.minTimestamp !== null &&
       frame.timestamp < this.minTimestamp - 30000
     ) {
-      console.log(
-        `[FrameQueue] Discarding intermediate frame for seek at timestamp=${(frame.timestamp / 1e6).toFixed(3)}s (minTimestamp=${(this.minTimestamp / 1e6).toFixed(3)}s)`,
-      );
+      if (DEBUG_LOG) {
+        console.log(
+          `[FrameQueue] Discarding intermediate frame for seek at timestamp=${(frame.timestamp / 1e6).toFixed(3)}s (minTimestamp=${(this.minTimestamp / 1e6).toFixed(3)}s)`,
+        );
+      }
       frame.close();
       return;
     }
 
-    console.log(
-      `[FrameQueue] push timestamp=${(frame.timestamp / 1e6).toFixed(3)}s queueSizeBefore=${this.queue.length}`,
-    );
+    if (DEBUG_LOG) {
+      console.log(
+        `[FrameQueue] push timestamp=${(frame.timestamp / 1e6).toFixed(3)}s queueSizeBefore=${this.queue.length}`,
+      );
+    }
 
     // Deduplicate: If a frame with the same timestamp is already in the queue, discard this one
     const isDuplicate = this.queue.some((f) => f.timestamp === frame.timestamp);
     if (isDuplicate) {
-      console.log(
-        `[FrameQueue] Discarding duplicate frame at timestamp=${(frame.timestamp / 1e6).toFixed(3)}s`,
-      );
+      if (DEBUG_LOG) {
+        console.log(
+          `[FrameQueue] Discarding duplicate frame at timestamp=${(frame.timestamp / 1e6).toFixed(3)}s`,
+        );
+      }
       frame.close();
       return;
     }
@@ -77,9 +85,11 @@ export class FrameQueue {
     }
 
     if (bestFrame || origQueueLength > 0) {
-      console.log(
-        `[FrameQueue] getFrameForTime query=${(timeInMicroseconds / 1e6).toFixed(3)}s resultTimestamp=${bestFrame ? (bestFrame.timestamp / 1e6).toFixed(3) : 'null'} queueSizeAfter=${this.queue.length}`,
-      );
+      if (DEBUG_LOG) {
+        console.log(
+          `[FrameQueue] getFrameForTime query=${(timeInMicroseconds / 1e6).toFixed(3)}s resultTimestamp=${bestFrame ? (bestFrame.timestamp / 1e6).toFixed(3) : 'null'} queueSizeAfter=${this.queue.length}`,
+        );
+      }
     }
 
     return bestFrame;

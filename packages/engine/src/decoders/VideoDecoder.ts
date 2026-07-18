@@ -1,3 +1,5 @@
+const DEBUG_LOG = false;
+
 export class VideoDecoderWrapper {
   private decoder: VideoDecoder;
   private isConfigured = false;
@@ -11,9 +13,11 @@ export class VideoDecoderWrapper {
     // Initialize the WebCodecs VideoDecoder
     this.decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
-        console.log(
-          `[VideoDecoder] Decoded frame timestamp=${(frame.timestamp / 1e6).toFixed(3)}s`,
-        );
+        if (DEBUG_LOG) {
+          console.log(
+            `[VideoDecoder] Decoded frame timestamp=${(frame.timestamp / 1e6).toFixed(3)}s`,
+          );
+        }
         // This callback is triggered when the GPU finishes decoding a frame
         this.onFrameDecoded(frame);
       },
