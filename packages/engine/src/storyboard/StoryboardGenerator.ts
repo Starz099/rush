@@ -2,6 +2,7 @@ import { WebGPURenderer } from '../core/Renderer';
 import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../helpers/fps';
 import { isVideoTrack } from '../helpers/track';
+import { evaluateTransform, applySingleClipTransitions } from '../VideoEngine';
 import { SimpleClipDecoder } from './SimpleClipDecoder';
 import { StoryboardDownsampler } from './StoryboardDownsampler';
 import { StoryboardTiler } from './StoryboardTiler';
@@ -148,22 +149,13 @@ export async function generateStoryboardImpl(
 
         const frame = await decoder.getKeyframeNear(sourcePlayheadSeconds);
         if (frame) {
-          const originalTransform = clip.transform;
-          const modifiedTransform = originalTransform
-            ? {
-                x: (originalTransform.x ?? 0) * resolvedZoom,
-                y: (originalTransform.y ?? 0) * resolvedZoom,
-                scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                z_index: originalTransform.z_index,
-              }
-            : {
-                x: 0,
-                y: 0,
-                scale: resolvedZoom,
-                z_index: 0,
-              };
+          const evaluatedTransform = applySingleClipTransitions(
+            evaluateTransform(clip.transform, frameIndex, resolvedZoom),
+            clip,
+            frameIndex,
+          );
 
-          storyboardRenderer.drawClip(frame, modifiedTransform);
+          storyboardRenderer.drawClip(frame, evaluatedTransform as any);
           framesToClose.push(frame);
         }
       }
@@ -297,22 +289,13 @@ export async function generateStoryboardImpl(
 
         const frame = await decoder.getKeyframeNear(sourcePlayheadSeconds);
         if (frame) {
-          const originalTransform = clip.transform;
-          const modifiedTransform = originalTransform
-            ? {
-                x: (originalTransform.x ?? 0) * resolvedZoom,
-                y: (originalTransform.y ?? 0) * resolvedZoom,
-                scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                z_index: originalTransform.z_index,
-              }
-            : {
-                x: 0,
-                y: 0,
-                scale: resolvedZoom,
-                z_index: 0,
-              };
+          const evaluatedTransform = applySingleClipTransitions(
+            evaluateTransform(clip.transform, frameIndex, resolvedZoom),
+            clip,
+            frameIndex,
+          );
 
-          storyboardRenderer.drawClip(frame, modifiedTransform);
+          storyboardRenderer.drawClip(frame, evaluatedTransform as any);
           framesToClose.push(frame);
         }
       }

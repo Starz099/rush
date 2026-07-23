@@ -16,3 +16,4 @@ export { StoryboardTiler } from './storyboard/StoryboardTiler';
 export { MP4AudioProvider } from './audio/providers/MP4AudioProvider';
 export { StandaloneAudioProvider } from './audio/providers/StandaloneAudioProvider';
 export { getZIndex } from './helpers/clip';
+export * from './animation';

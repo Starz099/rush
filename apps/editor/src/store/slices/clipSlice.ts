@@ -35,6 +35,18 @@ export interface ClipSlice {
     targetTrackId: string,
     clipId: string,
   ) => Promise<void>;
+  addCrossClipTransition: (
+    trackId: string,
+    fromClipId: string,
+    toClipId: string,
+    transitionType: any,
+  ) => Promise<string | undefined>;
+  updateTransitionProperties: (
+    trackId: string,
+    transitionId: string,
+    properties: any,
+  ) => Promise<void>;
+  deleteTransition: (trackId: string, transitionId: string) => Promise<void>;
 }
 
 type CombinedState = ProjectSlice & AssetSlice & ClipSlice;
@@ -138,9 +150,21 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
       }, [])
       .sort((a: Clip, b: Clip) => a.timeline_in - b.timeline_in);
 
+    // Edge case: Update transitions referencing the split clip
+    const updatedTransitions = (track.transitions || []).map((t: any) => {
+      let nextT = { ...t };
+      if (t.from_clip_id === clipId) {
+        nextT.from_clip_id = clipB.id; // Transitions leaving the split clip now start from B
+      }
+      if (t.to_clip_id === clipId) {
+        nextT.to_clip_id = clipA.id; // Transitions entering the split clip now end at A
+      }
+      return nextT;
+    });
+
     const updatedTracks = timeline.tracks.map((t: any) => {
       if (t.id === trackId) {
-        return { ...t, clips: updatedClips };
+        return { ...t, clips: updatedClips, transitions: updatedTransitions };
       }
       return t;
     });
@@ -318,9 +342,17 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
         }
         return clip;
       });
+
+      // Edge case: Delete transitions referencing the deleted clip
+      const filteredTransitions = (t.transitions || []).filter(
+        (trans: any) =>
+          trans.from_clip_id !== clipId && trans.to_clip_id !== clipId,
+      );
+
       return {
         ...t,
         clips: shiftedClips,
+        transitions: filteredTransitions,
       };
     });
 
@@ -355,9 +387,15 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
 
     const updatedTracks = timeline.tracks.map((t: any) => {
       if (t.id === sourceTrackId) {
+        // Clean up transitions referencing the moved clip on the source track
+        const remainingTransitions = (t.transitions || []).filter(
+          (trans: any) =>
+            trans.from_clip_id !== clipId && trans.to_clip_id !== clipId,
+        );
         return {
           ...t,
           clips: t.clips.filter((c: any) => c.id !== clipId),
+          transitions: remainingTransitions,
         };
       }
       if (t.id === targetTrackId) {
@@ -383,6 +421,108 @@ export const createClipSlice: StateCreator<CombinedState, [], [], ClipSlice> = (
     });
 
     useWorkspaceStore.getState().setClipSelection(targetTrackId, clipId);
+    await get().saveTimeline(project.id, updatedTimeline);
+  },
+
+  addCrossClipTransition: async (
+    trackId,
+    fromClipId,
+    toClipId,
+    transitionType,
+  ) => {
+    const project = get().activeProject;
+    if (!project) return;
+
+    const timeline = project.timeline_state;
+    const transitionId = crypto.randomUUID();
+
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      if (track.id !== trackId) return track;
+
+      const newTransition = {
+        id: transitionId,
+        from_clip_id: fromClipId,
+        to_clip_id: toClipId,
+        transition_type: transitionType,
+        duration_frames: 30, // 1 second default at 30fps
+        ease_curve: 'ease_in_out' as any,
+        alignment: 'center' as any,
+        config: null,
+      };
+
+      return {
+        ...track,
+        transitions: [...(track.transitions || []), newTransition],
+      };
+    });
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    });
+
+    await get().saveTimeline(project.id, updatedTimeline);
+    return transitionId;
+  },
+
+  updateTransitionProperties: async (trackId, transitionId, properties) => {
+    const project = get().activeProject;
+    if (!project) return;
+
+    const timeline = project.timeline_state;
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      if (track.id !== trackId) return track;
+
+      return {
+        ...track,
+        transitions: (track.transitions || []).map((t: any) => {
+          if (t.id !== transitionId) return t;
+          return { ...t, ...properties };
+        }),
+      };
+    });
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    });
+
+    await get().saveTimeline(project.id, updatedTimeline);
+  },
+
+  deleteTransition: async (trackId, transitionId) => {
+    const project = get().activeProject;
+    if (!project) return;
+
+    const timeline = project.timeline_state;
+    const updatedTracks = timeline.tracks.map((track: any) => {
+      if (track.id !== trackId) return track;
+
+      return {
+        ...track,
+        transitions: (track.transitions || []).filter(
+          (t: any) => t.id !== transitionId,
+        ),
+      };
+    });
+
+    const updatedTimeline = { ...timeline, tracks: updatedTracks };
+
+    set({
+      activeProject: {
+        ...project,
+        timeline_state: updatedTimeline,
+      },
+    });
+
     await get().saveTimeline(project.id, updatedTimeline);
   },
 });

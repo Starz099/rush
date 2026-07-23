@@ -36,8 +36,8 @@ pub fn format_timeline(tracks: &[Track]) -> String {
 
                 if let Some(ref t) = clip.transform {
                     output.push_str(&format!(
-                        "    Transform: {{ x: {}, y: {}, scale: {}, z_index: {} }}\n",
-                        t.x, t.y, t.scale, t.z_index
+                        "    Transform: {{ x: {}, y: {}, scale: {}, rotation: {}, opacity: {}, z_index: {} }}\n",
+                        t.x.value, t.y.value, t.scale.value, t.rotation.value, t.opacity.value, t.z_index
                     ));
                 }
 

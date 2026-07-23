@@ -1,6 +1,145 @@
 import type { WebGPURenderer } from './core/Renderer';
 import { LookAheadManager } from './buffering/LookAheadManager';
-import type { Project, Clip, Asset, BackgroundConfig } from '@/api/bindings';
+import type { Project, Asset } from '@/api/bindings';
+import { evaluateAnimatable } from './animation/evaluator';
+
+export function evaluateTransform(
+  transform: any | null | undefined,
+  playheadFrame: number,
+  globalZoom: number = 1.0,
+) {
+  if (!transform) {
+    return {
+      x: 0,
+      y: 0,
+      scale: globalZoom,
+      rotation: 0,
+      anchor_x: 0.5,
+      anchor_y: 0.5,
+      opacity: 1.0,
+      z_index: 0,
+    };
+  }
+
+  const x = evaluateAnimatable(transform.x, playheadFrame, 0.0) * globalZoom;
+  const y = evaluateAnimatable(transform.y, playheadFrame, 0.0) * globalZoom;
+  const scale =
+    evaluateAnimatable(transform.scale, playheadFrame, 1.0) * globalZoom;
+  const rotation = evaluateAnimatable(transform.rotation, playheadFrame, 0.0);
+  const opacity = evaluateAnimatable(transform.opacity, playheadFrame, 1.0);
+  const anchor_x = transform.anchor_x ?? 0.5;
+  const anchor_y = transform.anchor_y ?? 0.5;
+
+  return {
+    x,
+    y,
+    scale,
+    rotation,
+    anchor_x,
+    anchor_y,
+    opacity,
+    z_index: transform.z_index ?? 0,
+  };
+}
+
+export function applySingleClipTransitions(
+  transform: any,
+  clip: any,
+  playheadFrame: number,
+): any {
+  let nextTransform = { ...transform };
+
+  // 1. Entrance (In) Transition
+  if (clip.clip_transitions?.in_transition) {
+    const start = clip.timeline_in;
+    const duration = clip.clip_transitions.in_transition.duration_frames;
+    if (
+      playheadFrame >= start &&
+      playheadFrame < start + duration &&
+      duration > 0
+    ) {
+      const t = Math.min(
+        1.0,
+        Math.max(0.0, (playheadFrame - start) / duration),
+      );
+      const type = clip.clip_transitions.in_transition.transition_type;
+      const config = clip.clip_transitions.in_transition.config || {};
+
+      if (type === 'fade') {
+        nextTransform.opacity *= t;
+      } else if (type === 'zoom') {
+        nextTransform.scale *= t;
+        nextTransform.opacity *= t;
+      } else if (type === 'spin') {
+        nextTransform.rotation += 360.0 * (1.0 - t);
+        nextTransform.scale *= t;
+        nextTransform.opacity *= t;
+      } else if (type === 'slide') {
+        const angle = ((config.angle_degrees ?? 180) * Math.PI) / 180.0;
+        const offsetX = Math.cos(angle) * 1920 * (1.0 - t);
+        const offsetY = Math.sin(angle) * 1080 * (1.0 - t);
+        nextTransform.x += offsetX;
+        nextTransform.y += offsetY;
+      } else if (type === 'glitch') {
+        // High frequency horizontal shake
+        const shake = Math.sin(playheadFrame * 1.8) * 35.0 * (1.0 - t);
+        nextTransform.x += shake;
+        // Digital opacity flicker
+        const flicker = Math.sin(playheadFrame * 4.0);
+        if (flicker > 0.2) {
+          nextTransform.opacity *= t;
+        } else {
+          nextTransform.opacity = 0.0;
+        }
+      }
+    }
+  }
+
+  // 2. Exit (Out) Transition
+  if (clip.clip_transitions?.out_transition) {
+    const end = clip.timeline_out;
+    const duration = clip.clip_transitions.out_transition.duration_frames;
+    if (
+      playheadFrame >= end - duration &&
+      playheadFrame < end &&
+      duration > 0
+    ) {
+      const t = Math.min(1.0, Math.max(0.0, (end - playheadFrame) / duration));
+      const type = clip.clip_transitions.out_transition.transition_type;
+      const config = clip.clip_transitions.out_transition.config || {};
+
+      if (type === 'fade') {
+        nextTransform.opacity *= t;
+      } else if (type === 'zoom') {
+        nextTransform.scale *= t;
+        nextTransform.opacity *= t;
+      } else if (type === 'spin') {
+        nextTransform.rotation += 360.0 * (1.0 - t);
+        nextTransform.scale *= t;
+        nextTransform.opacity *= t;
+      } else if (type === 'slide') {
+        const angle = ((config.angle_degrees ?? 0) * Math.PI) / 180.0;
+        const offsetX = Math.cos(angle) * 1920 * (1.0 - t);
+        const offsetY = Math.sin(angle) * 1080 * (1.0 - t);
+        nextTransform.x += offsetX;
+        nextTransform.y += offsetY;
+      } else if (type === 'glitch') {
+        // High frequency horizontal shake
+        const shake = Math.sin(playheadFrame * 1.8) * 35.0 * (1.0 - t);
+        nextTransform.x += shake;
+        // Digital opacity flicker
+        const flicker = Math.sin(playheadFrame * 4.0);
+        if (flicker > 0.2) {
+          nextTransform.opacity *= t;
+        } else {
+          nextTransform.opacity = 0.0;
+        }
+      }
+    }
+  }
+
+  return nextTransform;
+}
 
 interface CachedTextCanvas {
   canvas: OffscreenCanvas;
@@ -110,15 +249,15 @@ export class VideoEngine {
    */
   public renderFrame(
     playheadFrame: number,
-    activeClips: Clip[],
-    framerate: number,
-    background?: BackgroundConfig | null,
+    activeProject: Project,
     globalZoom: number = 1.0,
   ) {
     if (this.disposed) return;
 
     const width = (this.renderer as any).width || 1920;
     const height = (this.renderer as any).height || 1080;
+    const background = activeProject.timeline_state.background;
+    const framerate = activeProject.framerate; // numerical rate (e.g. 30)
 
     // Track text frames to close them safely after queue submission
     const tempFramesToClose: VideoFrame[] = [];
@@ -126,76 +265,82 @@ export class VideoEngine {
     // 1. Start WebGPU frame recording
     this.renderer.beginFrame(background);
 
-    // 2. Render each active clip
-    for (const clip of activeClips) {
-      if (clip.effect_type === 'text') {
-        const config = clip.effect_config || {};
+    // 2. Identify active tracks
+    const tracks = activeProject.timeline_state.tracks || [];
 
-        let canvas: OffscreenCanvas;
-        const cached = this.textCanvasCache.get(clip.id);
+    // Sort tracks to render backgrounds/videos first, then overlays/effects on top
+    const sortedTracks = [...tracks].sort((a, b) => {
+      if (a.track_type?.toLowerCase() === 'audio') return -1;
+      if (b.track_type?.toLowerCase() === 'audio') return 1;
+      if (a.track_type?.toLowerCase() === 'effects') return 1;
+      if (b.track_type?.toLowerCase() === 'effects') return -1;
+      return 0;
+    });
 
+    for (const track of sortedTracks) {
+      if (track.track_type?.toLowerCase() === 'audio') continue;
+
+      // Draw standard clips
+      for (const clip of track.clips) {
         if (
-          cached &&
-          cached.config === config &&
-          cached.width === width &&
-          cached.height === height
+          playheadFrame >= clip.timeline_in &&
+          playheadFrame < clip.timeline_out
         ) {
-          canvas = cached.canvas;
-        } else {
-          canvas = new OffscreenCanvas(width, height);
-          drawTextToCanvas(canvas, clip);
-          this.textCanvasCache.set(clip.id, {
-            canvas,
-            config,
-            width,
-            height,
-          });
-        }
+          if (clip.effect_type === 'text') {
+            const config = clip.effect_config || {};
+            let canvas: OffscreenCanvas;
+            const cached = this.textCanvasCache.get(clip.id);
 
-        const textFrame = new VideoFrame(canvas, { timestamp: 0 });
-        tempFramesToClose.push(textFrame); // Store for cleanup
+            if (
+              cached &&
+              cached.config === config &&
+              cached.width === width &&
+              cached.height === height
+            ) {
+              canvas = cached.canvas;
+            } else {
+              canvas = new OffscreenCanvas(width, height);
+              drawTextToCanvas(canvas, clip);
+              this.textCanvasCache.set(clip.id, {
+                canvas,
+                config,
+                width,
+                height,
+              });
+            }
 
-        const zIndex = config.z_index ?? 0;
+            const textFrame = new VideoFrame(canvas, { timestamp: 0 });
+            tempFramesToClose.push(textFrame);
 
-        this.renderer.drawClip(textFrame, {
-          x: 0,
-          y: 0,
-          scale: globalZoom,
-          z_index: zIndex,
-        });
-      } else {
-        // Pull the decoded frame from the LookAheadManager
-        const frame = this.lookAhead.getFrame(
-          clip.id,
-          playheadFrame,
-          framerate,
-        );
-
-        if (frame) {
-          const originalTransform = clip.transform;
-          const modifiedTransform = originalTransform
-            ? {
-                x: (originalTransform.x ?? 0) * globalZoom,
-                y: (originalTransform.y ?? 0) * globalZoom,
-                scale: (originalTransform.scale ?? 1.0) * globalZoom,
-                z_index: originalTransform.z_index,
-              }
-            : {
-                x: 0,
-                y: 0,
-                scale: globalZoom,
-                z_index: 0,
-              };
-
-          this.renderer.drawClip(frame, modifiedTransform);
+            const evaluatedTextTransform = applySingleClipTransitions(
+              evaluateTransform(clip.transform, playheadFrame, globalZoom),
+              clip,
+              playheadFrame,
+            );
+            this.renderer.drawClip(textFrame, evaluatedTextTransform as any);
+          } else if (clip.asset_id) {
+            const frame = this.lookAhead.getFrame(
+              clip.id,
+              playheadFrame,
+              framerate,
+            );
+            if (frame) {
+              const evaluatedTransform = applySingleClipTransitions(
+                evaluateTransform(clip.transform, playheadFrame, globalZoom),
+                clip,
+                playheadFrame,
+              );
+              this.renderer.drawClip(frame, evaluatedTransform as any);
+            }
+          }
         }
       }
     }
 
-    // 3. Submit WebGPU commands to the GPU (Wait for order submission)
+    // 3. Submit WebGPU commands to the GPU
     this.renderer.endFrame();
 
-    // 4. Now safe to destroy/close frames!
+    // 4. safe to close frames
     for (const frame of tempFramesToClose) {
       frame.close();
     }

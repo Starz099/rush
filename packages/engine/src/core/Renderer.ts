@@ -1,6 +1,11 @@
 import type { Transform, BackgroundConfig } from '@/api/bindings';
 import { hexToRgbaClearColor, hexToRgbaArray } from '../helpers/color';
 
+// Import shaders as raw strings via Vite
+import clipShaderCode from '../shaders/clip.wgsl?raw';
+import bgGradientShaderCode from '../shaders/background.wgsl?raw';
+import transitionShaderCode from '../shaders/transition.wgsl?raw';
+
 const MSAA_SAMPLE_COUNT = 4;
 
 export class WebGPURenderer {
@@ -9,6 +14,7 @@ export class WebGPURenderer {
   private context: GPUCanvasContext | null = null;
   private pipeline!: GPURenderPipeline;
   private bgGradientPipeline!: GPURenderPipeline;
+  private transitionPipeline!: GPURenderPipeline;
   private bgUniformBuffer!: GPUBuffer;
   private format: GPUTextureFormat = 'bgra8unorm';
   private disposed: boolean = false;
@@ -55,16 +61,13 @@ export class WebGPURenderer {
         device: this.device,
         format: this.format,
         alphaMode: 'premultiplied',
-        // COPY_SRC is useful if we ever want to read from preview canvas
         usage:
           GPUTextureUsage.RENDER_ATTACHMENT |
           GPUTextureUsage.COPY_SRC |
           GPUTextureUsage.TEXTURE_BINDING,
       });
     } else {
-      // Force RGBA format for offscreen exporting (standard format avoiding driver channels swap)
       this.format = 'rgba8unorm';
-      // Initialize custom offscreen texture with COPY_SRC enabled for extraction
       this.offscreenTexture = this.device.createTexture({
         size: [this.width, this.height],
         format: this.format,
@@ -75,7 +78,6 @@ export class WebGPURenderer {
       });
     }
 
-    // Allocate multisampled texture for MSAA (4x MSAA)
     this.multisampledTexture = this.device.createTexture({
       size: [this.width, this.height],
       sampleCount: MSAA_SAMPLE_COUNT,
@@ -83,16 +85,14 @@ export class WebGPURenderer {
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
-    // Create the reusable bilinear sampler
     this.sampler = this.device.createSampler({
       minFilter: 'linear',
       magFilter: 'linear',
     });
 
-    // Reusable uniform buffer for background rendering parameters (272 bytes)
     this.bgUniformBuffer = this.device.createBuffer({
       size: 272,
-      usage: 64 | 8, // GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     this.setupPipeline();
@@ -106,7 +106,6 @@ export class WebGPURenderer {
     )
       return;
 
-    // Dynamically resize preview canvas WebGPU context and MSAA texture if dimensions change
     if (this.canvas) {
       const currentWidth = this.canvas.width;
       const currentHeight = this.canvas.height;
@@ -136,9 +135,8 @@ export class WebGPURenderer {
 
     this.currentCommandEncoder = this.device.createCommandEncoder();
 
-    // Determine clear value color from background configuration
     let clearColor = { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
-    let bgType = 0; // 0 = solid/clear, 1 = linear, 2 = radial, 3 = conic
+    let bgType = 0;
 
     if (background && background.source) {
       const source = background.source;
@@ -163,12 +161,11 @@ export class WebGPURenderer {
           resolveTarget: resolveTargetView,
           clearValue: clearColor,
           loadOp: 'clear',
-          storeOp: 'discard', // Discard multisampled texture after resolving to resolveTarget
+          storeOp: 'discard',
         },
       ],
     });
 
-    // If gradient background is active, render it onto canvas
     if (bgType > 0 && background) {
       const source = background.source;
       const numColors =
@@ -179,7 +176,6 @@ export class WebGPURenderer {
         source.type === 'gradient' ? (source.params.angle_degrees ?? 0) : 0;
       const blurValue = background.blur_value ?? 0;
 
-      // Prepare Uniform Buffer Data (272 bytes)
       const bufferData = new ArrayBuffer(272);
       const view = new DataView(bufferData);
       view.setUint32(0, bgType, true);
@@ -187,7 +183,6 @@ export class WebGPURenderer {
       view.setFloat32(8, angleDegrees, true);
       view.setFloat32(12, blurValue, true);
 
-      // Populate up to 16 colors
       for (let i = 0; i < 16; i++) {
         const colorHex = colors[i];
         const colorRgba = colorHex
@@ -202,7 +197,6 @@ export class WebGPURenderer {
       this.device.queue.writeBuffer(this.bgUniformBuffer, 0, bufferData);
 
       if (bgType >= 1 && bgType <= 3) {
-        // Gradient backgrounds (linear, radial, conic)
         const bindGroup = this.device.createBindGroup({
           layout: this.bgGradientPipeline.getBindGroupLayout(0),
           entries: [{ binding: 0, resource: { buffer: this.bgUniformBuffer } }],
@@ -214,7 +208,6 @@ export class WebGPURenderer {
       }
     }
 
-    // Set the clip render pipeline back to default for rendering clips
     this.currentRenderPass.setPipeline(this.pipeline);
   }
 
@@ -223,30 +216,42 @@ export class WebGPURenderer {
       return;
     }
 
-    // prepare the texture from the VideoFrame
     const externalTexture = this.device.importExternalTexture({
       source: frame,
     });
 
-    // Prepare the Uniform Data (MUST match the Shader struct above)
+    // Extract dynamic transform options from evaluated state
+    const t: any = transform || {};
+    const xVal = typeof t.x === 'number' ? t.x : 0.0;
+    const yVal = typeof t.y === 'number' ? t.y : 0.0;
+    const scaleVal = typeof t.scale === 'number' ? t.scale : 1.0;
+    const rotationVal = typeof t.rotation === 'number' ? t.rotation : 0.0;
+    const anchorXVal = typeof t.anchor_x === 'number' ? t.anchor_x : 0.5;
+    const anchorYVal = typeof t.anchor_y === 'number' ? t.anchor_y : 0.5;
+    const opacityVal = typeof t.opacity === 'number' ? t.opacity : 1.0;
+
+    // Prepare Uniform Data (48 bytes)
     const uniformData = new Float32Array([
       this.width, // canvasResolution.x
       this.height, // canvasResolution.y
       frame.displayWidth, // frameResolution.x
       frame.displayHeight, // frameResolution.y
-      transform?.x ?? 0, // position.x
-      transform?.y ?? 0, // position.y
-      transform?.scale ?? 1, // scale
-      0, // Padding (for 16-byte alignment)
+      xVal, // position.x
+      yVal, // position.y
+      anchorXVal, // anchor.x
+      anchorYVal, // anchor.y
+      scaleVal, // scale
+      rotationVal, // rotation
+      opacityVal, // opacity
+      0, // Padding
     ]);
 
     const uniformBuffer = this.device.createBuffer({
       size: uniformData.byteLength,
-      usage: 64 | 8, // GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-    // Create the Bind Group for this specific clip
     const bindGroup = this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
@@ -256,75 +261,90 @@ export class WebGPURenderer {
       ],
     });
 
-    // Record the draw command into the current pass
+    this.currentRenderPass.setPipeline(this.pipeline);
+    this.currentRenderPass.setBindGroup(0, bindGroup);
+    this.currentRenderPass.draw(6);
+  }
+
+  public drawTransition(
+    frameA: VideoFrame,
+    frameB: VideoFrame,
+    type: string,
+    progress: number,
+    config?: any,
+  ) {
+    if (!this.currentRenderPass || !this.device) return;
+
+    const textureA = this.device.importExternalTexture({ source: frameA });
+    const textureB = this.device.importExternalTexture({ source: frameB });
+
+    // Map Transition string to shader enum ID
+    let typeId = 1; // default crossfade (fade)
+    let dirX = 1.0;
+    let dirY = 0.0;
+
+    const typeLower = (type || 'fade').toLowerCase();
+    if (typeLower === 'fade') {
+      typeId = 1;
+    } else if (typeLower === 'slide') {
+      typeId = 2;
+      const angle = ((config?.angle_degrees ?? 0) * Math.PI) / 180.0;
+      dirX = Math.cos(angle);
+      dirY = Math.sin(angle);
+    } else if (typeLower === 'wipe') {
+      typeId = 3;
+    } else if (typeLower === 'zoom') {
+      typeId = 4;
+    } else if (typeLower === 'spin') {
+      typeId = 5;
+    } else if (typeLower === 'glitch') {
+      typeId = 6;
+    }
+
+    // 32-byte Uniform block
+    const uniformData = new Float32Array([
+      this.width, // canvasResolution.x
+      this.height, // canvasResolution.y
+      progress, // progress
+      typeId, // transitionType (uint)
+      dirX, // direction.x
+      dirY, // direction.y
+      0, // padding
+      0, // padding
+    ]);
+
+    const uniformBuffer = this.device.createBuffer({
+      size: uniformData.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+    const bindGroup = this.device.createBindGroup({
+      layout: this.transitionPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.sampler },
+        { binding: 1, resource: textureA },
+        { binding: 2, resource: textureB },
+        { binding: 3, resource: { buffer: uniformBuffer } },
+      ],
+    });
+
+    this.currentRenderPass.setPipeline(this.transitionPipeline);
     this.currentRenderPass.setBindGroup(0, bindGroup);
     this.currentRenderPass.draw(6);
   }
 
   public setupPipeline() {
-    // 1. Clip render pipeline
-    const shaderCode = `
-      struct Uniforms {
-        canvasResolution: vec2<f32>,
-        frameResolution: vec2<f32>,
-        position: vec2<f32>,
-        scale: f32,
-      }
-
-      struct VertexOutput {
-        @builtin(position) Position : vec4<f32>,
-        @location(0) uv : vec2<f32>,
-      }
-
-      @group(0) @binding(0) var mySampler: sampler;
-      @group(0) @binding(1) var myTexture: texture_external;
-      @group(0) @binding(2) var<uniform> uniforms: Uniforms;
-
-      @vertex
-      fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
-          var pos = array<vec2<f32>, 6>(
-              vec2<f32>(-1.0, -1.0), vec2<f32>( 1.0, -1.0), vec2<f32>(-1.0,  1.0),
-              vec2<f32>(-1.0,  1.0), vec2<f32>( 1.0, -1.0), vec2<f32>( 1.0,  1.0)
-          );
-
-          var uv_coords = array<vec2<f32>, 6>(
-              vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0),
-              vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0), vec2<f32>(1.0, 0.0)
-          );
-
-          var p = pos[VertexIndex];
-          var out: VertexOutput;
-
-          out.uv = uv_coords[VertexIndex];
-
-          // Apply transformation: Scale then Translate
-          p = p * uniforms.scale;
-          
-          // Convert pixel position to NDC (-1 to 1)
-          let offset = vec2<f32>(
-            (uniforms.position.x / uniforms.canvasResolution.x) * 2.0,
-            -(uniforms.position.y / uniforms.canvasResolution.y) * 2.0
-          );
-
-          out.Position = vec4<f32>(p + offset, 0.0, 1.0);
-          return out;
-      }
-
-      @fragment
-      fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-          return textureSampleBaseClampToEdge(myTexture, mySampler, uv);
-      }
-    `;
-
-    const module = this.device.createShaderModule({ code: shaderCode });
+    // 1. Clip render pipeline (imported from clip.wgsl)
+    const clipModule = this.device.createShaderModule({ code: clipShaderCode });
     this.pipeline = this.device.createRenderPipeline({
       layout: 'auto',
       vertex: {
-        module,
+        module: clipModule,
         entryPoint: 'vs_main',
       },
       fragment: {
-        module,
+        module: clipModule,
         entryPoint: 'fs_main',
         targets: [
           {
@@ -350,100 +370,7 @@ export class WebGPURenderer {
       },
     });
 
-    // 2. Background Gradient Pipeline setup
-    const bgGradientShaderCode = `
-      struct BgUniforms {
-        bgType: u32,
-        numColors: u32,
-        angleDegrees: f32,
-        blurValue: f32,
-        colors: array<vec4<f32>, 16>,
-      }
-
-      struct VertexOutput {
-        @builtin(position) position: vec4<f32>,
-        @location(0) uv: vec2<f32>,
-      }
-
-      @vertex
-      fn vs_bg(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
-          var pos = array<vec2<f32>, 6>(
-              vec2<f32>(-1.0, -1.0), vec2<f32>( 1.0, -1.0), vec2<f32>(-1.0,  1.0),
-              vec2<f32>(-1.0,  1.0), vec2<f32>( 1.0, -1.0), vec2<f32>( 1.0,  1.0)
-          );
-          var uv_coords = array<vec2<f32>, 6>(
-              vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 0.0),
-              vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0), vec2<f32>(1.0, 0.0)
-          );
-          var out: VertexOutput;
-          out.position = vec4<f32>(pos[VertexIndex], 0.0, 1.0);
-          out.uv = uv_coords[VertexIndex];
-          return out;
-      }
-
-      @group(0) @binding(0) var<uniform> bgUniforms: BgUniforms;
-
-      fn get_gradient_color(uv: vec2<f32>) -> vec4<f32> {
-          let n = bgUniforms.numColors;
-          if (n == 0u) {
-              return vec4<f32>(0.0, 0.0, 0.0, 1.0);
-          }
-          if (n == 1u) {
-              return bgUniforms.colors[0];
-          }
-
-          var t = 0.0;
-          if (bgUniforms.bgType == 1u) { // Linear gradient
-              let angleRad = bgUniforms.angleDegrees * 3.14159265 / 180.0;
-              let dir = vec2<f32>(cos(angleRad), sin(angleRad));
-              let pt = uv - vec2<f32>(0.5);
-              let dotProduct = dot(pt, dir);
-              t = clamp(dotProduct + 0.5, 0.0, 1.0);
-          } else if (bgUniforms.bgType == 2u) { // Radial gradient
-              let dist = distance(uv, vec2<f32>(0.5)) * 2.0;
-              t = clamp(dist, 0.0, 1.0);
-          } else if (bgUniforms.bgType == 3u) { // Conic gradient
-              let pt = uv - vec2<f32>(0.5);
-              let angleRad = bgUniforms.angleDegrees * 3.14159265 / 180.0;
-              let angle = atan2(pt.y, pt.x) - angleRad;
-              t = fract((angle + 3.14159265) / (2.0 * 3.14159265));
-          }
-
-          let maxIdx = f32(n - 1u);
-          let scaledT = t * maxIdx;
-          let idx = u32(floor(scaledT));
-          let nextIdx = min(idx + 1u, n - 1u);
-          let localT = fract(scaledT);
-          
-          let c1 = bgUniforms.colors[idx];
-          let c2 = bgUniforms.colors[nextIdx];
-          return mix(c1, c2, localT);
-      }
-
-      @fragment
-      fn fs_gradient(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-          if (bgUniforms.blurValue <= 0.0) {
-              return get_gradient_color(uv);
-          }
-          
-          var colorSum = vec4<f32>(0.0);
-          var totalWeight = 0.0;
-          let step = bgUniforms.blurValue * 0.0002;
-          
-          for (var x = -4.0; x <= 4.0; x += 1.0) {
-              for (var y = -4.0; y <= 4.0; y += 1.0) {
-                  let offset = vec2<f32>(x, y) * step;
-                  let sampleUv = clamp(uv + offset, vec2<f32>(0.0), vec2<f32>(1.0));
-                  let weight = 1.0 - (length(vec2<f32>(x, y)) / 6.0);
-                  if (weight > 0.0) {
-                      colorSum += get_gradient_color(sampleUv) * weight;
-                      totalWeight += weight;
-                  }
-              }
-          }
-          return colorSum / totalWeight;
-      }
-    `;
+    // 2. Background Gradient Pipeline setup (imported from background.wgsl)
     const bgGradientModule = this.device.createShaderModule({
       code: bgGradientShaderCode,
     });
@@ -457,6 +384,43 @@ export class WebGPURenderer {
         module: bgGradientModule,
         entryPoint: 'fs_gradient',
         targets: [{ format: this.format }],
+      },
+      primitive: { topology: 'triangle-list' },
+      multisample: {
+        count: MSAA_SAMPLE_COUNT,
+      },
+    });
+
+    // 3. Transition Pipeline setup (imported from transition.wgsl)
+    const transitionModule = this.device.createShaderModule({
+      code: transitionShaderCode,
+    });
+    this.transitionPipeline = this.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module: transitionModule,
+        entryPoint: 'vs_transition',
+      },
+      fragment: {
+        module: transitionModule,
+        entryPoint: 'fs_transition',
+        targets: [
+          {
+            format: this.format,
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+            },
+          },
+        ],
       },
       primitive: { topology: 'triangle-list' },
       multisample: {

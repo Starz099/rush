@@ -12,7 +12,11 @@ import {
   EXPORT_VIDEO_BITRATE,
 } from '../constants/export';
 import { getZIndex } from '../helpers/clip';
-import { drawTextToCanvas } from '../VideoEngine';
+import {
+  drawTextToCanvas,
+  evaluateTransform,
+  applySingleClipTransitions,
+} from '../VideoEngine';
 import { generateStoryboardImpl } from '../storyboard/StoryboardGenerator';
 const yieldToMainThread = () =>
   new Promise((resolve) => {
@@ -331,13 +335,12 @@ export class ExportEngine {
 
         const textFrame = new VideoFrame(canvas, { timestamp: 0 });
         tempFramesToClose.push(textFrame);
-        const zIndex = config.z_index ?? 0;
-        this.renderer.drawClip(textFrame, {
-          x: 0,
-          y: 0,
-          scale: resolvedZoom,
-          z_index: zIndex,
-        });
+        const evaluatedTransform = applySingleClipTransitions(
+          evaluateTransform(clip.transform, playheadFrame, resolvedZoom),
+          clip,
+          playheadFrame,
+        );
+        this.renderer.drawClip(textFrame, evaluatedTransform as any);
       } else {
         const frame = this.lookAhead.getFrame(
           clip.id,
@@ -345,22 +348,12 @@ export class ExportEngine {
           framerate,
         );
         if (frame) {
-          const originalTransform = clip.transform;
-          const modifiedTransform = originalTransform
-            ? {
-                x: (originalTransform.x ?? 0) * resolvedZoom,
-                y: (originalTransform.y ?? 0) * resolvedZoom,
-                scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                z_index: originalTransform.z_index,
-              }
-            : {
-                x: 0,
-                y: 0,
-                scale: resolvedZoom,
-                z_index: 0,
-              };
-
-          this.renderer.drawClip(frame, modifiedTransform);
+          const evaluatedTransform = applySingleClipTransitions(
+            evaluateTransform(clip.transform, playheadFrame, resolvedZoom),
+            clip,
+            playheadFrame,
+          );
+          this.renderer.drawClip(frame, evaluatedTransform as any);
         }
       }
     }
@@ -571,13 +564,16 @@ export class ExportEngine {
 
             const textFrame = new VideoFrame(canvas, { timestamp: 0 });
             tempFramesToClose.push(textFrame);
-            const zIndex = config.z_index ?? 0;
-            this.renderer.drawClip(textFrame, {
-              x: 0,
-              y: 0,
-              scale: resolvedZoom,
-              z_index: zIndex,
-            });
+            const evaluatedTransform = applySingleClipTransitions(
+              evaluateTransform(
+                clip.transform,
+                currentTimelineFrame,
+                resolvedZoom,
+              ),
+              clip,
+              currentTimelineFrame,
+            );
+            this.renderer.drawClip(textFrame, evaluatedTransform as any);
           } else {
             const frame = this.lookAhead.getFrame(
               clip.id,
@@ -585,22 +581,16 @@ export class ExportEngine {
               framerate,
             );
             if (frame) {
-              const originalTransform = clip.transform;
-              const modifiedTransform = originalTransform
-                ? {
-                    x: (originalTransform.x ?? 0) * resolvedZoom,
-                    y: (originalTransform.y ?? 0) * resolvedZoom,
-                    scale: (originalTransform.scale ?? 1.0) * resolvedZoom,
-                    z_index: originalTransform.z_index,
-                  }
-                : {
-                    x: 0,
-                    y: 0,
-                    scale: resolvedZoom,
-                    z_index: 0,
-                  };
-
-              this.renderer.drawClip(frame, modifiedTransform);
+              const evaluatedTransform = applySingleClipTransitions(
+                evaluateTransform(
+                  clip.transform,
+                  currentTimelineFrame,
+                  resolvedZoom,
+                ),
+                clip,
+                currentTimelineFrame,
+              );
+              this.renderer.drawClip(frame, evaluatedTransform as any);
             }
           }
         }
