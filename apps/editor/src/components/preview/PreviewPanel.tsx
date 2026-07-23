@@ -9,7 +9,6 @@ import {
   VideoEngine,
   AudioEngine,
   ExportEngine,
-  getZIndex,
 } from '@rush/engine';
 import { useAudioOrchestrator } from '@/hooks/useAudioOrchestrator';
 import { fpsToNumeric } from '@/helpers/fps';
@@ -255,24 +254,6 @@ export const PreviewPanel = () => {
           return;
         }
 
-        // Query active text overlay clips using the existing effectsTracks definition
-        const activeTextClips = effectsTracks
-          .flatMap((t: any) => t.clips)
-          .filter(
-            (clip: any) =>
-              clip.effect_type === 'text' &&
-              targetPlayhead >= clip.timeline_in &&
-              targetPlayhead < clip.timeline_out,
-          );
-
-        // Interleave video clips and text clips
-        const clipsToRender = [...activeClips, ...activeTextClips];
-
-        // Sort by z_index so they render in correct layered order
-        const sortedClips = clipsToRender.sort(
-          (a, b) => getZIndex(a) - getZIndex(b),
-        );
-
         const activeEffectsClip = effectsTracks
           .flatMap((t: any) => t.clips)
           .find(
@@ -285,14 +266,8 @@ export const PreviewPanel = () => {
             ? (activeEffectsClip.effect_config?.scale ?? 1.0)
             : 1.0;
 
-        // Render the frame immediately
-        videoEngine.renderFrame(
-          targetPlayhead,
-          sortedClips,
-          projectFps,
-          activeProject.timeline_state.background,
-          globalZoom,
-        );
+        // Render the frame immediately using the new state-driven engine
+        videoEngine.renderFrame(targetPlayhead, activeProject, globalZoom);
       });
 
       if (audioEngine) {

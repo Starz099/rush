@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/timelineStore';
 import { useProjectStore } from '../store/projectStore';
 import { fpsToNumeric } from '../helpers/fps';
-import { type VideoEngine, type AudioEngine, getZIndex } from '@rush/engine';
-import { isEffectsTrack, isVideoTrack } from '@/constants/trackConfig';
+import { type VideoEngine, type AudioEngine } from '@rush/engine';
+import { isEffectsTrack } from '@/constants/trackConfig';
 
 /**
  * usePlaybackLoop drives the frame-by-frame progression of the project.
@@ -90,39 +90,10 @@ export function usePlaybackLoop(
       }
 
       // 2. UPDATE VIDEO (High-precision every tick)
-      const videoTracks = timeline?.tracks.filter(isVideoTrack) || [];
 
-      if (videoEngine) {
+      if (videoEngine && activeProject) {
         // Trigger look-ahead buffering in the background (Non-Blocking!)
-        if (activeProject) {
-          void videoEngine.tick(currentPlayhead, activeProject, assets);
-        }
-
-        // Identify all video clips that should be visible on screen right now
-        const activeClipsToRender: any[] = [];
-
-        videoTracks.forEach((track: any) => {
-          const activeClips = track.clips.filter(
-            (clip: any) =>
-              clip.asset_id &&
-              playheadFloatRef.current >= clip.timeline_in &&
-              playheadFloatRef.current < clip.timeline_out,
-          );
-          activeClipsToRender.push(...activeClips);
-        });
-
-        effectsTracks.forEach((track: any) => {
-          const activeClips = track.clips.filter(
-            (clip: any) =>
-              clip.effect_type === 'text' &&
-              playheadFloatRef.current >= clip.timeline_in &&
-              playheadFloatRef.current < clip.timeline_out,
-          );
-          activeClipsToRender.push(...activeClips);
-        });
-
-        // Sort by z_index so overlays are drawn on top of backgrounds
-        activeClipsToRender.sort((a, b) => getZIndex(a) - getZIndex(b));
+        void videoEngine.tick(currentPlayhead, activeProject, assets);
 
         // Find active global zoom multiplier
         const activeEffectsClip = effectsTracks
@@ -137,14 +108,8 @@ export function usePlaybackLoop(
             ? (activeEffectsClip.effect_config?.scale ?? 1.0)
             : 1.0;
 
-        // Render the pre-decoded frames to the WebGPU canvas
-        videoEngine.renderFrame(
-          currentPlayhead,
-          activeClipsToRender,
-          framerate,
-          activeProject?.timeline_state.background,
-          globalZoom,
-        );
+        // Render the pre-decoded frames directly via WebGPU VideoEngine
+        videoEngine.renderFrame(currentPlayhead, activeProject, globalZoom);
       }
 
       // UPDATE AUDIO

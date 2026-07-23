@@ -1,4 +1,4 @@
-use rush_db::models::clip::{TimelineState, Transform};
+use rush_db::models::clip::{TimelineState};
 use serde_json::Value;
 
 pub fn update_transform(
@@ -15,20 +15,15 @@ pub fn update_transform(
     let mut found = false;
     for track in &mut timeline_state.tracks {
         if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
-            let mut current_transform = clip.transform.take().unwrap_or(Transform {
-                x: 0.0,
-                y: 0.0,
-                scale: 1.0,
-                z_index: 0,
-            });
+            let mut current_transform = clip.transform.take().unwrap_or_default();
             if let Some(val) = x {
-                current_transform.x = val;
+                current_transform.x.value = val;
             }
             if let Some(val) = y {
-                current_transform.y = val;
+                current_transform.y.value = val;
             }
             if let Some(val) = scale {
-                current_transform.scale = val;
+                current_transform.scale.value = val;
             }
             clip.transform = Some(current_transform);
             found = true;
@@ -74,13 +69,8 @@ pub fn add_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<St
             // Mirror to legacy properties for video engine compatibility
             if effect_type_lower == "zoom" {
                 let start_scale = config["start_scale"].as_f64().unwrap_or(1.2) as f32;
-                let mut current_transform = clip.transform.take().unwrap_or(Transform {
-                    x: 0.0,
-                    y: 0.0,
-                    scale: 1.0,
-                    z_index: 0,
-                });
-                current_transform.scale = start_scale;
+                let mut current_transform = clip.transform.take().unwrap_or_default();
+                current_transform.scale.value = start_scale;
                 clip.transform = Some(current_transform);
             } else if effect_type_lower == "speed" {
                 let speed = config["speed_factor"].as_f64().unwrap_or(1.0) as f32;

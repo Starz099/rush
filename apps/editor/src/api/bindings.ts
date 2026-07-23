@@ -127,6 +127,12 @@ export const commands = {
 };
 
 /* Types */
+export type Animatable<T> = {
+  has_keyframes: boolean;
+  value: T;
+  keyframes: Keyframe<T>[];
+};
+
 export type Asset = {
   id: string;
   project_id: string;
@@ -167,9 +173,16 @@ export type Clip = {
   source_in: number;
   source_out: number;
   transform: Transform | null;
+  clip_transitions?: ClipTransitions | null;
   speed_factor?: number | null;
   effect_type?: string | null;
   effect_config?: any | null;
+};
+
+export type ClipTransitions = {
+  in_transition: SingleClipTransition | null;
+  out_transition: SingleClipTransition | null;
+  loop_animation: SingleClipTransition | null;
 };
 
 export type ComposedTranscript = {
@@ -185,7 +198,13 @@ export type ComposedWord = {
   end_ms: number;
 };
 
-export type EaseCurve = 'linear' | 'ease_in' | 'ease_out';
+export type EaseCurve =
+  | 'linear'
+  | 'ease_in'
+  | 'ease_out'
+  | 'ease_in_out'
+  | 'spring'
+  | 'bounce';
 
 export type EditingRegistry = {
   tools: ToolDescriptor[];
@@ -206,6 +225,12 @@ export type FpsConfig = {
 };
 
 export type FpsPreset = '15' | '30' | '60';
+
+export type Keyframe<T> = {
+  frame: number;
+  value: T;
+  ease_curve: EaseCurve;
+};
 
 export type Message = {
   id: string;
@@ -256,6 +281,13 @@ export type Session = {
   updated_at: string;
 };
 
+export type SingleClipTransition = {
+  transition_type: TransitionType;
+  duration_frames: number;
+  ease_curve: EaseCurve;
+  config?: any | null;
+};
+
 export type TimelineState = {
   playhead_position: number;
   tracks: Track[];
@@ -281,9 +313,13 @@ export type Track = {
 export type TrackType = 'video' | 'audio' | 'effects';
 
 export type Transform = {
-  x: number | null;
-  y: number | null;
-  scale: number | null;
+  x: Animatable<number | null>;
+  y: Animatable<number | null>;
+  scale: Animatable<number | null>;
+  rotation: Animatable<number | null>;
+  anchor_x: number | null;
+  anchor_y: number | null;
+  opacity: Animatable<number | null>;
   z_index: number;
 };
 
@@ -294,9 +330,19 @@ export type Transition = {
   transition_type: TransitionType;
   duration_frames: number;
   ease_curve: EaseCurve;
+  alignment: TransitionAlignment;
+  config?: any | null;
 };
 
-export type TransitionType = 'fade' | 'slide' | 'wipe' | 'zoom';
+export type TransitionAlignment = 'center' | 'start' | 'end';
+
+export type TransitionType =
+  | 'fade'
+  | 'slide'
+  | 'wipe'
+  | 'zoom'
+  | 'spin'
+  | 'glitch';
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(

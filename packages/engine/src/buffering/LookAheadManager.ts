@@ -52,14 +52,14 @@ export class LookAheadManager {
       const lookAheadStart = Math.max(0, playheadSeconds - 1.0);
       const lookAheadEnd = playheadSeconds + 5.0;
 
-      // 2. Identify all video clips intersecting with this window
+      // 2. Identify all video clips intersecting with this window (extending outgoing transition clips)
       const videoTracks = timeline.tracks.filter(isVideoTrack);
       const clipsInWindow: Clip[] = [];
 
       for (const track of videoTracks) {
         for (const clip of track.clips) {
           if (!clip.asset_id) continue;
-          // Convert clip timeline positions from frames to seconds
+
           const clipInSec = clip.timeline_in / framerate;
           const clipOutSec = clip.timeline_out / framerate;
 
@@ -264,6 +264,11 @@ export class LookAheadManager {
           playheadSeconds - clipInSec + clip.source_in / framerate;
         if (sourceTimeSeconds < clip.source_in / framerate) {
           sourceTimeSeconds = clip.source_in / framerate;
+        } else {
+          const maxOut = clip.source_out / framerate;
+          if (sourceTimeSeconds > maxOut) {
+            sourceTimeSeconds = maxOut;
+          }
         }
 
         console.log(
@@ -308,7 +313,9 @@ export class LookAheadManager {
 
           const nextSample = session.demuxer.samples[nextIndex];
           const sourceTime = (nextSample.cts - firstCts) / timescale;
-          if (sourceTime >= clip.source_out / framerate) {
+          const maxSourceOutSeconds = clip.source_out / framerate;
+
+          if (sourceTime >= maxSourceOutSeconds) {
             break; // Past the clip's end time
           }
 
@@ -368,15 +375,27 @@ export class LookAheadManager {
     const clip = session.clip;
     const clipInSec = clip.timeline_in / framerate;
     const playheadSeconds = playheadFrame / framerate;
-    const sourcePlayheadSeconds =
-      playheadSeconds - clipInSec + clip.source_in / framerate;
+    const sourcePlayheadSeconds = Math.max(
+      clip.source_in / framerate,
+      playheadSeconds - clipInSec + clip.source_in / framerate,
+    );
     const sourcePlayheadMicroseconds = Math.round(sourcePlayheadSeconds * 1e6);
 
-    let newFrame = session.queue.getFrameForTime(sourcePlayheadMicroseconds);
-    if (!newFrame && !session.currentFrame && session.queue.size > 0) {
-      // Fallback: If we don't have any cached frame yet, grab the first frame in the queue.
-      // This avoids a black frame delay when a clip first starts playing.
-      newFrame = session.queue.shiftFirstFrame();
+    // If the playhead is past the clip's actual bounds (during a transition bleed)
+    // we want to freeze/hold the last successfully decoded frame.
+    const isPastClipEnd = playheadSeconds >= clip.timeline_out / framerate;
+
+    let newFrame = null;
+    if (!isPastClipEnd) {
+      newFrame = session.queue.getFrameForTime(sourcePlayheadMicroseconds);
+      if (!newFrame && !session.currentFrame && session.queue.size > 0) {
+        // Fallback: If we don't have any cached frame yet, grab the first frame in the queue.
+        // This avoids a black frame delay when a clip first starts playing.
+        newFrame = session.queue.shiftFirstFrame();
+      }
+    } else {
+      const finalFrameMicros = Math.round((clip.source_out / framerate) * 1e6);
+      newFrame = session.queue.getFrameForTime(finalFrameMicros);
     }
 
     if (newFrame) {

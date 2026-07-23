@@ -1,6 +1,7 @@
 use crate::models::TrackType;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
 pub enum BackgroundSource {
@@ -21,6 +22,8 @@ pub enum TransitionType {
     Slide,
     Wipe,
     Zoom,
+    Spin,
+    Glitch,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
@@ -29,6 +32,41 @@ pub enum EaseCurve {
     Linear,
     EaseIn,
     EaseOut,
+    EaseInOut,
+    Spring,
+    Bounce,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionAlignment {
+    Center,
+    Start,
+    End,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct Keyframe<T> {
+    pub frame: i32,
+    pub value: T,
+    pub ease_curve: EaseCurve,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct Animatable<T> {
+    pub has_keyframes: bool,
+    pub value: T,
+    pub keyframes: Vec<Keyframe<T>>,
+}
+
+impl<T> Animatable<T> {
+    pub fn from_value(value: T) -> Self {
+        Self {
+            has_keyframes: false,
+            value,
+            keyframes: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Type)]
@@ -63,6 +101,10 @@ pub struct Transition {
     pub transition_type: TransitionType,
     pub duration_frames: i32,
     pub ease_curve: EaseCurve,
+    pub alignment: TransitionAlignment,
+    #[serde(default)]
+    #[specta(type = Option<specta_typescript::Any>)]
+    pub config: Option<serde_json::Value>,
 }
 
 pub fn default_background() -> BackgroundConfig {
@@ -98,10 +140,46 @@ pub struct Track {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Transform {
-    pub x: f32,
-    pub y: f32,
-    pub scale: f32,
+    pub x: Animatable<f32>,
+    pub y: Animatable<f32>,
+    pub scale: Animatable<f32>,
+    pub rotation: Animatable<f32>,
+    pub anchor_x: f32, // Default 0.5 (center)
+    pub anchor_y: f32, // Default 0.5 (center)
+    pub opacity: Animatable<f32>,
     pub z_index: i32,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            x: Animatable::from_value(0.0),
+            y: Animatable::from_value(0.0),
+            scale: Animatable::from_value(1.0),
+            rotation: Animatable::from_value(0.0),
+            anchor_x: 0.5,
+            anchor_y: 0.5,
+            opacity: Animatable::from_value(1.0),
+            z_index: 0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct SingleClipTransition {
+    pub transition_type: TransitionType,
+    pub duration_frames: i32,
+    pub ease_curve: EaseCurve,
+    #[serde(default)]
+    #[specta(type = Option<specta_typescript::Any>)]
+    pub config: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct ClipTransitions {
+    pub in_transition: Option<SingleClipTransition>,
+    pub out_transition: Option<SingleClipTransition>,
+    pub loop_animation: Option<SingleClipTransition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
@@ -113,6 +191,8 @@ pub struct Clip {
     pub source_in: i32,
     pub source_out: i32,
     pub transform: Option<Transform>,
+    #[serde(default)]
+    pub clip_transitions: Option<ClipTransitions>,
     #[serde(default = "default_speed_factor")]
     pub speed_factor: f32,
     #[serde(default)]
@@ -121,6 +201,7 @@ pub struct Clip {
     #[specta(type = Option<specta_typescript::Any>)]
     pub effect_config: Option<serde_json::Value>,
 }
+
 
 impl Clip {
     pub fn is_gap(&self, track_type: TrackType) -> bool {
@@ -206,6 +287,7 @@ impl Track {
                         source_in: 0,
                         source_out: gap_duration,
                         transform: None,
+                        clip_transitions: None,
                         speed_factor: 1.0,
                         effect_type: None,
                         effect_config: None,
