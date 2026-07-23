@@ -2,7 +2,11 @@ import { WebGPURenderer } from '../core/Renderer';
 import type { Project, Clip, Asset } from '@/api/bindings';
 import { fpsToNumeric } from '../helpers/fps';
 import { isVideoTrack } from '../helpers/track';
-import { evaluateTransform, applySingleClipTransitions } from '../VideoEngine';
+import {
+  evaluateTransform,
+  applySingleClipTransitions,
+  applyZoomEffect,
+} from '../VideoEngine';
 import { SimpleClipDecoder } from './SimpleClipDecoder';
 import { StoryboardDownsampler } from './StoryboardDownsampler';
 import { StoryboardTiler } from './StoryboardTiler';
@@ -131,12 +135,10 @@ export async function generateStoryboardImpl(
       .flatMap((t: any) => t.clips)
       .find(
         (clip: any) =>
-          clip.transform?.scale !== undefined &&
-          clip.transform?.scale !== null &&
+          clip.effect_type === 'zoom' &&
           frameIndex >= clip.timeline_in &&
           frameIndex < clip.timeline_out,
       );
-    const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
     storyboardRenderer.beginFrame(background);
     const framesToClose: VideoFrame[] = [];
@@ -149,10 +151,15 @@ export async function generateStoryboardImpl(
 
         const frame = await decoder.getKeyframeNear(sourcePlayheadSeconds);
         if (frame) {
-          const evaluatedTransform = applySingleClipTransitions(
-            evaluateTransform(clip.transform, frameIndex, resolvedZoom),
-            clip,
-            frameIndex,
+          const evaluatedTransform = applyZoomEffect(
+            applySingleClipTransitions(
+              evaluateTransform(clip.transform, frameIndex),
+              clip,
+              frameIndex,
+            ),
+            activeZoomClip,
+            rendererWidth,
+            rendererHeight,
           );
 
           storyboardRenderer.drawClip(frame, evaluatedTransform as any);
@@ -271,12 +278,10 @@ export async function generateStoryboardImpl(
       .flatMap((t: any) => t.clips)
       .find(
         (clip: any) =>
-          clip.transform?.scale !== undefined &&
-          clip.transform?.scale !== null &&
+          clip.effect_type === 'zoom' &&
           frameIndex >= clip.timeline_in &&
           frameIndex < clip.timeline_out,
       );
-    const resolvedZoom = activeZoomClip?.transform?.scale ?? 1.0;
 
     storyboardRenderer.beginFrame(background);
     const framesToClose: VideoFrame[] = [];
@@ -289,10 +294,15 @@ export async function generateStoryboardImpl(
 
         const frame = await decoder.getKeyframeNear(sourcePlayheadSeconds);
         if (frame) {
-          const evaluatedTransform = applySingleClipTransitions(
-            evaluateTransform(clip.transform, frameIndex, resolvedZoom),
-            clip,
-            frameIndex,
+          const evaluatedTransform = applyZoomEffect(
+            applySingleClipTransitions(
+              evaluateTransform(clip.transform, frameIndex),
+              clip,
+              frameIndex,
+            ),
+            activeZoomClip,
+            rendererWidth,
+            rendererHeight,
           );
 
           storyboardRenderer.drawClip(frame, evaluatedTransform as any);

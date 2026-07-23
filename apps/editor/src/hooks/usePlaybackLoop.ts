@@ -105,7 +105,7 @@ export function usePlaybackLoop(
           );
         const globalZoom =
           activeEffectsClip?.effect_type === 'zoom'
-            ? (activeEffectsClip.effect_config?.scale ?? 1.0)
+            ? (activeEffectsClip.transform?.scale?.value ?? 1.0)
             : 1.0;
 
         // Render the pre-decoded frames directly via WebGPU VideoEngine

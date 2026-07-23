@@ -16,6 +16,7 @@ import {
   drawTextToCanvas,
   evaluateTransform,
   applySingleClipTransitions,
+  applyZoomEffect,
 } from '../VideoEngine';
 import { generateStoryboardImpl } from '../storyboard/StoryboardGenerator';
 const yieldToMainThread = () =>
@@ -233,7 +234,7 @@ export class ExportEngine {
     playheadFrame: number,
     activeProject: Project,
     assets: Asset[],
-    globalZoom: number = 1.0,
+    _globalZoom: number = 1.0,
   ): Promise<Uint8Array> {
     const timeline = activeProject.timeline_state;
     const framerate = fpsToNumeric(activeProject.framerate);
@@ -252,12 +253,9 @@ export class ExportEngine {
           playheadFrame >= clip.timeline_in &&
           playheadFrame < clip.timeline_out,
       );
-    const activeZoom = activeZoomClip?.effect_config?.scale ?? 1.0;
-
-    const resolvedZoom = globalZoom !== 1.0 ? globalZoom : activeZoom;
 
     console.log(
-      `[ExportEngine] Resolved Zoom Scale: ${resolvedZoom}x. Pre-buffering assets for frame ${playheadFrame}...`,
+      `[ExportEngine] Pre-buffering assets for frame ${playheadFrame}...`,
     );
     // Pre-decodes upcoming frames (tick lookahead manager)
     await this.lookAhead.tick(playheadFrame, activeProject, assets);
@@ -335,10 +333,15 @@ export class ExportEngine {
 
         const textFrame = new VideoFrame(canvas, { timestamp: 0 });
         tempFramesToClose.push(textFrame);
-        const evaluatedTransform = applySingleClipTransitions(
-          evaluateTransform(clip.transform, playheadFrame, resolvedZoom),
-          clip,
-          playheadFrame,
+        const evaluatedTransform = applyZoomEffect(
+          applySingleClipTransitions(
+            evaluateTransform(clip.transform, playheadFrame),
+            clip,
+            playheadFrame,
+          ),
+          activeZoomClip,
+          this.width,
+          this.height,
         );
         this.renderer.drawClip(textFrame, evaluatedTransform as any);
       } else {
@@ -348,10 +351,15 @@ export class ExportEngine {
           framerate,
         );
         if (frame) {
-          const evaluatedTransform = applySingleClipTransitions(
-            evaluateTransform(clip.transform, playheadFrame, resolvedZoom),
-            clip,
-            playheadFrame,
+          const evaluatedTransform = applyZoomEffect(
+            applySingleClipTransitions(
+              evaluateTransform(clip.transform, playheadFrame),
+              clip,
+              playheadFrame,
+            ),
+            activeZoomClip,
+            this.width,
+            this.height,
           );
           this.renderer.drawClip(frame, evaluatedTransform as any);
         }
@@ -522,7 +530,7 @@ export class ExportEngine {
           }
         }
 
-        // Resolve zoom scale factor active at this specific frameIndex
+        // Resolve zoom clip active at this specific frameIndex
         const activeZoomClip = effectsTracks
           .flatMap((t: any) => t.clips)
           .find(
@@ -531,7 +539,6 @@ export class ExportEngine {
               currentTimelineFrame >= clip.timeline_in &&
               currentTimelineFrame < clip.timeline_out,
           );
-        const resolvedZoom = activeZoomClip?.effect_config?.scale ?? 1.0;
 
         // 3. Render offscreen directly into canvas
         const tempFramesToClose: VideoFrame[] = [];
@@ -564,14 +571,15 @@ export class ExportEngine {
 
             const textFrame = new VideoFrame(canvas, { timestamp: 0 });
             tempFramesToClose.push(textFrame);
-            const evaluatedTransform = applySingleClipTransitions(
-              evaluateTransform(
-                clip.transform,
+            const evaluatedTransform = applyZoomEffect(
+              applySingleClipTransitions(
+                evaluateTransform(clip.transform, currentTimelineFrame),
+                clip,
                 currentTimelineFrame,
-                resolvedZoom,
               ),
-              clip,
-              currentTimelineFrame,
+              activeZoomClip,
+              this.width,
+              this.height,
             );
             this.renderer.drawClip(textFrame, evaluatedTransform as any);
           } else {
@@ -581,14 +589,15 @@ export class ExportEngine {
               framerate,
             );
             if (frame) {
-              const evaluatedTransform = applySingleClipTransitions(
-                evaluateTransform(
-                  clip.transform,
+              const evaluatedTransform = applyZoomEffect(
+                applySingleClipTransitions(
+                  evaluateTransform(clip.transform, currentTimelineFrame),
+                  clip,
                   currentTimelineFrame,
-                  resolvedZoom,
                 ),
-                clip,
-                currentTimelineFrame,
+                activeZoomClip,
+                this.width,
+                this.height,
               );
               this.renderer.drawClip(frame, evaluatedTransform as any);
             }
