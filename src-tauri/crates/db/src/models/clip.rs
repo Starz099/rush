@@ -200,6 +200,16 @@ pub struct Clip {
     #[serde(default)]
     #[specta(type = Option<specta_typescript::Any>)]
     pub effect_config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub adjustments: Option<Adjustments>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct Adjustments {
+    pub brightness: f32, // Default: 1.0
+    pub contrast: f32,   // Default: 1.0
+    pub saturation: f32, // Default: 1.0
+    pub vignette: f32,   // Default: 0.0
 }
 
 
@@ -291,6 +301,7 @@ impl Track {
                         speed_factor: 1.0,
                         effect_type: None,
                         effect_config: None,
+                        adjustments: None,
                     }
                 };
 

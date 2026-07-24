@@ -6,6 +6,10 @@ struct Uniforms {
     scale: f32,
     rotation: f32,
     opacity: f32,
+    brightness: f32,
+    contrast: f32,
+    saturation: f32,
+    vignette: f32,
     padding: f32,
 }
 
@@ -69,6 +73,23 @@ fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 @fragment
 fn fs_main(@location(0) uv: vec2<f32>, @location(1) opacity: f32) -> @location(0) vec4<f32> {
     var color = textureSampleBaseClampToEdge(myTexture, mySampler, uv);
+    
+    // Brightness
+    color = vec4<f32>(color.rgb * uniforms.brightness, color.a);
+    
+    // Contrast
+    color = vec4<f32>((color.rgb - 0.5) * uniforms.contrast + 0.5, color.a);
+    
+    // Apply Saturation
+    let luma = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+    let gray = vec3<f32>(luma);
+    color = vec4<f32>(mix(gray, color.rgb, uniforms.saturation), color.a);
+    
+    // Apply Vignette (darken corners based on distance from center UV)
+    let dist = distance(uv, vec2<f32>(0.5, 0.5));
+    let vig = smoothstep(0.8, 0.4, dist * uniforms.vignette);
+    color = vec4<f32>(color.rgb * vig, color.a);
+    
     color.a = color.a * opacity;
     return color;
 }

@@ -153,7 +153,7 @@ export async function generateStoryboardImpl(
         if (frame) {
           const evaluatedTransform = applyZoomEffect(
             applySingleClipTransitions(
-              evaluateTransform(clip.transform, frameIndex),
+              evaluateTransform(clip, frameIndex),
               clip,
               frameIndex,
             ),
@@ -296,7 +296,7 @@ export async function generateStoryboardImpl(
         if (frame) {
           const evaluatedTransform = applyZoomEffect(
             applySingleClipTransitions(
-              evaluateTransform(clip.transform, frameIndex),
+              evaluateTransform(clip, frameIndex),
               clip,
               frameIndex,
             ),

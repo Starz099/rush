@@ -230,7 +230,12 @@ export class WebGPURenderer {
     const anchorYVal = typeof t.anchor_y === 'number' ? t.anchor_y : 0.5;
     const opacityVal = typeof t.opacity === 'number' ? t.opacity : 1.0;
 
-    // Prepare Uniform Data (48 bytes)
+    const brightVal = typeof t.brightness === 'number' ? t.brightness : 1.0;
+    const contrastVal = typeof t.contrast === 'number' ? t.contrast : 1.0;
+    const satVal = typeof t.saturation === 'number' ? t.saturation : 1.0;
+    const vigVal = typeof t.vignette === 'number' ? t.vignette : 0.0;
+
+    // Prepare Uniform Data (64 bytes)
     const uniformData = new Float32Array([
       this.width, // canvasResolution.x
       this.height, // canvasResolution.y
@@ -243,6 +248,10 @@ export class WebGPURenderer {
       scaleVal, // scale
       rotationVal, // rotation
       opacityVal, // opacity
+      brightVal, // brightness
+      contrastVal, // contrast
+      satVal, // saturation
+      vigVal, // vignette
       0, // Padding
     ]);
 

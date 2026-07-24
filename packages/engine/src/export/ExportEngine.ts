@@ -335,7 +335,7 @@ export class ExportEngine {
         tempFramesToClose.push(textFrame);
         const evaluatedTransform = applyZoomEffect(
           applySingleClipTransitions(
-            evaluateTransform(clip.transform, playheadFrame),
+            evaluateTransform(clip, playheadFrame),
             clip,
             playheadFrame,
           ),
@@ -353,7 +353,7 @@ export class ExportEngine {
         if (frame) {
           const evaluatedTransform = applyZoomEffect(
             applySingleClipTransitions(
-              evaluateTransform(clip.transform, playheadFrame),
+              evaluateTransform(clip, playheadFrame),
               clip,
               playheadFrame,
             ),
@@ -573,7 +573,7 @@ export class ExportEngine {
             tempFramesToClose.push(textFrame);
             const evaluatedTransform = applyZoomEffect(
               applySingleClipTransitions(
-                evaluateTransform(clip.transform, currentTimelineFrame),
+                evaluateTransform(clip, currentTimelineFrame),
                 clip,
                 currentTimelineFrame,
               ),
@@ -591,7 +591,7 @@ export class ExportEngine {
             if (frame) {
               const evaluatedTransform = applyZoomEffect(
                 applySingleClipTransitions(
-                  evaluateTransform(clip.transform, currentTimelineFrame),
+                  evaluateTransform(clip, currentTimelineFrame),
                   clip,
                   currentTimelineFrame,
                 ),

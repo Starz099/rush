@@ -68,6 +68,7 @@ pub fn add_clip(
         speed_factor: 1.0,
         effect_type: None,
         effect_config: None,
+        adjustments: None,
     };
 
     track.clips.push(clip.clone());

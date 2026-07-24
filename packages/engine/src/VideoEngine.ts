@@ -4,10 +4,12 @@ import type { Project, Asset } from '@/api/bindings';
 import { evaluateAnimatable } from './animation/evaluator';
 
 export function evaluateTransform(
-  transform: any | null | undefined,
+  clip: any | null | undefined,
   playheadFrame: number,
 ) {
+  const transform = clip?.transform;
   if (!transform) {
+    const adjustments = clip?.adjustments || {};
     return {
       x: 0,
       y: 0,
@@ -17,6 +19,10 @@ export function evaluateTransform(
       anchor_y: 0.5,
       opacity: 1.0,
       z_index: 0,
+      brightness: adjustments.brightness ?? 1.0,
+      contrast: adjustments.contrast ?? 1.0,
+      saturation: adjustments.saturation ?? 1.0,
+      vignette: adjustments.vignette ?? 0.0,
     };
   }
 
@@ -28,6 +34,12 @@ export function evaluateTransform(
   const anchor_x = transform.anchor_x ?? 0.5;
   const anchor_y = transform.anchor_y ?? 0.5;
 
+  const adjustments = clip.adjustments || {};
+  const brightness = adjustments.brightness ?? 1.0;
+  const contrast = adjustments.contrast ?? 1.0;
+  const saturation = adjustments.saturation ?? 1.0;
+  const vignette = adjustments.vignette ?? 0.0;
+
   return {
     x,
     y,
@@ -37,6 +49,10 @@ export function evaluateTransform(
     anchor_y,
     opacity,
     z_index: transform.z_index ?? 0,
+    brightness,
+    contrast,
+    saturation,
+    vignette,
   };
 }
 
@@ -349,7 +365,7 @@ export class VideoEngine {
 
             const evaluatedTextTransform = applyZoomEffect(
               applySingleClipTransitions(
-                evaluateTransform(clip.transform, playheadFrame),
+                evaluateTransform(clip, playheadFrame),
                 clip,
                 playheadFrame,
               ),
@@ -367,7 +383,7 @@ export class VideoEngine {
             if (frame) {
               const evaluatedTransform = applyZoomEffect(
                 applySingleClipTransitions(
-                  evaluateTransform(clip.transform, playheadFrame),
+                  evaluateTransform(clip, playheadFrame),
                   clip,
                   playheadFrame,
                 ),

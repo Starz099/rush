@@ -105,8 +105,8 @@ const PropertiesTab = () => {
               {/* Timing Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-white/40" />
-                  <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
+                  <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                  <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                     Timeline Position
                   </h3>
                 </div>
@@ -148,8 +148,8 @@ const PropertiesTab = () => {
               {!isGap && track && activeProject && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="h-1 w-1 rounded-full bg-white/40" />
-                    <h3 className="text-[10px] font-bold tracking-tight text-white/50 uppercase">
+                    <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                    <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                       Track Assignment
                     </h3>
                   </div>
@@ -196,8 +196,8 @@ const PropertiesTab = () => {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                            <h3 className="text-[10px] font-bold tracking-tight text-blue-400 uppercase">
+                            <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                            <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                               Zoom Motion
                             </h3>
                           </div>
@@ -246,8 +246,8 @@ const PropertiesTab = () => {
                     <>
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                          <h3 className="text-[10px] font-bold tracking-tight text-blue-400 uppercase">
+                          <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                          <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                             Transform & Layout
                           </h3>
                         </div>
@@ -291,8 +291,8 @@ const PropertiesTab = () => {
                       {/* Single Clip Transitions Section */}
                       <div className="space-y-4 pt-1">
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                          <h3 className="text-[10px] font-bold tracking-tight text-purple-400 uppercase">
+                          <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                          <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                             Clip Transitions (Entrance/Exit)
                           </h3>
                         </div>
@@ -623,6 +623,153 @@ const PropertiesTab = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Color Adjustments Section */}
+                      <Separator className="bg-white/5" />
+                      <div className="space-y-4 pt-1">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                          <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
+                            Color Adjustments
+                          </h3>
+                        </div>
+
+                        {/* Brightness Slider */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-white/30 uppercase">
+                              Brightness
+                            </span>
+                            <span className="font-mono text-[10px] text-white/60">
+                              {(
+                                selectedClip.adjustments?.brightness ?? 1.0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[
+                              selectedClip.adjustments?.brightness ?? 1.0,
+                            ]}
+                            min={0.5}
+                            max={2.0}
+                            step={0.05}
+                            onValueChange={([val]) =>
+                              handleClipUpdate({
+                                adjustments: {
+                                  ...(selectedClip.adjustments || {
+                                    brightness: 1.0,
+                                    contrast: 1.0,
+                                    saturation: 1.0,
+                                    vignette: 0.0,
+                                  }),
+                                  brightness: val,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+
+                        {/* Contrast Slider */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-white/30 uppercase">
+                              Contrast
+                            </span>
+                            <span className="font-mono text-[10px] text-white/60">
+                              {(
+                                selectedClip.adjustments?.contrast ?? 1.0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[selectedClip.adjustments?.contrast ?? 1.0]}
+                            min={0.5}
+                            max={2.0}
+                            step={0.05}
+                            onValueChange={([val]) =>
+                              handleClipUpdate({
+                                adjustments: {
+                                  ...(selectedClip.adjustments || {
+                                    brightness: 1.0,
+                                    contrast: 1.0,
+                                    saturation: 1.0,
+                                    vignette: 0.0,
+                                  }),
+                                  contrast: val,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+
+                        {/* Saturation Slider */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-white/30 uppercase">
+                              Saturation
+                            </span>
+                            <span className="font-mono text-[10px] text-white/60">
+                              {(
+                                selectedClip.adjustments?.saturation ?? 1.0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[
+                              selectedClip.adjustments?.saturation ?? 1.0,
+                            ]}
+                            min={0.0}
+                            max={2.0}
+                            step={0.05}
+                            onValueChange={([val]) =>
+                              handleClipUpdate({
+                                adjustments: {
+                                  ...(selectedClip.adjustments || {
+                                    brightness: 1.0,
+                                    contrast: 1.0,
+                                    saturation: 1.0,
+                                    vignette: 0.0,
+                                  }),
+                                  saturation: val,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+
+                        {/* Vignette Slider */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-white/30 uppercase">
+                              Vignette
+                            </span>
+                            <span className="font-mono text-[10px] text-white/60">
+                              {(
+                                selectedClip.adjustments?.vignette ?? 0.0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[selectedClip.adjustments?.vignette ?? 0.0]}
+                            min={0.0}
+                            max={1.0}
+                            step={0.05}
+                            onValueChange={([val]) =>
+                              handleClipUpdate({
+                                adjustments: {
+                                  ...(selectedClip.adjustments || {
+                                    brightness: 1.0,
+                                    contrast: 1.0,
+                                    saturation: 1.0,
+                                    vignette: 0.0,
+                                  }),
+                                  vignette: val,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
                       <Separator className="bg-white/5" />
                     </>
                   )}
@@ -632,8 +779,8 @@ const PropertiesTab = () => {
               {/* Layer Order Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-orange-500" />
-                  <h3 className="text-[10px] font-bold tracking-tight text-orange-400/80 uppercase">
+                  <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                  <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                     Layer Order
                   </h3>
                 </div>
@@ -665,8 +812,8 @@ const PropertiesTab = () => {
                 <>
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-purple-500" />
-                      <h3 className="text-[10px] font-bold tracking-tight text-purple-400/80 uppercase">
+                      <div className="bg-primary h-1.5 w-1.5 rounded-full" />
+                      <h3 className="text-primary text-[10px] font-bold tracking-tight uppercase">
                         Source Trimming
                       </h3>
                     </div>
