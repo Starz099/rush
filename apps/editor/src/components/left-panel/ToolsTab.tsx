@@ -159,7 +159,28 @@ export const ToolsTab = () => {
     newClip.effect_config = parsedConfig;
 
     if (effect.name === 'zoom') {
-      newClip.transform = parsedConfig;
+      newClip.transform = {
+        x: {
+          has_keyframes: false,
+          value: parsedConfig.x ?? 0.0,
+          keyframes: [],
+        },
+        y: {
+          has_keyframes: false,
+          value: parsedConfig.y ?? 0.0,
+          keyframes: [],
+        },
+        scale: {
+          has_keyframes: false,
+          value: parsedConfig.scale ?? 1.2,
+          keyframes: [],
+        },
+        rotation: { has_keyframes: false, value: 0.0, keyframes: [] },
+        opacity: { has_keyframes: false, value: 1.0, keyframes: [] },
+        anchor_x: 0.5,
+        anchor_y: 0.5,
+        z_index: parsedConfig.z_index ?? 0,
+      };
     } else if (effect.name === 'speed') {
       newClip.speed_factor = parsedConfig.speed_factor;
     }

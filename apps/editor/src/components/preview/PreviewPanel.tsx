@@ -263,7 +263,7 @@ export const PreviewPanel = () => {
           );
         const globalZoom =
           activeEffectsClip?.effect_type === 'zoom'
-            ? (activeEffectsClip.effect_config?.scale ?? 1.0)
+            ? (activeEffectsClip.transform?.scale?.value ?? 1.0)
             : 1.0;
 
         // Render the frame immediately using the new state-driven engine

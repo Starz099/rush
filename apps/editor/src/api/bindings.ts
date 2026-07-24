@@ -127,6 +127,13 @@ export const commands = {
 };
 
 /* Types */
+export type Adjustments = {
+  brightness: number | null;
+  contrast: number | null;
+  saturation: number | null;
+  vignette: number | null;
+};
+
 export type Animatable<T> = {
   has_keyframes: boolean;
   value: T;
@@ -177,6 +184,7 @@ export type Clip = {
   speed_factor?: number | null;
   effect_type?: string | null;
   effect_config?: any | null;
+  adjustments?: Adjustments | null;
 };
 
 export type ClipTransitions = {

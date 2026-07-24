@@ -4,31 +4,41 @@ import type { Project, Asset } from '@/api/bindings';
 import { evaluateAnimatable } from './animation/evaluator';
 
 export function evaluateTransform(
-  transform: any | null | undefined,
+  clip: any | null | undefined,
   playheadFrame: number,
-  globalZoom: number = 1.0,
 ) {
+  const transform = clip?.transform;
   if (!transform) {
+    const adjustments = clip?.adjustments || {};
     return {
       x: 0,
       y: 0,
-      scale: globalZoom,
+      scale: 1.0,
       rotation: 0,
       anchor_x: 0.5,
       anchor_y: 0.5,
       opacity: 1.0,
       z_index: 0,
+      brightness: adjustments.brightness ?? 1.0,
+      contrast: adjustments.contrast ?? 1.0,
+      saturation: adjustments.saturation ?? 1.0,
+      vignette: adjustments.vignette ?? 0.0,
     };
   }
 
-  const x = evaluateAnimatable(transform.x, playheadFrame, 0.0) * globalZoom;
-  const y = evaluateAnimatable(transform.y, playheadFrame, 0.0) * globalZoom;
-  const scale =
-    evaluateAnimatable(transform.scale, playheadFrame, 1.0) * globalZoom;
+  const x = evaluateAnimatable(transform.x, playheadFrame, 0.0);
+  const y = evaluateAnimatable(transform.y, playheadFrame, 0.0);
+  const scale = evaluateAnimatable(transform.scale, playheadFrame, 1.0);
   const rotation = evaluateAnimatable(transform.rotation, playheadFrame, 0.0);
   const opacity = evaluateAnimatable(transform.opacity, playheadFrame, 1.0);
   const anchor_x = transform.anchor_x ?? 0.5;
   const anchor_y = transform.anchor_y ?? 0.5;
+
+  const adjustments = clip.adjustments || {};
+  const brightness = adjustments.brightness ?? 1.0;
+  const contrast = adjustments.contrast ?? 1.0;
+  const saturation = adjustments.saturation ?? 1.0;
+  const vignette = adjustments.vignette ?? 0.0;
 
   return {
     x,
@@ -39,6 +49,10 @@ export function evaluateTransform(
     anchor_y,
     opacity,
     z_index: transform.z_index ?? 0,
+    brightness,
+    contrast,
+    saturation,
+    vignette,
   };
 }
 
@@ -139,6 +153,28 @@ export function applySingleClipTransitions(
   }
 
   return nextTransform;
+}
+
+export function applyZoomEffect(
+  transform: any,
+  zoomClip: any,
+  _width: number,
+  _height: number,
+): any {
+  if (!zoomClip) return transform;
+
+  // Evaluate the zoom effect clip's transform values
+  const zScale =
+    typeof zoomClip.transform?.scale?.value === 'number'
+      ? zoomClip.transform.scale.value
+      : 1.0;
+
+  return {
+    ...transform,
+    x: transform.x * zScale,
+    y: transform.y * zScale,
+    scale: transform.scale * zScale,
+  };
 }
 
 interface CachedTextCanvas {
@@ -250,7 +286,7 @@ export class VideoEngine {
   public renderFrame(
     playheadFrame: number,
     activeProject: Project,
-    globalZoom: number = 1.0,
+    _globalZoom: number = 1.0,
   ) {
     if (this.disposed) return;
 
@@ -276,6 +312,21 @@ export class VideoEngine {
       if (b.track_type?.toLowerCase() === 'effects') return -1;
       return 0;
     });
+
+    // Find active Zoom Effect clip (if any) on the effects track at this playhead
+    const effectsTrack = tracks.find(
+      (t) => t.track_type?.toLowerCase() === 'effects',
+    );
+    const activeZoomClip = effectsTrack?.clips.find(
+      (clip: any) =>
+        playheadFrame >= clip.timeline_in &&
+        playheadFrame < clip.timeline_out &&
+        clip.effect_type === 'zoom',
+    );
+
+    console.log(
+      `[VideoEngine] renderFrame playhead=${playheadFrame} activeZoomClip=${activeZoomClip?.id} scale=${activeZoomClip?.transform?.scale?.value} anchorX=${activeZoomClip?.transform?.anchor_x} anchorY=${activeZoomClip?.transform?.anchor_y}`,
+    );
 
     for (const track of sortedTracks) {
       if (track.track_type?.toLowerCase() === 'audio') continue;
@@ -312,10 +363,15 @@ export class VideoEngine {
             const textFrame = new VideoFrame(canvas, { timestamp: 0 });
             tempFramesToClose.push(textFrame);
 
-            const evaluatedTextTransform = applySingleClipTransitions(
-              evaluateTransform(clip.transform, playheadFrame, globalZoom),
-              clip,
-              playheadFrame,
+            const evaluatedTextTransform = applyZoomEffect(
+              applySingleClipTransitions(
+                evaluateTransform(clip, playheadFrame),
+                clip,
+                playheadFrame,
+              ),
+              activeZoomClip,
+              width,
+              height,
             );
             this.renderer.drawClip(textFrame, evaluatedTextTransform as any);
           } else if (clip.asset_id) {
@@ -325,10 +381,15 @@ export class VideoEngine {
               framerate,
             );
             if (frame) {
-              const evaluatedTransform = applySingleClipTransitions(
-                evaluateTransform(clip.transform, playheadFrame, globalZoom),
-                clip,
-                playheadFrame,
+              const evaluatedTransform = applyZoomEffect(
+                applySingleClipTransitions(
+                  evaluateTransform(clip, playheadFrame),
+                  clip,
+                  playheadFrame,
+                ),
+                activeZoomClip,
+                width,
+                height,
               );
               this.renderer.drawClip(frame, evaluatedTransform as any);
             }
