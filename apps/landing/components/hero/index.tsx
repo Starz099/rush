@@ -95,7 +95,7 @@ export default function Hero() {
     <div className="relative flex w-full flex-col items-center gap-8 pt-32 pb-36">
       {/* Hero Title with Ambient Orange Drop Glow */}
       <h1
-        className="max-w-4xl text-center text-5xl leading-[1.05] font-black tracking-tight text-white md:text-7xl"
+        className="max-w-4xl text-center text-5xl leading-[1.05] font-black tracking-wide text-white md:text-7xl"
         style={{
           textShadow:
             '0 0 25px rgba(251, 85, 54, 0.35), 0 0 60px rgba(251, 85, 54, 0.15)',
@@ -104,7 +104,7 @@ export default function Hero() {
         Ship a week of edits in an afternoon.
       </h1>
 
-      <div className="text-muted-foreground max-w-220 text-center text-xl leading-relaxed">
+      <div className="max-w-4xl px-4 text-center font-sans text-lg leading-relaxed font-normal text-white/70 antialiased md:text-xl">
         <StyledText text="Rush" index={0} /> is a desktop video editor with a
         chat-style agent panel. Describe your vision, and it executes{' '}
         <StyledText text="edits for you" index={1} />, saving you hours of
@@ -112,41 +112,41 @@ export default function Hero() {
       </div>
 
       {/* High-fidelity CTA buttons */}
-      <div className="flex min-w-86 justify-between gap-4 pt-12 pb-8">
+      <div className="flex items-center justify-center gap-4 pt-10 pb-8">
         {/* Primary Download Button with Tactile Hover Scale, Glow and Shine */}
         <Button
           size="lg"
           onClick={() => {
             window.dispatchEvent(new Event('open-download-modal'));
           }}
-          className="group relative cursor-pointer overflow-hidden rounded-none px-8 py-6 text-sm font-bold tracking-tight uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_35px_rgba(251,85,54,0.35)] active:scale-[0.98]"
+          className="group relative flex h-12 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-none px-8 text-sm font-semibold tracking-wide text-white shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_35px_rgba(251,85,54,0.35)] active:scale-[0.98]"
         >
           <span className="relative z-10 flex items-center gap-2">
             <DownloadSimpleIcon weight="bold" size={16} />
-            Download Now
+            <span>Download Now</span>
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
         </Button>
 
         {/* Secondary Learn More Button with Hover Arrow Push */}
-        <Button
-          size="lg"
-          variant="outline"
+        <button
           onClick={() => {
             customSmoothScroll('how-it-works');
           }}
-          className="group border-border cursor-pointer rounded-none px-8 py-6 text-sm font-bold tracking-tight uppercase transition-all duration-300 hover:bg-white/5"
+          className="group relative flex h-12 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-none border border-white/5 bg-[#141414] px-8 text-sm font-semibold tracking-wide text-white transition-all duration-300 hover:border-white/15 hover:bg-[#1c1c1c] active:scale-[0.98]"
         >
-          <span className="flex items-center gap-2">
-            Learn more
+          <span className="relative z-10 flex items-center gap-2">
+            <span>Learn More</span>
             <CaretRightIcon
               weight="bold"
               size={15}
-              className="transition-transform duration-300 group-hover:translate-x-1.5"
+              className="transition-transform duration-300 group-hover:translate-x-1"
             />
           </span>
-        </Button>
+          {/* Hardware-accelerated continuous shine */}
+          <span className="custom-shine-element" />
+        </button>
       </div>
 
       {/* Looping V-Shape Scroll Indicator */}

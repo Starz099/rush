@@ -4,11 +4,11 @@ export const revalidate = 60; // Cache for 1 minute
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const platform = searchParams.get('platform')?.toLowerCase();
+  const platform = searchParams.get('platform')?.toLowerCase() || 'windows';
 
   const fallbackUrl = 'https://github.com/Starz099/rush/releases';
 
-  if (!platform || !['windows', 'macos', 'linux'].includes(platform)) {
+  if (platform !== 'windows') {
     return NextResponse.redirect(fallbackUrl, 302);
   }
 
@@ -31,21 +31,10 @@ export async function GET(request: NextRequest) {
     const release = await res.json();
     const assets = release.assets || [];
 
-    let matchedAsset = null;
-
-    if (platform === 'windows') {
-      // Look for .exe installers
-      matchedAsset = assets.find((asset: any) => asset.name.endsWith('.exe'));
-    } else if (platform === 'macos') {
-      // Look for .dmg installers
-      matchedAsset = assets.find((asset: any) => asset.name.endsWith('.dmg'));
-    } else if (platform === 'linux') {
-      // Look for .deb packages or .AppImage
-      matchedAsset = assets.find(
-        (asset: any) =>
-          asset.name.endsWith('.deb') || asset.name.endsWith('.AppImage'),
-      );
-    }
+    // Look for .exe installers
+    const matchedAsset = assets.find((asset: any) =>
+      asset.name.endsWith('.exe'),
+    );
 
     if (matchedAsset && matchedAsset.browser_download_url) {
       return NextResponse.redirect(matchedAsset.browser_download_url, 302);

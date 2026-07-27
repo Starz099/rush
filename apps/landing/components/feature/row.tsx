@@ -33,10 +33,8 @@ export function FeatureRow({ feat, index }: FeatureRowProps) {
     offset: ['start center', 'center center'],
   });
 
-  // Transform stroke pathLength, color, and scale based on row scroll position
+  // Transform branch line animation based on row scroll position
   const branchPathLength = useTransform(rowScroll, [0, 1], [0, 1]);
-  const branchColor = useTransform(rowScroll, [0, 1], ['#1f1f23', '#fb5536']);
-  const nodeScale = useTransform(rowScroll, [0, 1], [1, 1.25]);
 
   return (
     <div
@@ -83,16 +81,16 @@ export function FeatureRow({ feat, index }: FeatureRowProps) {
             )}
           >
             {feat.icon}
-            <span className="text-primary text-[10px] font-black tracking-widest uppercase">
+            <span className="text-primary text-xs font-bold tracking-widest uppercase">
               0{feat.id} / {feat.tag}
             </span>
           </div>
 
-          <h4 className="text-md relative z-10 font-black tracking-tight text-white uppercase">
+          <h4 className="relative z-10 text-base font-bold tracking-wide text-white uppercase md:text-lg">
             {feat.title}
           </h4>
 
-          <p className="text-muted-foreground relative z-10 text-[11px] leading-relaxed">
+          <p className="relative z-10 font-sans text-xs leading-relaxed font-normal text-white/70 md:text-sm">
             {feat.description}
           </p>
         </motion.div>
@@ -100,32 +98,35 @@ export function FeatureRow({ feat, index }: FeatureRowProps) {
 
       {/* Hinge & Tree Node Column */}
       <div className="relative col-span-1 hidden h-full items-center justify-center lg:order-2 lg:flex">
-        {/* Branch line SVG */}
-        <svg className="pointer-events-none absolute left-1/2 h-[30px] w-[110px] -translate-x-1/2 overflow-visible">
-          <motion.path
-            d={isLeft ? 'M 55 15 L 0 15' : 'M 55 15 L 110 15'}
-            fill="none"
-            strokeWidth="1.5"
+        {/* Horizontal branch laser in pure primary orange */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          {/* Ambient Glow Aura */}
+          <motion.div
+            className={cn(
+              'absolute h-[6px] opacity-70 blur-[4px]',
+              isLeft
+                ? 'right-1/2 w-1/2 origin-right bg-gradient-to-l from-[#fb5536] via-[#fb5536]/60 to-transparent'
+                : 'left-1/2 w-1/2 origin-left bg-gradient-to-r from-[#fb5536] via-[#fb5536]/60 to-transparent',
+            )}
             style={{
-              pathLength: branchPathLength,
-              stroke: branchColor,
+              scaleX: branchPathLength,
+              opacity: rowScroll,
             }}
           />
-        </svg>
-
-        {/* Glowing Dot Node */}
-        <motion.div
-          className="z-20 flex size-3.5 items-center justify-center border bg-[#080808] transition-all duration-300"
-          style={{
-            scale: nodeScale,
-            borderColor: branchColor,
-          }}
-        >
+          {/* Core Orange Laser Beam */}
           <motion.div
-            className="size-1.5"
-            style={{ backgroundColor: branchColor }}
+            className={cn(
+              'absolute h-[2px] shadow-[0_0_12px_#fb5536,0_0_4px_#fb5536]',
+              isLeft
+                ? 'right-1/2 w-1/2 origin-right bg-gradient-to-l from-[#fb5536] via-[#fb5536]/80 to-transparent'
+                : 'left-1/2 w-1/2 origin-left bg-gradient-to-r from-[#fb5536] via-[#fb5536]/80 to-transparent',
+            )}
+            style={{
+              scaleX: branchPathLength,
+              opacity: rowScroll,
+            }}
           />
-        </motion.div>
+        </div>
       </div>
 
       {/* Empty Column for grid alignment on desktop */}

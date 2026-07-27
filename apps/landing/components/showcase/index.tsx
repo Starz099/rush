@@ -138,7 +138,7 @@ export default function Showcase() {
 
         {/* Row 2: Active Sub-step Details */}
         <div className="flex flex-col gap-1.5">
-          <h4 className="font-sans text-sm font-black tracking-tight text-white uppercase md:text-base">
+          <h4 className="font-sans text-sm font-bold tracking-wide text-white uppercase md:text-base">
             {activeSubStep.title}
           </h4>
           <p className="h-[20px] w-full overflow-hidden text-[12px] leading-relaxed text-white/50 md:h-[22px] md:text-[13px]">

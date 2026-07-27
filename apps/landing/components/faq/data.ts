@@ -21,7 +21,7 @@ export const FAQS: FaqItem[] = [
     id: 3,
     question: 'What system specs are recommended to run Rush smoothly?',
     answer:
-      'Rush runs on Windows, macOS, and Linux. For optimal performance (especially local transcription and visual search indexing), we recommend at least 16GB of system RAM and a dedicated GPU (Apple Silicon, NVIDIA, or AMD) to handle local AI processing.',
+      'Rush runs on Windows. For optimal performance (especially local transcription and visual search indexing), we recommend at least 16GB of system RAM and a dedicated GPU (Apple Silicon, NVIDIA, or AMD) to handle local AI processing.',
   },
   {
     id: 4,

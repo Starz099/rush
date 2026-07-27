@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Outfit } from 'next/font/google';
+import localFont from 'next/font/local';
 import { cn } from '@/lib/utils';
 import Providers from './providers';
 import Navbar from '@/components/navbar';
@@ -9,7 +10,25 @@ import DownloadModal from '@/components/download-modal';
 
 const outfit = Outfit({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-outfit',
+});
+
+const coolvetica = localFont({
+  src: [
+    {
+      path: '../public/fonts/Coolvetica Rg.otf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/Coolvetica Rg It.otf',
+      weight: '400',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-coolvetica',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -48,7 +67,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn('dark', 'h-full', 'antialiased', outfit.className)}
+      className={cn(
+        'dark',
+        'h-full',
+        'antialiased',
+        outfit.variable,
+        coolvetica.variable,
+        outfit.className,
+      )}
       style={{ colorScheme: 'dark' }}
       suppressHydrationWarning
     >
