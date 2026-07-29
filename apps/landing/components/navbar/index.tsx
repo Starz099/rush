@@ -111,15 +111,15 @@ export default function Navbar() {
             href="https://github.com/Starz099/rush"
             target="_blank"
             rel="noopener noreferrer"
-            className="border-border text-muted-foreground bg-secondary relative hidden items-center gap-2 overflow-hidden border px-3 py-1.5 text-xs transition-all hover:border-white/20 hover:bg-white/[0.05] hover:text-white md:flex"
+            className="group relative hidden items-center gap-2 overflow-hidden rounded-none border border-white/5 bg-[#141414] px-3.5 py-1.5 text-xs font-semibold text-white transition-all duration-300 hover:border-white/15 hover:bg-[#1c1c1c] md:flex"
           >
-            <GithubLogoIcon size={14} weight="bold" />
-            <span>Github</span>
-            <span className="bg-border h-3 w-[1px]" />
-            <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
-              <StarIcon size={10} weight="fill" />
+            <GithubLogoIcon size={14} weight="bold" className="shrink-0" />
+            <span>GitHub</span>
+            <span className="h-3.5 w-[1px] shrink-0 bg-white/20" />
+            <span className="text-primary flex shrink-0 items-center gap-1 text-xs font-bold">
+              <StarIcon size={12} weight="fill" />
               <span>{formattedStars}</span>
-            </div>
+            </span>
             {/* Hardware-accelerated continuous shine */}
             <span className="custom-shine-element" />
           </a>
@@ -131,11 +131,11 @@ export default function Navbar() {
             onClick={() => {
               window.dispatchEvent(new Event('open-download-modal'));
             }}
-            className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden rounded-none px-4 text-xs font-bold tracking-tight text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
+            className="bg-primary hover:bg-primary/90 group relative flex items-center gap-1.5 overflow-hidden rounded-none px-4 text-xs font-semibold text-white shadow-[0_0_15px_rgba(251,85,54,0.1)] transition-all hover:scale-[1.03] hover:shadow-[0_0_25px_rgba(251,85,54,0.3)] active:scale-[0.97]"
           >
             <span className="relative z-10 flex items-center gap-1.5">
               <DownloadSimpleIcon size={14} weight="bold" />
-              <span>DOWNLOAD</span>
+              <span>Download</span>
             </span>
             {/* Hardware-accelerated continuous shine */}
             <span className="custom-shine-element" />
@@ -175,7 +175,7 @@ export default function Navbar() {
                     }}
                     className="text-muted-foreground border-b border-white/[0.03] py-2.5 text-xs font-semibold transition-colors hover:text-white"
                   >
-                    {item.label.toUpperCase()}
+                    {item.label}
                   </a>
                 ))}
               </div>
@@ -185,16 +185,16 @@ export default function Navbar() {
                   href="https://github.com/Starz099/rush"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="border-border text-muted-foreground flex items-center justify-between border bg-white/[0.02] px-4 py-3 text-xs transition-all hover:text-white"
+                  className="flex items-center justify-between border border-white/5 bg-[#141414] px-4 py-3 text-xs font-semibold text-white transition-all hover:border-white/15 hover:bg-[#1c1c1c]"
                 >
                   <div className="flex items-center gap-2">
                     <GithubLogoIcon size={16} weight="bold" />
-                    <span>GITHUB REPOSITORY</span>
+                    <span>GitHub Repository</span>
                   </div>
-                  <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
+                  <span className="text-primary flex shrink-0 items-center gap-1 text-xs font-bold">
                     <StarIcon size={12} weight="fill" />
                     <span>{formattedStars}</span>
-                  </div>
+                  </span>
                 </a>
 
                 <Button
@@ -204,10 +204,10 @@ export default function Navbar() {
                     setIsMobileMenuOpen(false);
                     window.dispatchEvent(new Event('open-download-modal'));
                   }}
-                  className="bg-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-none text-xs font-bold tracking-tight text-white"
+                  className="bg-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-none text-xs font-semibold text-white"
                 >
                   <DownloadSimpleIcon size={16} weight="bold" />
-                  <span>DOWNLOAD NOW</span>
+                  <span>Download Now</span>
                 </Button>
               </div>
             </motion.div>

@@ -207,7 +207,7 @@ export default function Footer() {
 
               {activeModal === 'pricing' ? (
                 <div>
-                  <h4 className="mb-4 text-lg font-black tracking-tight text-white uppercase">
+                  <h4 className="mb-4 text-lg font-bold tracking-wide text-white uppercase">
                     Rush is 100% Free
                   </h4>
                   <div className="text-muted-foreground space-y-3 text-sm leading-relaxed">
@@ -226,7 +226,7 @@ export default function Footer() {
                 </div>
               ) : (
                 <div>
-                  <h4 className="mb-4 text-lg font-black tracking-tight text-white uppercase">
+                  <h4 className="mb-4 text-lg font-bold tracking-wide text-white uppercase">
                     Local-First Architecture
                   </h4>
                   <div className="text-muted-foreground space-y-3 text-sm leading-relaxed">

@@ -23,9 +23,9 @@ export default function FeatureSection() {
     >
       {/* Section Header */}
       <div className="mb-20 flex flex-col items-center text-center">
-        <h3 className="max-w-md text-2xl leading-tight font-black tracking-tight text-white uppercase">
+        <h2 className="max-w-2xl text-center text-3xl leading-tight font-bold tracking-wide text-white uppercase md:text-4xl">
           Built for speed, privacy, and control
-        </h3>
+        </h2>
         <div className="bg-primary/30 mt-4 h-[1px] w-20" />
       </div>
 

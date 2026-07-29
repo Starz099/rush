@@ -20,9 +20,9 @@ export default function FaqSection() {
     >
       {/* Centered Heading on Top */}
       <div className="mb-16 flex flex-col items-center text-center">
-        <h3 className="text-2xl leading-tight font-black tracking-tight text-white uppercase md:text-3xl">
+        <h2 className="max-w-2xl text-center text-3xl leading-tight font-bold tracking-wide text-white uppercase md:text-4xl">
           Frequently Asked Questions
-        </h3>
+        </h2>
         <div className="bg-primary/30 mt-6 h-[1px] w-20" />
       </div>
 
@@ -55,7 +55,7 @@ export default function FaqSection() {
               >
                 <span
                   className={cn(
-                    'text-sm font-black tracking-tight uppercase transition-colors duration-200 md:text-base',
+                    'text-sm font-bold tracking-wide uppercase transition-colors duration-200 md:text-base',
                     isOpen
                       ? 'text-primary'
                       : 'text-white/80 group-hover:text-white',

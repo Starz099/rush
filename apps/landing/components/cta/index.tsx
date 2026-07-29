@@ -14,7 +14,7 @@ export default function CtaSection() {
   return (
     <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-5 overflow-visible px-6 py-24 text-center">
       {/* Heading */}
-      <h2 className="max-w-xl text-3xl leading-tight font-black tracking-tight text-white uppercase md:text-4xl">
+      <h2 className="max-w-2xl text-center text-3xl leading-tight font-bold tracking-wide text-white uppercase md:text-4xl">
         The video editor you actually own
       </h2>
 
@@ -33,12 +33,12 @@ export default function CtaSection() {
           }}
           className={cn(
             buttonVariants({ variant: 'default' }),
-            'group relative flex h-11 cursor-pointer items-center gap-2 overflow-hidden rounded-none px-8 font-bold tracking-tight uppercase shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,85,54,0.3)] active:scale-[0.98]',
+            'group relative flex h-12 cursor-pointer items-center gap-2 overflow-hidden rounded-none px-8 text-sm font-semibold tracking-wide text-white shadow-[0_0_20px_rgba(251,85,54,0.15)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,85,54,0.3)] active:scale-[0.98]',
           )}
         >
           <span className="relative z-10 flex items-center gap-2">
             <DownloadSimpleIcon weight="bold" size={16} />
-            Download Installer
+            <span>Download Installer</span>
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
@@ -47,19 +47,16 @@ export default function CtaSection() {
           href="https://github.com/Starz099/rush"
           target="_blank"
           rel="noopener noreferrer"
-          className={cn(
-            buttonVariants({ variant: 'outline' }),
-            'border-border relative flex h-11 cursor-pointer items-center gap-2 overflow-hidden rounded-none px-8 font-bold tracking-tight uppercase transition-all duration-300 hover:bg-white/5',
-          )}
+          className="group relative flex h-12 cursor-pointer items-center gap-2 overflow-hidden rounded-none border border-white/5 bg-[#141414] px-8 text-sm font-semibold tracking-wide text-white transition-all duration-300 hover:border-white/15 hover:bg-[#1c1c1c] active:scale-[0.98]"
         >
           <span className="relative z-10 flex items-center gap-2">
-            <GithubLogoIcon weight="bold" size={16} />
+            <GithubLogoIcon weight="bold" size={16} className="shrink-0" />
             <span>Star on GitHub</span>
-            <span className="bg-border h-3 w-[1px]" />
-            <div className="text-primary flex items-center gap-1 text-[10px] font-bold">
-              <StarIcon size={10} weight="fill" />
+            <span className="h-4 w-[1px] shrink-0 bg-white/20" />
+            <span className="text-primary flex shrink-0 items-center gap-1 text-sm font-bold">
+              <StarIcon size={13} weight="fill" />
               <span>{formattedStars}</span>
-            </div>
+            </span>
           </span>
           {/* Hardware-accelerated continuous shine */}
           <span className="custom-shine-element" />
