@@ -1,5 +1,10 @@
 export type EaseCurveType =
-  'linear' | 'ease_in' | 'ease_out' | 'ease_in_out' | 'spring' | 'bounce';
+  | 'linear'
+  | 'ease_in'
+  | 'ease_out'
+  | 'ease_in_out'
+  | 'spring'
+  | 'bounce';
 
 export function easeLinear(t: number): number {
   return t;

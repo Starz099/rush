@@ -10,7 +10,6 @@ import {
 } from '@phosphor-icons/react';
 
 import { Button } from '@/components/ui/button';
-import { BackgroundBeams } from '@/components/ui/background-beams';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -152,7 +151,6 @@ const Home = () => {
 
   return (
     <div className="bg-background text-foreground relative flex h-screen items-center justify-center overflow-hidden p-4">
-      <BackgroundBeams />
       <Card className="relative z-10 w-full max-w-[400px]">
         <CardContent className="flex flex-col gap-5 p-4">
           <div className="flex w-full gap-2">

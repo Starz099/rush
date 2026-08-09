@@ -207,7 +207,12 @@ export type ComposedWord = {
 };
 
 export type EaseCurve =
-  'linear' | 'ease_in' | 'ease_out' | 'ease_in_out' | 'spring' | 'bounce';
+  | 'linear'
+  | 'ease_in'
+  | 'ease_out'
+  | 'ease_in_out'
+  | 'spring'
+  | 'bounce';
 
 export type EditingRegistry = {
   tools: ToolDescriptor[];
@@ -340,7 +345,12 @@ export type Transition = {
 export type TransitionAlignment = 'center' | 'start' | 'end';
 
 export type TransitionType =
-  'fade' | 'slide' | 'wipe' | 'zoom' | 'spin' | 'glitch';
+  | 'fade'
+  | 'slide'
+  | 'wipe'
+  | 'zoom'
+  | 'spin'
+  | 'glitch';
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(

@@ -30,7 +30,9 @@ export class WebGPURenderer {
 
   constructor(
     target:
-      HTMLCanvasElement | OffscreenCanvas | { width: number; height: number },
+      | HTMLCanvasElement
+      | OffscreenCanvas
+      | { width: number; height: number },
   ) {
     if (target && 'getContext' in target) {
       this.canvas = target as any;

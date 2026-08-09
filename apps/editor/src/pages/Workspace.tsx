@@ -2,16 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProjectStore } from '@/store/projectStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable';
 import { projectApi } from '@/api/project';
 import { LeftPanel } from '@/components/left-panel';
 import { PreviewPanel } from '@/components/preview/PreviewPanel';
 import { TimelinePanel } from '@/components/timeline/TimelinePanel';
-import { CaretLeftIcon } from '@phosphor-icons/react';
+import { CaretLeftIcon, SidebarIcon } from '@phosphor-icons/react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +45,33 @@ const Workspace = () => {
 
   // Background asset preprocessor and model download tasks state
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+
+  // Custom workspace sizing and collapse states (matching rush-v2)
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [timelineHeight, setTimelineHeight] = useState(250);
+  const isResizingRef = useRef(false);
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizingRef.current) return;
+    const newHeight = window.innerHeight - e.clientY;
+    if (newHeight >= 140 && newHeight <= 500) {
+      setTimelineHeight(newHeight);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isResizingRef.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -392,35 +414,77 @@ const Workspace = () => {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+      {/* Main Workspace Layout (Custom resizing & sidebars matching rush-v2) */}
+      <div className="flex flex-1 overflow-hidden bg-black">
         {/* Left Sidebar */}
-        <ResizablePanel maxSize={15} className="border-r">
-          <LeftPanel projectId={projectId!} />
-        </ResizablePanel>
+        {leftCollapsed ? (
+          <div className="flex w-10 shrink-0 flex-col items-center justify-start border-r border-white/5 bg-[#111] pt-2">
+            <button
+              onClick={() => setLeftCollapsed(false)}
+              className="cursor-pointer rounded border border-transparent p-2 text-white/40 transition-all hover:border-white/10 hover:bg-white/5 hover:text-white"
+              title="Expand Left Panel"
+            >
+              <SidebarIcon size={15} weight="bold" />
+            </button>
+            <div className="mt-6 flex flex-col items-center gap-6 font-mono text-[9px] font-bold tracking-widest text-white/30 uppercase select-none [writing-mode:vertical-lr]">
+              LEFT PANEL
+            </div>
+          </div>
+        ) : (
+          <div className="flex w-64 shrink-0 flex-col border-r border-white/5 bg-[#111]">
+            <LeftPanel
+              projectId={projectId!}
+              onCollapse={() => setLeftCollapsed(true)}
+            />
+          </div>
+        )}
 
-        <ResizableHandle />
+        {/* Center: Preview Port & Timeline */}
+        <div className="flex flex-1 flex-col overflow-hidden bg-black/10">
+          {/* Preview Panel */}
+          <div className="relative min-h-0 flex-1">
+            <PreviewPanel />
+          </div>
 
-        {/* Center Content */}
-        <ResizablePanel maxSize={60} className="flex flex-col bg-black/10">
-          <ResizablePanelGroup orientation="vertical" className="flex-1">
-            <ResizablePanel maxSize={60} className="border-b">
-              <PreviewPanel />
-            </ResizablePanel>
+          {/* Resizer Handle */}
+          <div
+            onMouseDown={startResize}
+            className="hover:bg-primary relative z-40 h-1 w-full shrink-0 cursor-ns-resize bg-white/5 transition-colors"
+            title="Drag to resize timeline height"
+          ></div>
 
-            <ResizablePanel maxSize={40} className="border-t">
-              <TimelinePanel />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </ResizablePanel>
-
-        <ResizableHandle />
+          {/* Timeline Panel */}
+          <div
+            style={{ height: `${timelineHeight}px` }}
+            className="relative flex-none shrink-0"
+          >
+            <TimelinePanel />
+          </div>
+        </div>
 
         {/* Right Sidebar */}
-        <ResizablePanel maxSize={25} className="border-l">
-          <RightPanel projectId={activeProject.id} />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        {rightCollapsed ? (
+          <div className="flex w-10 shrink-0 flex-col items-center justify-start border-l border-white/5 bg-[#111] pt-2">
+            <button
+              onClick={() => setRightCollapsed(false)}
+              className="cursor-pointer rounded border border-transparent p-2 text-white/40 transition-all hover:border-white/10 hover:bg-white/5 hover:text-white"
+              title="Expand Right Panel"
+            >
+              <SidebarIcon size={15} weight="bold" />
+            </button>
+            <div className="mt-6 flex flex-col items-center gap-6 font-mono text-[9px] font-bold tracking-widest text-white/30 uppercase select-none [writing-mode:vertical-lr]">
+              RIGHT PANEL
+            </div>
+          </div>
+        ) : (
+          <div className="flex w-96 shrink-0 flex-col border-l border-white/5 bg-[#111]">
+            <RightPanel
+              projectId={activeProject.id}
+              onCollapse={() => setRightCollapsed(true)}
+            />
+          </div>
+        )}
+      </div>
       <ExportModal
         isOpen={isRendering}
         phase={exportPhase}
