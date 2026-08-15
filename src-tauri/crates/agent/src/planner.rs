@@ -38,7 +38,7 @@ pub async fn run_planner(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .or_else(|| std::env::var("RUSH_LLM_MODEL").ok())
-        .unwrap_or_else(|| "nvidia/nemotron-3-ultra-550b-a55b:free".to_string());
+        .unwrap_or_else(|| "google/gemini-2.5-flash".to_string());
     let _ = app.emit(
         "agent_status",
         AgentStatusPayload {
@@ -207,12 +207,11 @@ pub async fn run_planner(
             .trim()
             .to_string();
 
-        let json_res: Value = match serde_json::from_str(&cleaned_res) {
-            Ok(v) => v,
-            Err(e) => {
+        let json_res: Value = match extract_json(&cleaned_res) {
+            Some(v) => v,
+            None => {
                 println!(
-                    "[planner] Failed to parse JSON, treating response as plain text: {}",
-                    e
+                    "[planner] Failed to extract JSON, treating response as plain text."
                 );
                 serde_json::json!({
                     "status": "success",
@@ -394,4 +393,17 @@ pub async fn run_planner(
     );
 
     Ok(final_response)
+}
+
+fn extract_json(text: &str) -> Option<Value> {
+    if let Some(start_idx) = text.find('{') {
+        if let Some(end_idx) = text.rfind('}') {
+            if end_idx > start_idx {
+                if let Ok(json_val) = serde_json::from_str::<Value>(&text[start_idx..=end_idx]) {
+                    return Some(json_val);
+                }
+            }
+        }
+    }
+    None
 }
