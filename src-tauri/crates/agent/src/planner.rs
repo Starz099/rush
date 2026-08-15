@@ -190,11 +190,39 @@ pub async fn run_planner(
         "content": system_prompt
     }));
 
-    for msg in &history_messages {
+    // Find the message index corresponding to the start of the last 2 user turns
+    let mut user_turns_count = 0;
+    let mut cut_off_idx = 0;
+    for (i, msg) in history_messages.iter().enumerate().rev() {
+        if let rush_db::models::MessageAuthor::User = msg.role {
+            user_turns_count += 1;
+            if user_turns_count == 3 {
+                cut_off_idx = i;
+                break;
+            }
+        }
+    }
+
+    for (i, msg) in history_messages.iter().enumerate() {
         match &msg.role {
             rush_db::models::MessageAuthor::Tool => {
-                // Skip historical tool execution logs from past turns to prevent context bloat
-                continue;
+                // Keep tool execution logs only for the last 2 turns to prevent context bloat
+                if i < cut_off_idx {
+                    continue;
+                }
+
+                // Match tool message tags to roles
+                if msg.content.starts_with("● Tool Call:") {
+                    messages.push(serde_json::json!({
+                        "role": "assistant",
+                        "content": msg.content.clone()
+                    }));
+                } else {
+                    messages.push(serde_json::json!({
+                        "role": "user",
+                        "content": msg.content.clone()
+                    }));
+                }
             }
             rush_db::models::MessageAuthor::User => {
                 messages.push(serde_json::json!({

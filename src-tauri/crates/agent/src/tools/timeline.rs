@@ -257,3 +257,106 @@ pub fn split_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<St
         clip_id, split_frame, clip_a.id, clip_b.id
     ))
 }
+
+pub fn close_timeline_gaps(
+    args: &Value,
+    timeline_state: &mut TimelineState,
+) -> Result<String, String> {
+    let track_id = args["track_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'track_id' argument".to_string())?;
+    let preserve_start = args["preserve_start"].as_bool().unwrap_or(false);
+
+    let idx = timeline_state
+        .tracks
+        .iter()
+        .position(|t| t.id == track_id)
+        .ok_or_else(|| format!("Track '{}' not found.", track_id))?;
+
+    let track = &mut timeline_state.tracks[idx];
+
+    if track.clips.is_empty() {
+        return Ok(format!(
+            "Track '{}' has no clips, no gaps to close.",
+            track.name
+        ));
+    }
+
+    // Sort clips chronologically by start frame
+    track.clips.sort_by_key(|c| c.timeline_in);
+
+    let mut current_timeline_cursor = if preserve_start {
+        track.clips[0].timeline_in
+    } else {
+        0
+    };
+
+    let mut changes_count = 0;
+
+    for clip in &mut track.clips {
+        let duration = clip.timeline_out - clip.timeline_in;
+
+        if clip.timeline_in != current_timeline_cursor {
+            clip.timeline_in = current_timeline_cursor;
+            clip.timeline_out = current_timeline_cursor + duration;
+            changes_count += 1;
+        }
+
+        current_timeline_cursor = clip.timeline_out;
+    }
+
+    track.validate_and_sort_clips();
+
+    Ok(format!(
+        "Successfully closed gaps on track '{}'. Adjusted {} clips. Track is now gapless starting from frame {}.",
+        track.name, changes_count, if preserve_start { "original start" } else { "0" }
+    ))
+}
+
+pub fn ripple_delete_clip(
+    args: &Value,
+    timeline_state: &mut TimelineState,
+) -> Result<String, String> {
+    let clip_id = args["clip_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'clip_id' argument".to_string())?;
+
+    let mut found_track_idx = None;
+    let mut deleted_clip_in = 0;
+    let mut deleted_clip_duration = 0;
+
+    for (t_idx, track) in timeline_state.tracks.iter().enumerate() {
+        if let Some(clip) = track.clips.iter().find(|c| c.id == clip_id) {
+            found_track_idx = Some(t_idx);
+            deleted_clip_in = clip.timeline_in;
+            deleted_clip_duration = clip.timeline_out - clip.timeline_in;
+            break;
+        }
+    }
+
+    let track_idx =
+        found_track_idx.ok_or_else(|| format!("Clip '{}' not found in any track.", clip_id))?;
+    let track = &mut timeline_state.tracks[track_idx];
+
+    // Remove the target clip
+    if let Some(pos) = track.clips.iter().position(|c| c.id == clip_id) {
+        track.clips.remove(pos);
+    }
+
+    // Shift all subsequent clips on this track to the left by the deleted clip's duration
+    let mut shift_count = 0;
+    for clip in &mut track.clips {
+        if clip.timeline_in >= deleted_clip_in {
+            clip.timeline_in -= deleted_clip_duration;
+            clip.timeline_out -= deleted_clip_duration;
+            shift_count += 1;
+        }
+    }
+
+    track.validate_and_sort_clips();
+
+    Ok(format!(
+        "Successfully ripple deleted clip '{}' from track '{}'. Shifted {} subsequent clips left by {} frames to close the gap.",
+        clip_id, track.name, shift_count, deleted_clip_duration
+    ))
+}

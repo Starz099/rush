@@ -107,7 +107,20 @@ Use these to perform editing actions.
      - `split_frame` (number, required): The timeline frame number at which the split occurs.
    - Signature: `split_clip(clip_id, split_frame)`
 
-15. `update_transform`
+15. `close_timeline_gaps`
+   - Description: Automatically closes all silent empty gaps on a specific track by shifting clips back-to-back chronologically.
+   - Parameters:
+     - `track_id` (string, required): The ID of the track.
+     - `preserve_start` (boolean, optional): If true, preserves the starting position of the first clip instead of shifting it to frame 0 (defaults to false).
+   - Signature: `close_timeline_gaps(track_id, preserve_start)`
+
+16. `ripple_delete_clip`
+   - Description: Deletes a clip from the timeline and automatically shifts all subsequent clips left on that track to close the resulting gap.
+   - Parameters:
+     - `clip_id` (string, required): The ID of the clip to remove.
+   - Signature: `ripple_delete_clip(clip_id)`
+
+17. `update_transform`
     - Description: Adjusts scale and 2D translation offsets (x, y) of a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -116,7 +129,7 @@ Use these to perform editing actions.
       - `scale` (number, optional): Visual size multiplier (e.g. 1.2).
     - Signature: `update_transform(clip_id, x, y, scale)`
 
-16. `add_effect`
+18. `add_effect`
     - Description: Adds a zoom or speed adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -126,14 +139,14 @@ Use these to perform editing actions.
         - For "speed": `{ "speed_factor": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
-17. `remove_effect`
+19. `remove_effect`
     - Description: Removes an existing effect or speed adjustment from a clip.
     - Parameters:
       - `clip_id` (string, required): The ID of the clip.
       - `effect_type` (string, required): The effect type to remove ("zoom", "speed").
     - Signature: `remove_effect(clip_id, effect_type)`
 
-18. `set_background`
+20. `set_background`
     - Description: Sets the canvas background style.
     - Parameters:
       - `color_hex` (string, optional): Hex code for solid background (e.g. "#FF0000").
@@ -141,13 +154,13 @@ Use these to perform editing actions.
       - `blur` (number, optional): Blur filter radius.
     - Signature: `set_background(color_hex, gradient_colors, blur)`
 
-19. `set_playhead`
+21. `set_playhead`
     - Description: Changes the current timeline position of the playback cursor.
     - Parameters:
       - `position` (number, required): Frame number.
     - Signature: `set_playhead(position)`
 
-20. `mute_track` / `lock_track`
+22. `mute_track` / `lock_track`
     - Description: Mutes or locks a track.
     - Parameters:
       - `track_id` (string, required): Track ID.
