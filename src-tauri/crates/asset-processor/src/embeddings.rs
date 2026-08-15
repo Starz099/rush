@@ -1,6 +1,9 @@
 use instant_clip_tokenizer::Tokenizer;
 use ort::{inputs, session::Session, value::Value};
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+
+static CLIP_TEXT_SESSION: OnceLock<Mutex<Session>> = OnceLock::new();
 
 /// Generates the 512-dimension text embedding for a text query using the local quantized CLIP text ONNX model.
 pub async fn get_text_embedding(
@@ -8,10 +11,7 @@ pub async fn get_text_embedding(
     text_query: &str,
     app_data_dir: &Path,
 ) -> Result<Vec<f32>, String> {
-    // 1. Ensure the local CLIP text model is downloaded
-    let model_path = super::models::ensure_clip_text_model(app, app_data_dir).await?;
-
-    // 2. Tokenize input text using instant-clip-tokenizer (OpenAI vocabulary)
+    // Tokenize input text using instant-clip-tokenizer (OpenAI vocabulary)
     let tokenizer = Tokenizer::new();
     let mut tokens = Vec::new();
     tokens.push(tokenizer.start_of_text());
@@ -31,20 +31,32 @@ pub async fn get_text_embedding(
         input_ids_data[i] = token.to_u16() as i64;
     }
 
-    // 3. Initialize the ONNX session
-    let mut session = Session::builder()
-        .map_err(|e| format!("Failed to build Session: {}", e))?
-        .commit_from_file(model_path)
-        .map_err(|e| format!("Failed to load CLIP text model: {}", e))?;
+    // Retrieve or initialize the ONNX session
+    let session_mutex = if let Some(m) = CLIP_TEXT_SESSION.get() {
+        m
+    } else {
+        // Ensure the local CLIP text model is downloaded
+        let model_path = super::models::ensure_clip_text_model(app, app_data_dir).await?;
 
-    // 4. Construct the 2D input tensor of shape [1, 77]
+        let new_session = Session::builder()
+            .map_err(|e| format!("Failed to build Session builder: {}", e))?
+            .commit_from_file(model_path)
+            .map_err(|e| format!("Failed to load CLIP text model ONNX session: {}", e))?;
+
+        let _ = CLIP_TEXT_SESSION.set(Mutex::new(new_session));
+        CLIP_TEXT_SESSION.get().unwrap()
+    };
+
+    let mut session = session_mutex.lock().map_err(|e| format!("Mutex lock failed: {}", e))?;
+
+    // Construct the 2D input tensor of shape [1, 77]
     let input_ids = Value::from_array(
         ndarray::Array2::from_shape_vec((1, 77), input_ids_data)
             .map_err(|e| format!("Failed to create input_ids array: {}", e))?,
     )
     .map_err(|e| format!("Failed to create input_ids tensor: {}", e))?;
 
-    // 5. Run ONNX inference
+    // Run ONNX inference
     let outputs = session
         .run(inputs![
             "input_ids" => input_ids

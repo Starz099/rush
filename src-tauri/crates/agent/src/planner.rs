@@ -127,7 +127,61 @@ pub async fn run_planner(
         ));
     }
 
-    let system_prompt = build_system_prompt(&registry_desc);
+    // Build dynamic workspace context
+    let mut project_context = format!(
+        "CURRENT PROJECT:\n- Name: \"{}\"\n- Viewport: {}x{}\n- Framerate: {} FPS\n\n",
+        project.name, project.viewport_width, project.viewport_height, project.framerate
+    );
+
+    project_context.push_str("AVAILABLE MEDIA ASSETS:\n");
+    if assets.is_empty() {
+        project_context.push_str("(No media assets imported yet)\n");
+    } else {
+        for asset in &assets {
+            let duration_ms = asset.duration_ms.unwrap_or(0);
+            let duration_sec = duration_ms as f64 / 1000.0;
+            let duration_frames = (duration_sec * project.framerate as f64).round() as i32;
+            project_context.push_str(&format!(
+                "- ID: \"{}\"\n  Name: \"{}\"\n  Type: \"{}\"\n  Duration: {:.2}s ({} frames)\n",
+                asset.id, asset.name, asset.media_type, duration_sec, duration_frames
+            ));
+        }
+    }
+
+    project_context.push_str("\nCURRENT TIMELINE STATE:\n");
+    if project.timeline_state.tracks.is_empty() {
+        project_context.push_str("(Timeline has no tracks)\n");
+    } else {
+        for track in &project.timeline_state.tracks {
+            let status_str = format!(
+                "ID: \"{}\", Type: \"{:?}\", Locked: {}, Muted: {}",
+                track.id, track.track_type, track.is_locked, track.is_muted
+            );
+            project_context.push_str(&format!("- Track \"{}\" ({}):\n", track.name, status_str));
+            if track.clips.is_empty() {
+                project_context.push_str("  (No clips on this track)\n");
+            } else {
+                for clip in &track.clips {
+                    let asset_name = assets
+                        .iter()
+                        .find(|a| Some(a.id.clone()) == clip.asset_id)
+                        .map(|a| a.name.as_str())
+                        .unwrap_or("unknown");
+                    project_context.push_str(&format!(
+                        "  * Clip ID: \"{}\"\n    Asset: \"{}\" (ID: \"{}\")\n    Timeline Range: frame {} to {}\n    Duration: {} frames\n",
+                        clip.id,
+                        asset_name,
+                        clip.asset_id.as_deref().unwrap_or("None"),
+                        clip.timeline_in,
+                        clip.timeline_out,
+                        clip.timeline_out - clip.timeline_in
+                    ));
+                }
+            }
+        }
+    }
+
+    let system_prompt = build_system_prompt(&registry_desc, &project_context);
 
     // 6. Build the message array for the multi-turn LLM completions call
     let mut messages = Vec::new();
