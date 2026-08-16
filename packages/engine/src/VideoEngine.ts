@@ -23,6 +23,10 @@ export function evaluateTransform(
       contrast: adjustments.contrast ?? 1.0,
       saturation: adjustments.saturation ?? 1.0,
       vignette: adjustments.vignette ?? 0.0,
+      sepia: adjustments.sepia ?? 0.0,
+      temperature: adjustments.temperature ?? 0.0,
+      preset: adjustments.preset ?? 'none',
+      tint: adjustments.tint ?? [1.0, 1.0, 1.0],
     };
   }
 
@@ -39,6 +43,10 @@ export function evaluateTransform(
   const contrast = adjustments.contrast ?? 1.0;
   const saturation = adjustments.saturation ?? 1.0;
   const vignette = adjustments.vignette ?? 0.0;
+  const sepia = adjustments.sepia ?? 0.0;
+  const temperature = adjustments.temperature ?? 0.0;
+  const preset = adjustments.preset ?? 'none';
+  const tint = adjustments.tint ?? [1.0, 1.0, 1.0];
 
   return {
     x,
@@ -53,6 +61,10 @@ export function evaluateTransform(
     contrast,
     saturation,
     vignette,
+    sepia,
+    temperature,
+    preset,
+    tint,
   };
 }
 
@@ -204,17 +216,35 @@ export function drawTextToCanvas(canvas: OffscreenCanvas, clip: any) {
     const x = position.x * canvas.width;
     const y = position.y * canvas.height;
 
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
+    const fontWeight = config.font_weight ?? 'bold';
+    const fontStyle = config.font_style ?? 'normal';
+    const textDecoration = config.text_decoration ?? 'none';
+
+    const letterSpacing = config.letter_spacing ?? 0;
+
+    // Calculate individual character widths and total width
+    const chars = text.split('');
+    let totalWidth = 0;
+    const charWidths: number[] = [];
+
+    ctx.save();
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    for (let i = 0; i < chars.length; i++) {
+      const w = ctx.measureText(chars[i]).width;
+      charWidths.push(w);
+      totalWidth += w;
+      if (i < chars.length - 1) {
+        totalWidth += letterSpacing;
+      }
+    }
+    ctx.restore();
 
     // 1. Draw dynamic background bounding box if enabled
     if (bgEnable) {
-      const textMetrics = ctx.measureText(text);
       const paddingX = fontSize * 0.4;
       const paddingY = fontSize * 0.25;
 
-      const boxWidth = textMetrics.width + paddingX * 2;
+      const boxWidth = totalWidth + paddingX * 2;
       const boxHeight = fontSize + paddingY * 2;
 
       ctx.save();
@@ -236,8 +266,36 @@ export function drawTextToCanvas(canvas: OffscreenCanvas, clip: any) {
       ctx.restore();
     }
 
-    // 2. Draw Text on top
+    // 2. Draw Text characters on top
+    const strokeEnable = config.stroke_enable ?? false;
+    const strokeColor = config.stroke_color ?? '#000000';
+    const strokeWidth = config.stroke_width ?? 4;
+
+    const startX = x - totalWidth / 2;
+
+    // Draw Stroke Outline first if enabled
+    if (strokeEnable) {
+      ctx.save();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
+      ctx.lineJoin = 'round';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+
+      let currentX = startX;
+      for (let i = 0; i < chars.length; i++) {
+        ctx.strokeText(chars[i], currentX, y);
+        currentX += charWidths[i] + letterSpacing;
+      }
+      ctx.restore();
+    }
+
+    ctx.save();
     ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
 
     // Premium drop shadow (only if no background box is enabled)
     if (!bgEnable) {
@@ -252,7 +310,24 @@ export function drawTextToCanvas(canvas: OffscreenCanvas, clip: any) {
       ctx.shadowOffsetY = 0;
     }
 
-    ctx.fillText(text, x, y);
+    let currentX = startX;
+    for (let i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], currentX, y);
+      currentX += charWidths[i] + letterSpacing;
+    }
+    ctx.restore();
+
+    // 3. Draw Underline manually on canvas if configured
+    if (textDecoration === 'underline') {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, fontSize * 0.08); // Scale line thickness with font size
+      ctx.beginPath();
+      ctx.moveTo(startX, y + fontSize * 0.45);
+      ctx.lineTo(startX + totalWidth, y + fontSize * 0.45);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 }
 

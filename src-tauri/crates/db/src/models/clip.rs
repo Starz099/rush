@@ -210,6 +210,29 @@ pub struct Adjustments {
     pub contrast: f32,   // Default: 1.0
     pub saturation: f32, // Default: 1.0
     pub vignette: f32,   // Default: 0.0
+    #[serde(default)]
+    pub sepia: f32,      // Default: 0.0
+    #[serde(default)]
+    pub temperature: f32, // Default: 0.0
+    #[serde(default)]
+    pub preset: Option<String>,
+    #[serde(default)]
+    pub tint: Option<Vec<f32>>,
+}
+
+impl Default for Adjustments {
+    fn default() -> Self {
+        Self {
+            brightness: 1.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            vignette: 0.0,
+            sepia: 0.0,
+            temperature: 0.0,
+            preset: None,
+            tint: None,
+        }
+    }
 }
 
 

@@ -230,12 +230,43 @@ export class WebGPURenderer {
     const anchorYVal = typeof t.anchor_y === 'number' ? t.anchor_y : 0.5;
     const opacityVal = typeof t.opacity === 'number' ? t.opacity : 1.0;
 
-    const brightVal = typeof t.brightness === 'number' ? t.brightness : 1.0;
-    const contrastVal = typeof t.contrast === 'number' ? t.contrast : 1.0;
-    const satVal = typeof t.saturation === 'number' ? t.saturation : 1.0;
-    const vigVal = typeof t.vignette === 'number' ? t.vignette : 0.0;
+    // Resolve preset values
+    let finalBrightness = typeof t.brightness === 'number' ? t.brightness : 1.0;
+    let finalContrast = typeof t.contrast === 'number' ? t.contrast : 1.0;
+    let finalSaturation = typeof t.saturation === 'number' ? t.saturation : 1.0;
+    let finalVignette = typeof t.vignette === 'number' ? t.vignette : 0.0;
+    let finalSepia = typeof t.sepia === 'number' ? t.sepia : 0.0;
+    let finalTemp = typeof t.temperature === 'number' ? t.temperature : 0.0;
+    let tint = Array.isArray(t.tint) ? t.tint : [1.0, 1.0, 1.0];
 
-    // Prepare Uniform Data (64 bytes)
+    if (t.preset === 'classic_pop') {
+      finalBrightness *= 1.05;
+      finalContrast *= 1.25;
+      finalSaturation *= 1.45;
+      finalVignette = Math.max(finalVignette, 0.2);
+      finalTemp = 0.1;
+      tint = [1.05, 1.0, 1.05];
+    } else if (t.preset === 'cinematic_dark') {
+      finalBrightness *= 0.82;
+      finalContrast *= 1.35;
+      finalSaturation *= 0.55;
+      finalVignette = Math.max(finalVignette, 0.65);
+      finalTemp = -0.4;
+      tint = [0.9, 0.95, 1.1];
+    } else if (t.preset === 'cyberpunk_neon') {
+      finalContrast *= 1.3;
+      finalSaturation *= 1.5;
+      finalVignette = Math.max(finalVignette, 0.3);
+      tint = [1.2, 0.85, 1.35];
+    } else if (t.preset === 'vintage_film') {
+      finalBrightness *= 0.95;
+      finalContrast *= 1.1;
+      finalSaturation *= 0.85;
+      finalSepia = Math.max(finalSepia, 0.25);
+      finalTemp = 0.2;
+    }
+
+    // Prepare Uniform Data (80 bytes - aligned to 16 bytes for WebGPU)
     const uniformData = new Float32Array([
       this.width, // canvasResolution.x
       this.height, // canvasResolution.y
@@ -248,11 +279,15 @@ export class WebGPURenderer {
       scaleVal, // scale
       rotationVal, // rotation
       opacityVal, // opacity
-      brightVal, // brightness
-      contrastVal, // contrast
-      satVal, // saturation
-      vigVal, // vignette
-      0, // Padding
+      finalBrightness, // brightness
+      finalContrast, // contrast
+      finalSaturation, // saturation
+      finalVignette, // vignette
+      finalSepia, // sepia
+      finalTemp, // temperature
+      tint[0], // tint_r
+      tint[1], // tint_g
+      tint[2], // tint_b
     ]);
 
     const uniformBuffer = this.device.createBuffer({

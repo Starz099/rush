@@ -1,5 +1,5 @@
 use rush_db::models::asset::Asset;
-use rush_db::models::clip::{Clip, TimelineState, Track, Transform};
+use rush_db::models::clip::{Adjustments, Clip, TimelineState, Track, Transform};
 use rush_db::models::presets::TrackType;
 use serde_json::Value;
 use uuid::Uuid;
@@ -431,4 +431,74 @@ pub fn ripple_delete_clip(
         }
     });
     Ok(receipt.to_string())
+}
+
+pub fn update_adjustments(
+    args: &Value,
+    timeline_state: &mut TimelineState,
+) -> Result<String, String> {
+    let clip_id = args["clip_id"]
+        .as_str()
+        .ok_or_else(|| "Missing 'clip_id' argument".to_string())?;
+
+    let mut found = false;
+    let mut updated_adj = None;
+
+    for track in &mut timeline_state.tracks {
+        if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
+            let mut current = match clip.adjustments.take() {
+                Some(v) => v,
+                None => Adjustments::default(),
+            };
+
+            if let Some(val) = args.get("brightness").and_then(|v| v.as_f64()) {
+                current.brightness = val as f32;
+            }
+            if let Some(val) = args.get("contrast").and_then(|v| v.as_f64()) {
+                current.contrast = val as f32;
+            }
+            if let Some(val) = args.get("saturation").and_then(|v| v.as_f64()) {
+                current.saturation = val as f32;
+            }
+            if let Some(val) = args.get("vignette").and_then(|v| v.as_f64()) {
+                current.vignette = val as f32;
+            }
+            if let Some(val) = args.get("sepia").and_then(|v| v.as_f64()) {
+                current.sepia = val as f32;
+            }
+            if let Some(val) = args.get("temperature").and_then(|v| v.as_f64()) {
+                current.temperature = val as f32;
+            }
+            if let Some(val) = args.get("preset") {
+                current.preset = val.as_str().map(|s| s.to_string());
+            }
+            if let Some(val) = args.get("tint").and_then(|v| v.as_array()) {
+                let tint_vals: Vec<f32> = val
+                    .iter()
+                    .map(|v| v.as_f64().unwrap_or(1.0) as f32)
+                    .collect();
+                current.tint = Some(tint_vals);
+            }
+
+            updated_adj = Some(current.clone());
+            clip.adjustments = Some(current);
+            track.validate_and_sort_clips();
+            found = true;
+            break;
+        }
+    }
+
+    if found {
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "update_adjustments",
+            "receipt": {
+                "clip_id": clip_id,
+                "adjustments": updated_adj
+            }
+        });
+        Ok(receipt.to_string())
+    } else {
+        Err(format!("Clip '{}' not found in any track.", clip_id))
+    }
 }

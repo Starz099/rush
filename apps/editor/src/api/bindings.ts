@@ -132,6 +132,10 @@ export type Adjustments = {
   contrast: number | null;
   saturation: number | null;
   vignette: number | null;
+  sepia?: number | null;
+  temperature?: number | null;
+  preset?: string | null;
+  tint?: (number | null)[] | null;
 };
 
 export type Animatable<T> = {

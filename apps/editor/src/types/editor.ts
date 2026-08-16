@@ -1,1 +1,1 @@
-export type EditingTool = 'select' | 'split' | 'trim' | 'bg';
+export type EditingTool = 'select' | 'split' | 'trim' | 'bg' | 'color';
