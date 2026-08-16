@@ -3,8 +3,12 @@ use ort::{inputs, session::Session, value::Value};
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
 use uuid::Uuid;
+
+static CLIP_VISION_SESSION: OnceLock<Mutex<Session>> = OnceLock::new();
+
 #[derive(Debug, Clone)]
 pub struct LumaGrid {
     pub cells: [f32; 64],
@@ -59,11 +63,20 @@ pub fn extract_visual_storyboard(
     db_path: &Path,
     clip_model_path: &Path,
 ) -> Result<(), String> {
-    // Initialize the ONNX runtime session once
-    let mut session = Session::builder()
-        .map_err(|e| format!("Failed to create builder: {}", e))?
-        .commit_from_file(clip_model_path)
-        .map_err(|e| format!("Failed to load CLIP ONNX model: {}", e))?;
+    // Initialize the ONNX runtime session once (with CPU cache)
+    let session_mutex = if let Some(m) = CLIP_VISION_SESSION.get() {
+        m
+    } else {
+        let new_session = Session::builder()
+            .map_err(|e| format!("Failed to create builder: {}", e))?
+            .commit_from_file(clip_model_path)
+            .map_err(|e| format!("Failed to load CLIP ONNX model: {}", e))?;
+
+        let _ = CLIP_VISION_SESSION.set(Mutex::new(new_session));
+        CLIP_VISION_SESSION.get().unwrap()
+    };
+
+    let mut session = session_mutex.lock().map_err(|e| format!("Mutex lock failed: {}", e))?;
 
     // Setup temporary directory for extracted frames
     let temp_dir = std::env::temp_dir().join(format!("lumagrid_{}", asset_id));
@@ -179,7 +192,7 @@ pub fn extract_visual_storyboard(
             .map_err(|e| format!("Failed to insert storyboard keyframe: {}", e))?;
 
             // Compute the 512-dimension visual embedding using our ONNX session
-            let embedding = compute_image_embedding(path, &mut session)?;
+            let embedding = compute_image_embedding(path, &mut *session)?;
 
             // Convert the f32 vector into a little-endian byte blob (2048 bytes)
             let mut byte_blob = Vec::with_capacity(512 * 4);

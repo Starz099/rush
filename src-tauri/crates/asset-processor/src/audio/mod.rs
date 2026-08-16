@@ -82,6 +82,13 @@ pub fn transcribe_audio(
     params.set_translate(true);
     params.set_language(Some("en"));
 
+    // Configure multi-threaded transcription for CPU acceleration
+    let num_threads = std::thread::available_parallelism()
+        .map(|p| p.get() as i32)
+        .unwrap_or(4)
+        .min(8);
+    params.set_n_threads(num_threads);
+
     // 4. Run inference
     state
         .full(params, &samples)

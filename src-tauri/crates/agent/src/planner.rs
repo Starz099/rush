@@ -38,7 +38,7 @@ pub async fn run_planner(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .or_else(|| std::env::var("RUSH_LLM_MODEL").ok())
-        .unwrap_or_else(|| "nvidia/nemotron-3-ultra-550b-a55b:free".to_string());
+        .unwrap_or_else(|| "google/gemini-2.5-flash".to_string());
     let _ = app.emit(
         "agent_status",
         AgentStatusPayload {
@@ -127,7 +127,61 @@ pub async fn run_planner(
         ));
     }
 
-    let system_prompt = build_system_prompt(&registry_desc);
+    // Build dynamic workspace context
+    let mut project_context = format!(
+        "CURRENT PROJECT:\n- Name: \"{}\"\n- Viewport: {}x{}\n- Framerate: {} FPS\n\n",
+        project.name, project.viewport_width, project.viewport_height, project.framerate
+    );
+
+    project_context.push_str("AVAILABLE MEDIA ASSETS:\n");
+    if assets.is_empty() {
+        project_context.push_str("(No media assets imported yet)\n");
+    } else {
+        for asset in &assets {
+            let duration_ms = asset.duration_ms.unwrap_or(0);
+            let duration_sec = duration_ms as f64 / 1000.0;
+            let duration_frames = (duration_sec * project.framerate as f64).round() as i32;
+            project_context.push_str(&format!(
+                "- ID: \"{}\"\n  Name: \"{}\"\n  Type: \"{}\"\n  Duration: {:.2}s ({} frames)\n",
+                asset.id, asset.name, asset.media_type, duration_sec, duration_frames
+            ));
+        }
+    }
+
+    project_context.push_str("\nCURRENT TIMELINE STATE:\n");
+    if project.timeline_state.tracks.is_empty() {
+        project_context.push_str("(Timeline has no tracks)\n");
+    } else {
+        for track in &project.timeline_state.tracks {
+            let status_str = format!(
+                "ID: \"{}\", Type: \"{:?}\", Locked: {}, Muted: {}",
+                track.id, track.track_type, track.is_locked, track.is_muted
+            );
+            project_context.push_str(&format!("- Track \"{}\" ({}):\n", track.name, status_str));
+            if track.clips.is_empty() {
+                project_context.push_str("  (No clips on this track)\n");
+            } else {
+                for clip in &track.clips {
+                    let asset_name = assets
+                        .iter()
+                        .find(|a| Some(a.id.clone()) == clip.asset_id)
+                        .map(|a| a.name.as_str())
+                        .unwrap_or("unknown");
+                    project_context.push_str(&format!(
+                        "  * Clip ID: \"{}\"\n    Asset: \"{}\" (ID: \"{}\")\n    Timeline Range: frame {} to {}\n    Duration: {} frames\n",
+                        clip.id,
+                        asset_name,
+                        clip.asset_id.as_deref().unwrap_or("None"),
+                        clip.timeline_in,
+                        clip.timeline_out,
+                        clip.timeline_out - clip.timeline_in
+                    ));
+                }
+            }
+        }
+    }
+
+    let system_prompt = build_system_prompt(&registry_desc, &project_context);
 
     // 6. Build the message array for the multi-turn LLM completions call
     let mut messages = Vec::new();
@@ -136,11 +190,39 @@ pub async fn run_planner(
         "content": system_prompt
     }));
 
-    for msg in &history_messages {
+    // Find the message index corresponding to the start of the last 2 user turns
+    let mut user_turns_count = 0;
+    let mut cut_off_idx = 0;
+    for (i, msg) in history_messages.iter().enumerate().rev() {
+        if let rush_db::models::MessageAuthor::User = msg.role {
+            user_turns_count += 1;
+            if user_turns_count == 3 {
+                cut_off_idx = i;
+                break;
+            }
+        }
+    }
+
+    for (i, msg) in history_messages.iter().enumerate() {
         match &msg.role {
             rush_db::models::MessageAuthor::Tool => {
-                // Skip historical tool execution logs from past turns to prevent context bloat
-                continue;
+                // Keep tool execution logs only for the last 2 turns to prevent context bloat
+                if i < cut_off_idx {
+                    continue;
+                }
+
+                // Match tool message tags to roles
+                if msg.content.starts_with("● Tool Call:") {
+                    messages.push(serde_json::json!({
+                        "role": "assistant",
+                        "content": msg.content.clone()
+                    }));
+                } else {
+                    messages.push(serde_json::json!({
+                        "role": "user",
+                        "content": msg.content.clone()
+                    }));
+                }
             }
             rush_db::models::MessageAuthor::User => {
                 messages.push(serde_json::json!({
@@ -207,12 +289,11 @@ pub async fn run_planner(
             .trim()
             .to_string();
 
-        let json_res: Value = match serde_json::from_str(&cleaned_res) {
-            Ok(v) => v,
-            Err(e) => {
+        let json_res: Value = match extract_json(&cleaned_res) {
+            Some(v) => v,
+            None => {
                 println!(
-                    "[planner] Failed to parse JSON, treating response as plain text: {}",
-                    e
+                    "[planner] Failed to extract JSON, treating response as plain text."
                 );
                 serde_json::json!({
                     "status": "success",
@@ -239,6 +320,8 @@ pub async fn run_planner(
                 continue;
             }
             let mut feedback = Vec::new();
+            let mut temp_timeline = current_timeline.clone();
+            let mut transaction_failed = false;
 
             if let Some(calls_list) = calls {
                 for call in calls_list {
@@ -266,11 +349,32 @@ pub async fn run_planner(
                         );
                     }
 
+                    // If a previous tool in this turn failed, skip subsequent executions and log rollback status
+                    if transaction_failed {
+                        let rollback_msg = format!(
+                            "● Tool Result: Rolled Back (Skipped due to previous error in transaction)"
+                        );
+                        if let Ok(db) = db_state.db.lock() {
+                            let _ = crate::create_agent_message(
+                                &app,
+                                &db,
+                                &session_id,
+                                rush_db::models::MessageAuthor::Tool,
+                                &rollback_msg,
+                            );
+                        }
+                        feedback.push(format!(
+                            "Skipped: {} (rolled back due to previous transaction error)",
+                            tool_name
+                        ));
+                        continue;
+                    }
+
                     match execute_tool(
                         &app,
                         tool_name,
                         args,
-                        &mut current_timeline,
+                        &mut temp_timeline,
                         &assets,
                         &project,
                     )
@@ -290,6 +394,7 @@ pub async fn run_planner(
                             feedback.push(format!("Success: {}", msg));
                         }
                         Err(e) => {
+                            transaction_failed = true;
                             let result_msg = format!("● Tool Result: Error ({})", e);
                             if let Ok(db) = db_state.db.lock() {
                                 let _ = crate::create_agent_message(
@@ -306,21 +411,27 @@ pub async fn run_planner(
                 }
             }
 
-            // Save the updated timeline state back to the database
-            let db = state.db.lock().map_err(|e| e.to_string())?;
+            // Save the updated timeline state back to the database only if the transaction succeeded
+            if !transaction_failed {
+                current_timeline = temp_timeline;
+                let db = state.db.lock().map_err(|e| e.to_string())?;
 
-            for track in &mut current_timeline.tracks {
-                track.validate_and_sort_clips();
+                for track in &mut current_timeline.tracks {
+                    track.validate_and_sort_clips();
+                }
+
+                let timeline_json =
+                    serde_json::to_string(&current_timeline).map_err(|e| e.to_string())?;
+                db.execute(
+                    "UPDATE projects SET timeline_state = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+                    (&timeline_json, &project_id),
+                )
+                .map_err(|e| e.to_string())?;
+                drop(db);
+                println!("[planner] Transaction committed successfully to database.");
+            } else {
+                println!("[planner] Transaction failed. Rolled back all changes from current turn.");
             }
-
-            let timeline_json =
-                serde_json::to_string(&current_timeline).map_err(|e| e.to_string())?;
-            db.execute(
-                "UPDATE projects SET timeline_state = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-                (&timeline_json, &project_id),
-            )
-            .map_err(|e| e.to_string())?;
-            drop(db);
 
             let feedback_str = feedback.join("\n");
             println!("[planner] Tool execution feedback: {}", feedback_str);
@@ -394,4 +505,17 @@ pub async fn run_planner(
     );
 
     Ok(final_response)
+}
+
+fn extract_json(text: &str) -> Option<Value> {
+    if let Some(start_idx) = text.find('{') {
+        if let Some(end_idx) = text.rfind('}') {
+            if end_idx > start_idx {
+                if let Ok(json_val) = serde_json::from_str::<Value>(&text[start_idx..=end_idx]) {
+                    return Some(json_val);
+                }
+            }
+        }
+    }
+    None
 }

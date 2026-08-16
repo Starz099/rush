@@ -31,7 +31,14 @@ pub fn set_background(args: &Value, timeline_state: &mut TimelineState) -> Resul
         blur_value: blur,
     });
 
-    Ok("Successfully updated viewport background settings.".to_string())
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "set_background",
+        "receipt": {
+            "blur": blur
+        }
+    });
+    Ok(receipt.to_string())
 }
 
 pub fn set_playhead(args: &Value, timeline_state: &mut TimelineState) -> Result<String, String> {
@@ -40,10 +47,14 @@ pub fn set_playhead(args: &Value, timeline_state: &mut TimelineState) -> Result<
         .ok_or_else(|| "Missing 'position' argument".to_string())? as i32;
 
     timeline_state.playhead_position = position;
-    Ok(format!(
-        "Successfully moved playhead to frame {}.",
-        position
-    ))
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "set_playhead",
+        "receipt": {
+            "position": position
+        }
+    });
+    Ok(receipt.to_string())
 }
 
 pub fn mute_track(args: &Value, timeline_state: &mut TimelineState) -> Result<String, String> {
@@ -56,8 +67,15 @@ pub fn mute_track(args: &Value, timeline_state: &mut TimelineState) -> Result<St
 
     if let Some(track) = timeline_state.tracks.iter_mut().find(|t| t.id == track_id) {
         track.is_muted = value;
-        let status = if value { "muted" } else { "unmuted" };
-        Ok(format!("Successfully {} track '{}'.", status, track_id))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "mute_track",
+            "receipt": {
+                "track_id": track_id,
+                "is_muted": value
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!("Track '{}' not found.", track_id))
     }
@@ -73,8 +91,15 @@ pub fn lock_track(args: &Value, timeline_state: &mut TimelineState) -> Result<St
 
     if let Some(track) = timeline_state.tracks.iter_mut().find(|t| t.id == track_id) {
         track.is_locked = value;
-        let status = if value { "locked" } else { "unlocked" };
-        Ok(format!("Successfully {} track '{}'.", status, track_id))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "lock_track",
+            "receipt": {
+                "track_id": track_id,
+                "is_locked": value
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!("Track '{}' not found.", track_id))
     }
