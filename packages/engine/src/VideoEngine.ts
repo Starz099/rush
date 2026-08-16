@@ -23,6 +23,10 @@ export function evaluateTransform(
       contrast: adjustments.contrast ?? 1.0,
       saturation: adjustments.saturation ?? 1.0,
       vignette: adjustments.vignette ?? 0.0,
+      sepia: adjustments.sepia ?? 0.0,
+      temperature: adjustments.temperature ?? 0.0,
+      preset: adjustments.preset ?? 'none',
+      tint: adjustments.tint ?? [1.0, 1.0, 1.0],
     };
   }
 
@@ -39,6 +43,10 @@ export function evaluateTransform(
   const contrast = adjustments.contrast ?? 1.0;
   const saturation = adjustments.saturation ?? 1.0;
   const vignette = adjustments.vignette ?? 0.0;
+  const sepia = adjustments.sepia ?? 0.0;
+  const temperature = adjustments.temperature ?? 0.0;
+  const preset = adjustments.preset ?? 'none';
+  const tint = adjustments.tint ?? [1.0, 1.0, 1.0];
 
   return {
     x,
@@ -53,6 +61,10 @@ export function evaluateTransform(
     contrast,
     saturation,
     vignette,
+    sepia,
+    temperature,
+    preset,
+    tint,
   };
 }
 

@@ -120,7 +120,20 @@ Use these to perform editing actions.
      - `clip_id` (string, required): The ID of the clip to remove.
    - Signature: `ripple_delete_clip(clip_id)`
 
-17. `update_transform`
+17. `update_adjustments`
+    - Description: Adjusts cinematic color grading coefficients, color temperature, vignette, sepia, or preset film filters on a clip.
+    - Parameters:
+      - `clip_id` (string, required): The ID of the clip to adjust.
+      - `brightness` (number, optional): Exposure multiplier (0.5 to 2.0).
+      - `contrast` (number, optional): Contrast multiplier (0.5 to 2.0).
+      - `saturation` (number, optional): Saturation multiplier (0.0 to 2.0).
+      - `vignette` (number, optional): Vignette intensity (0.0 to 1.0).
+      - `sepia` (number, optional): Sepia aging filter blend (0.0 to 1.0).
+      - `temperature` (number, optional): Temperature shift (-1.0 to 1.0, cold to warm).
+      - `preset` (string, optional): Cinema filter preset name: "classic_pop", "cinematic_dark", "cyberpunk_neon", "vintage_film".
+    - Signature: `update_adjustments(clip_id, brightness, contrast, saturation, vignette, sepia, temperature, preset)`
+
+18. `update_transform`
     - Description: Adjusts scale and 2D translation offsets (x, y) of a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -129,7 +142,7 @@ Use these to perform editing actions.
       - `scale` (number, optional): Visual size multiplier (e.g. 1.2).
     - Signature: `update_transform(clip_id, x, y, scale)`
 
-18. `add_effect`
+19. `add_effect`
     - Description: Adds a zoom or speed adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
@@ -139,14 +152,14 @@ Use these to perform editing actions.
         - For "speed": `{ "speed_factor": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
-19. `remove_effect`
+20. `remove_effect`
     - Description: Removes an existing effect or speed adjustment from a clip.
     - Parameters:
       - `clip_id` (string, required): The ID of the clip.
       - `effect_type` (string, required): The effect type to remove ("zoom", "speed").
     - Signature: `remove_effect(clip_id, effect_type)`
 
-20. `set_background`
+21. `set_background`
     - Description: Sets the canvas background style.
     - Parameters:
       - `color_hex` (string, optional): Hex code for solid background (e.g. "#FF0000").
@@ -154,13 +167,13 @@ Use these to perform editing actions.
       - `blur` (number, optional): Blur filter radius.
     - Signature: `set_background(color_hex, gradient_colors, blur)`
 
-21. `set_playhead`
+22. `set_playhead`
     - Description: Changes the current timeline position of the playback cursor.
     - Parameters:
       - `position` (number, required): Frame number.
     - Signature: `set_playhead(position)`
 
-22. `mute_track` / `lock_track`
+23. `mute_track` / `lock_track`
     - Description: Mutes or locks a track.
     - Parameters:
       - `track_id` (string, required): Track ID.

@@ -7,6 +7,7 @@ import {
   SparkleIcon,
   TimerIcon,
   TextTIcon,
+  SlidersIcon,
 } from '@phosphor-icons/react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useProjectStore } from '@/store/projectStore';
@@ -15,6 +16,7 @@ import { projectApi } from '@/api/project';
 import type { ToolDescriptor, EffectDescriptor } from '@/api/bindings';
 import type { EditingTool } from '@/types/editor';
 import { BackgroundTool } from './tools/background/BackgroundTool';
+import { ColorTool } from './tools/color/ColorTool';
 
 /**
  * Fallback tools list to maintain UI functionality if backend fetch fails.
@@ -37,6 +39,12 @@ const DEFAULT_TOOLS = [
     label: 'Trim Tool',
     description:
       'Drag the edge of any clip on the timeline to crop its duration.',
+  },
+  {
+    name: 'color',
+    label: 'Color Grading',
+    description:
+      'Cinematic color presets, filters, vignettes, sepia, and temperature adjustments.',
   },
   {
     name: 'bg',
@@ -65,6 +73,11 @@ const TOOL_STYLES: Record<
   },
   trim: {
     icon: CropIcon,
+    colorClass: 'border-primary bg-primary/10 text-white',
+    iconClass: 'text-primary',
+  },
+  color: {
+    icon: SlidersIcon,
     colorClass: 'border-primary bg-primary/10 text-white',
     iconClass: 'text-primary',
   },
@@ -114,6 +127,10 @@ export const ToolsTab = () => {
 
   if (activeTool === 'bg') {
     return <BackgroundTool />;
+  }
+
+  if (activeTool === 'color') {
+    return <ColorTool />;
   }
 
   const tools = registry?.tools || DEFAULT_TOOLS;

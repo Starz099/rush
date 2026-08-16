@@ -151,6 +151,13 @@ pub fn get_editing_registry() -> EditingRegistry {
                     .to_string(),
             },
             ToolDescriptor {
+                name: "color".to_string(),
+                label: "Color Grading".to_string(),
+                description:
+                    "Cinematic color presets, filters, vignettes, sepia, and temperature adjustments."
+                        .to_string(),
+            },
+            ToolDescriptor {
                 name: "bg".to_string(),
                 label: "Background Config".to_string(),
                 description:

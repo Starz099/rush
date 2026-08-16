@@ -10,7 +10,11 @@ struct Uniforms {
     contrast: f32,
     saturation: f32,
     vignette: f32,
-    padding: f32,
+    sepia: f32,
+    temperature: f32,
+    tint_r: f32,
+    tint_g: f32,
+    tint_b: f32,
 }
 
 struct VertexOutput {
@@ -74,7 +78,7 @@ fn vs_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 fn fs_main(@location(0) uv: vec2<f32>, @location(1) opacity: f32) -> @location(0) vec4<f32> {
     var color = textureSampleBaseClampToEdge(myTexture, mySampler, uv);
     
-    // Brightness
+    // Brightness (Exposure)
     color = vec4<f32>(color.rgb * uniforms.brightness, color.a);
     
     // Contrast
@@ -85,6 +89,30 @@ fn fs_main(@location(0) uv: vec2<f32>, @location(1) opacity: f32) -> @location(0
     let gray = vec3<f32>(luma);
     color = vec4<f32>(mix(gray, color.rgb, uniforms.saturation), color.a);
     
+    // Color Temperature (Warm Amber / Cold Blue)
+    let temp_offset = uniforms.temperature * 0.12;
+    color = vec4<f32>(
+        color.r + temp_offset,
+        color.g,
+        color.b - temp_offset,
+        color.a
+    );
+
+    // Sepia Filter
+    let sepia_r = color.r * 0.393 + color.g * 0.769 + color.b * 0.189;
+    let sepia_g = color.r * 0.349 + color.g * 0.686 + color.b * 0.168;
+    let sepia_b = color.r * 0.272 + color.g * 0.534 + color.b * 0.131;
+    let sepia_color = vec3<f32>(sepia_r, sepia_g, sepia_b);
+    color = vec4<f32>(mix(color.rgb, sepia_color, uniforms.sepia), color.a);
+
+    // RGB Tint
+    color = vec4<f32>(
+        color.r * uniforms.tint_r,
+        color.g * uniforms.tint_g,
+        color.b * uniforms.tint_b,
+        color.a
+    );
+
     // Apply Vignette (darken corners based on distance from center UV)
     let dist = distance(uv, vec2<f32>(0.5, 0.5));
     let vig = smoothstep(0.8, 0.4, dist * uniforms.vignette);

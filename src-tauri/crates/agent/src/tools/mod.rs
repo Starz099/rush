@@ -39,6 +39,7 @@ pub async fn execute_tool(
         "split_clip" => timeline::split_clip(&args, timeline_state),
         "close_timeline_gaps" => timeline::close_timeline_gaps(&args, timeline_state),
         "ripple_delete_clip" => timeline::ripple_delete_clip(&args, timeline_state),
+        "update_adjustments" => timeline::update_adjustments(&args, timeline_state),
 
         // Effects / Spatial Tools
         "update_transform" => effects::update_transform(&args, timeline_state),
