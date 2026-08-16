@@ -56,11 +56,12 @@ pub fn add_clip(
         &mut timeline_state.tracks[len - 1]
     };
 
+    let clip_out = timeline_in + duration_frames;
     let clip = Clip {
         id: Uuid::new_v4().to_string(),
         asset_id: Some(asset_id.to_string()),
         timeline_in,
-        timeline_out: timeline_in + duration_frames,
+        timeline_out: clip_out,
         source_in: 0,
         source_out: duration_frames,
         transform: Some(Transform::default()),
@@ -74,10 +75,18 @@ pub fn add_clip(
     track.clips.push(clip.clone());
     track.validate_and_sort_clips();
 
-    Ok(format!(
-        "Successfully added clip '{}' (Asset: '{}') to track '{}' at frame {} with duration {} frames.",
-        clip.id, asset.name, track.name, timeline_in, duration_frames
-    ))
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "add_clip",
+        "receipt": {
+            "clip_id": clip.id,
+            "track_id": track.id,
+            "timeline_in": timeline_in,
+            "timeline_out": clip_out
+        }
+    });
+
+    Ok(receipt.to_string())
 }
 
 pub fn delete_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<String, String> {
@@ -96,10 +105,14 @@ pub fn delete_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<S
     }
 
     if found {
-        Ok(format!(
-            "Successfully deleted clip '{}' from timeline.",
-            clip_id
-        ))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "delete_clip",
+            "receipt": {
+                "clip_id": clip_id
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!("Clip '{}' not found in any track.", clip_id))
     }
@@ -142,22 +155,41 @@ pub fn move_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<Str
             .position(|t| t.id == target_track_id)
             .ok_or_else(|| format!("Target track '{}' not found.", target_track_id))?;
         let target_track = &mut timeline_state.tracks[target_idx];
+        let clip_out = clip.timeline_out;
         target_track.clips.push(clip);
         target_track.validate_and_sort_clips();
-        Ok(format!(
-            "Successfully moved clip '{}' to track '{}' at frame position {}.",
-            clip_id, target_track_id, new_timeline_in
-        ))
+
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "move_clip",
+            "receipt": {
+                "clip_id": clip_id,
+                "track_id": target_track_id,
+                "timeline_in": new_timeline_in,
+                "timeline_out": clip_out
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         // Put back in original track at new position
         let source_idx = source_track_idx.ok_or_else(|| "Source track idx mismatch".to_string())?;
         let source_track = &mut timeline_state.tracks[source_idx];
+        let track_id = source_track.id.clone();
+        let clip_out = clip.timeline_out;
         source_track.clips.push(clip);
         source_track.validate_and_sort_clips();
-        Ok(format!(
-            "Successfully moved clip '{}' to timeline frame position {}.",
-            clip_id, new_timeline_in
-        ))
+
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "move_clip",
+            "receipt": {
+                "clip_id": clip_id,
+                "track_id": track_id,
+                "timeline_in": new_timeline_in,
+                "timeline_out": clip_out
+            }
+        });
+        Ok(receipt.to_string())
     }
 }
 
@@ -170,8 +202,9 @@ pub fn trim_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<Str
     let source_in = args["source_in"].as_i64();
     let source_out = args["source_out"].as_i64();
 
-    let mut found = false;
+    let mut receipt_json = None;
     for track in &mut timeline_state.tracks {
+        let mut found_clip = None;
         if let Some(clip) = track.clips.iter_mut().find(|c| c.id == clip_id) {
             if let Some(val) = timeline_in {
                 clip.timeline_in = val as i32;
@@ -185,14 +218,33 @@ pub fn trim_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<Str
             if let Some(val) = source_out {
                 clip.source_out = val as i32;
             }
+            found_clip = Some((
+                clip.timeline_in,
+                clip.timeline_out,
+                clip.source_in,
+                clip.source_out,
+            ));
+        }
+
+        if let Some((t_in, t_out, s_in, s_out)) = found_clip {
             track.validate_and_sort_clips();
-            found = true;
+            receipt_json = Some(serde_json::json!({
+                "status": "success",
+                "tool": "trim_clip",
+                "receipt": {
+                    "clip_id": clip_id,
+                    "timeline_in": t_in,
+                    "timeline_out": t_out,
+                    "source_in": s_in,
+                    "source_out": s_out
+                }
+            }));
             break;
         }
     }
 
-    if found {
-        Ok(format!("Successfully trimmed clip '{}'.", clip_id))
+    if let Some(receipt) = receipt_json {
+        Ok(receipt.to_string())
     } else {
         Err(format!("Clip '{}' not found in any track.", clip_id))
     }
@@ -252,10 +304,17 @@ pub fn split_clip(args: &Value, timeline_state: &mut TimelineState) -> Result<St
     track.clips.push(clip_b.clone());
     track.validate_and_sort_clips();
 
-    Ok(format!(
-        "Successfully split clip '{}' at frame {} into clip '{}' and clip '{}'.",
-        clip_id, split_frame, clip_a.id, clip_b.id
-    ))
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "split_clip",
+        "receipt": {
+            "original_clip_id": clip_id,
+            "split_frame": split_frame,
+            "left_clip_id": clip_a.id,
+            "right_clip_id": clip_b.id
+        }
+    });
+    Ok(receipt.to_string())
 }
 
 pub fn close_timeline_gaps(
@@ -307,10 +366,16 @@ pub fn close_timeline_gaps(
 
     track.validate_and_sort_clips();
 
-    Ok(format!(
-        "Successfully closed gaps on track '{}'. Adjusted {} clips. Track is now gapless starting from frame {}.",
-        track.name, changes_count, if preserve_start { "original start" } else { "0" }
-    ))
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "close_timeline_gaps",
+        "receipt": {
+            "track_id": track_id,
+            "clips_adjusted": changes_count,
+            "preserve_start": preserve_start
+        }
+    });
+    Ok(receipt.to_string())
 }
 
 pub fn ripple_delete_clip(
@@ -355,8 +420,15 @@ pub fn ripple_delete_clip(
 
     track.validate_and_sort_clips();
 
-    Ok(format!(
-        "Successfully ripple deleted clip '{}' from track '{}'. Shifted {} subsequent clips left by {} frames to close the gap.",
-        clip_id, track.name, shift_count, deleted_clip_duration
-    ))
+    let receipt = serde_json::json!({
+        "status": "success",
+        "tool": "ripple_delete_clip",
+        "receipt": {
+            "deleted_clip_id": clip_id,
+            "track_id": track.id,
+            "clips_shifted": shift_count,
+            "shift_duration_frames": deleted_clip_duration
+        }
+    });
+    Ok(receipt.to_string())
 }

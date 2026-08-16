@@ -32,10 +32,17 @@ pub fn update_transform(
     }
 
     if found {
-        Ok(format!(
-            "Successfully updated spatial transform for clip '{}'.",
-            clip_id
-        ))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "update_transform",
+            "receipt": {
+                "clip_id": clip_id,
+                "x": x,
+                "y": y,
+                "scale": scale
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!("Clip '{}' not found.", clip_id))
     }
@@ -83,10 +90,15 @@ pub fn add_effect(args: &Value, timeline_state: &mut TimelineState) -> Result<St
     }
 
     if found {
-        Ok(format!(
-            "Successfully applied effect '{}' to clip '{}'.",
-            effect_type, clip_id
-        ))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "add_effect",
+            "receipt": {
+                "clip_id": clip_id,
+                "effect_type": effect_type_lower
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!("Clip '{}' not found.", clip_id))
     }
@@ -126,10 +138,15 @@ pub fn remove_effect(args: &Value, timeline_state: &mut TimelineState) -> Result
     }
 
     if found {
-        Ok(format!(
-            "Successfully removed effect '{}' from clip '{}'.",
-            effect_type, clip_id
-        ))
+        let receipt = serde_json::json!({
+            "status": "success",
+            "tool": "remove_effect",
+            "receipt": {
+                "clip_id": clip_id,
+                "effect_type": effect_type
+            }
+        });
+        Ok(receipt.to_string())
     } else {
         Err(format!(
             "Effect '{}' not found or clip '{}' doesn't exist.",

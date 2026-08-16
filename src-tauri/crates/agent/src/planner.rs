@@ -320,6 +320,8 @@ pub async fn run_planner(
                 continue;
             }
             let mut feedback = Vec::new();
+            let mut temp_timeline = current_timeline.clone();
+            let mut transaction_failed = false;
 
             if let Some(calls_list) = calls {
                 for call in calls_list {
@@ -347,11 +349,32 @@ pub async fn run_planner(
                         );
                     }
 
+                    // If a previous tool in this turn failed, skip subsequent executions and log rollback status
+                    if transaction_failed {
+                        let rollback_msg = format!(
+                            "● Tool Result: Rolled Back (Skipped due to previous error in transaction)"
+                        );
+                        if let Ok(db) = db_state.db.lock() {
+                            let _ = crate::create_agent_message(
+                                &app,
+                                &db,
+                                &session_id,
+                                rush_db::models::MessageAuthor::Tool,
+                                &rollback_msg,
+                            );
+                        }
+                        feedback.push(format!(
+                            "Skipped: {} (rolled back due to previous transaction error)",
+                            tool_name
+                        ));
+                        continue;
+                    }
+
                     match execute_tool(
                         &app,
                         tool_name,
                         args,
-                        &mut current_timeline,
+                        &mut temp_timeline,
                         &assets,
                         &project,
                     )
@@ -371,6 +394,7 @@ pub async fn run_planner(
                             feedback.push(format!("Success: {}", msg));
                         }
                         Err(e) => {
+                            transaction_failed = true;
                             let result_msg = format!("● Tool Result: Error ({})", e);
                             if let Ok(db) = db_state.db.lock() {
                                 let _ = crate::create_agent_message(
@@ -387,21 +411,27 @@ pub async fn run_planner(
                 }
             }
 
-            // Save the updated timeline state back to the database
-            let db = state.db.lock().map_err(|e| e.to_string())?;
+            // Save the updated timeline state back to the database only if the transaction succeeded
+            if !transaction_failed {
+                current_timeline = temp_timeline;
+                let db = state.db.lock().map_err(|e| e.to_string())?;
 
-            for track in &mut current_timeline.tracks {
-                track.validate_and_sort_clips();
+                for track in &mut current_timeline.tracks {
+                    track.validate_and_sort_clips();
+                }
+
+                let timeline_json =
+                    serde_json::to_string(&current_timeline).map_err(|e| e.to_string())?;
+                db.execute(
+                    "UPDATE projects SET timeline_state = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+                    (&timeline_json, &project_id),
+                )
+                .map_err(|e| e.to_string())?;
+                drop(db);
+                println!("[planner] Transaction committed successfully to database.");
+            } else {
+                println!("[planner] Transaction failed. Rolled back all changes from current turn.");
             }
-
-            let timeline_json =
-                serde_json::to_string(&current_timeline).map_err(|e| e.to_string())?;
-            db.execute(
-                "UPDATE projects SET timeline_state = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
-                (&timeline_json, &project_id),
-            )
-            .map_err(|e| e.to_string())?;
-            drop(db);
 
             let feedback_str = feedback.join("\n");
             println!("[planner] Tool execution feedback: {}", feedback_str);
