@@ -143,13 +143,14 @@ Use these to perform editing actions.
     - Signature: `update_transform(clip_id, x, y, scale)`
 
 19. `add_effect`
-    - Description: Adds a zoom or speed adjustment to a clip.
+    - Description: Adds a zoom, speed, or text effect style adjustment to a clip.
     - Parameters:
       - `clip_id` (string, required): Clip ID.
-      - `effect_type` (string, required): One of: "zoom", "speed".
+      - `effect_type` (string, required): One of: "zoom", "speed", "text".
       - `config` (object, required): Configurations map:
         - For "zoom": `{ "start_scale": float, "end_scale": float, "center_x": float, "center_y": float, "ease_curve": "ease_in"|"ease_out"|"linear" }`
         - For "speed": `{ "speed_factor": float }`
+        - For "text": `{ "text": string, "font_family": string, "font_size": integer, "color": string, "stroke_enable": boolean, "stroke_color": string, "stroke_width": float, "letter_spacing": integer, "position": { "x": float, "y": float }, "bg_enable": boolean, "bg_color": string, "bg_opacity": float }`
     - Signature: `add_effect(clip_id, effect_type, config)`
 
 20. `remove_effect`
